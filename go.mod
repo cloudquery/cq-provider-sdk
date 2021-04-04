@@ -23,4 +23,4 @@ require (
 	gopkg.in/yaml.v2 v2.3.0
 )
 
-replace github.com/thoas/go-funk => github.com/cloudquery/go-funk v0.8.1-0.20210404101428-0ba25fc395fb
+replace github.com/thoas/go-funk => github.com/cloudquery/go-funk v0.8.1-0.20210404121448-4d824a7058bc

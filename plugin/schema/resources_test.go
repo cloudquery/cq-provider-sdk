@@ -45,13 +45,13 @@ var testZeroTable = &Table{
 }
 
 type zeroValuedStruct struct {
-	ZeroBool bool `default:"false"`
-	ZeroInt int `default:"0"`
-	NotZeroInt int `default:"5"`
-	NotZeroBool bool `default:"true"`
-	ZeroIntPtr *int `default:"0"`
-	NotZeroIntPtr *int `default:"5"`
-	ZeroString string `default:""`
+	ZeroBool      bool   `default:"false"`
+	ZeroInt       int    `default:"0"`
+	NotZeroInt    int    `default:"5"`
+	NotZeroBool   bool   `default:"true"`
+	ZeroIntPtr    *int   `default:"0"`
+	NotZeroIntPtr *int   `default:"5"`
+	ZeroString    string `default:""`
 }
 
 func TestResourceColumns(t *testing.T) {
@@ -122,7 +122,7 @@ func TestResourceResolveColumns(t *testing.T) {
 		r = NewResourceData(testZeroTable, nil, object)
 		err = exec.resolveColumns(context.TODO(), nil, r, testZeroTable.Columns)
 		assert.Nil(t, err)
-		v, err = r.Values()
+		v, _ = r.Values()
 		assert.Equal(t, nil, v[5])
 	})
 
