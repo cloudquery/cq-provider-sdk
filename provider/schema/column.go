@@ -3,10 +3,11 @@ package schema
 import (
 	"context"
 	"fmt"
-	"github.com/cloudquery/go-funk"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/cloudquery/go-funk"
 
 	gofrs "github.com/gofrs/uuid"
 	"github.com/google/uuid"
