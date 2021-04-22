@@ -8,7 +8,7 @@ require (
 	github.com/creasty/defaults v1.5.1
 	github.com/georgysavva/scany v0.2.7
 	github.com/google/uuid v1.2.0
-	github.com/hashicorp/go-hclog v0.15.0
+	github.com/hashicorp/go-hclog v0.16.0
 	github.com/huandu/go-sqlbuilder v1.12.0
 	github.com/iancoleman/strcase v0.1.2
 	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
