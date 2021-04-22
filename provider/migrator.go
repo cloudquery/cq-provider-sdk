@@ -1,16 +1,17 @@
-package plugin
+package provider
 
 import (
 	"context"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/georgysavva/scany/pgxscan"
 
 	"github.com/cloudquery/go-funk"
 
-	"github.com/cloudquery/cq-provider-sdk/plugin/schema"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/hashicorp/go-hclog"
 	"github.com/huandu/go-sqlbuilder"
 )
@@ -47,8 +48,11 @@ func (m Migrator) upgradeTable(ctx context.Context, t *schema.Table) error {
 	columnsToAdd, _ := funk.DifferenceString(t.ColumnNames(), existingColumns.Columns)
 	for _, d := range columnsToAdd {
 		m.log.Debug("adding column", "column", d)
-
 		col := t.Column(d)
+		if col == nil {
+			m.log.Warn("column missing from table, not adding it", "table", t.Name, "column", d)
+			continue
+		}
 		sql, _ := sqlbuilder.Buildf(addColumnToTable, sqlbuilder.Raw(t.Name), sqlbuilder.Raw(d), sqlbuilder.Raw(schema.GetPgTypeFromType(col.Type))).BuildWithFlavor(sqlbuilder.PostgreSQL)
 		if err := m.db.Exec(ctx, sql); err != nil {
 			return err
@@ -96,7 +100,7 @@ func GetFunctionName(i interface{}) string {
 
 func (m Migrator) buildColumns(ctb *sqlbuilder.CreateTableBuilder, cc []schema.Column, parent *schema.Table) {
 	for _, c := range cc {
-		defs := []string{c.Name, schema.GetPgTypeFromType(c.Type)}
+		defs := []string{strconv.Quote(c.Name), schema.GetPgTypeFromType(c.Type)}
 		// TODO: This is a bit ugly. Think of a better way
 		if strings.HasSuffix(GetFunctionName(c.Resolver), "ParentIdResolver") {
 			defs = append(defs, "REFERENCES", parent.Name, "ON DELETE CASCADE")
