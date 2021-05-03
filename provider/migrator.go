@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -20,14 +22,27 @@ const queryTableColumns = `SELECT array_agg(column_name::text) as columns FROM i
 
 const addColumnToTable = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %v %v;`
 
+const maxTableName = 63
+
+const maxColumnName = 63
+
 // Migrator handles creation of schema.Table in database if they don't exist
 type Migrator struct {
-	db  schema.Database
-	log hclog.Logger
+	db         schema.Database
+	log        hclog.Logger
+	validators []TableValidator
 }
 
 func NewMigrator(db schema.Database, log hclog.Logger) Migrator {
-	return Migrator{db, log}
+	return Migrator{
+		db,
+		log,
+		[]TableValidator{
+			LengthTableValidator{
+				log: log,
+			},
+		},
+	}
 }
 
 func (m Migrator) upgradeTable(ctx context.Context, t *schema.Table) error {
@@ -108,4 +123,34 @@ func (m Migrator) buildColumns(ctb *sqlbuilder.CreateTableBuilder, cc []schema.C
 
 		ctb.Define(defs...)
 	}
+}
+
+func (m Migrator) ValidateTable(t *schema.Table) error {
+	for _, validator := range m.validators {
+		return validator.Validate(t)
+	}
+	return nil
+}
+
+type TableValidator interface {
+	Validate(t *schema.Table) error
+}
+
+type LengthTableValidator struct {
+	log hclog.Logger
+}
+
+func (tv LengthTableValidator) Validate(t *schema.Table) error {
+	if len(t.Name) > maxTableName {
+		tv.log.Error("table name has exceeded max length", "table", t.Name)
+		return errors.New("table name has exceeded max length")
+	}
+
+	for _, col := range t.ColumnNames() {
+		if len(col) > maxColumnName {
+			tv.log.Error("column name has exceeded max length", "column", col)
+			return errors.New(fmt.Sprintf("column name %s has exceeded max length", col))
+		}
+	}
+	return nil
 }
