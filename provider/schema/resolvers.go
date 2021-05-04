@@ -9,13 +9,19 @@ import (
 
 func PathResolver(path string) ColumnResolver {
 	return func(_ context.Context, meta ClientMeta, r *Resource, c Column) error {
-		r.Set(c.Name, funk.GetAllowZero(r.Item, path))
+		err := r.Set(c.Name, funk.GetAllowZero(r.Item, path))
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 }
 
 func ParentIdResolver(_ context.Context, _ ClientMeta, r *Resource, c Column) error {
-	r.Set(c.Name, r.Parent.Id())
+	err := r.Set(c.Name, r.Parent.Id())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

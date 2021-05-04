@@ -62,7 +62,7 @@ func (p *Provider) Init(_ string, dsn string, _ bool) error {
 	for _, t := range p.ResourceMap {
 
 		// validate table
-		validationErr := m.ValidateTable(t)
+		validationErr := schema.ValidateTable(t)
 		if validationErr != nil {
 			p.Logger.Error("table validation failed", "table", t.Name, "error", err)
 			return err
