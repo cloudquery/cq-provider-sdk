@@ -77,7 +77,8 @@ func TestResourceColumns(t *testing.T) {
 	assert.Equal(t, v, []interface{}{r.id, "test", "name_no_prefix", "prefix_name"})
 
 	// check non existing col
-	assert.Panics(t, func() { r.Set("non_exist_col", "test") })
+	err = r.Set("non_exist_col", "test")
+	assert.Error(t, err)
 }
 
 func TestResourceResolveColumns(t *testing.T) {
