@@ -4,9 +4,9 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/cloudquery/go-funk"
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
+	"github.com/thoas/go-funk"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -161,7 +161,7 @@ func (e ExecutionData) resolveColumns(ctx context.Context, meta ClientMeta, reso
 		}
 		meta.Logger().Trace("resolving column value", "column", c.Name)
 		// base use case: try to get column with CamelCase name
-		v := funk.GetAllowZero(resource.Item, strcase.ToCamel(c.Name))
+		v := funk.Get(resource.Item, strcase.ToCamel(c.Name), funk.WithAllowZero())
 		if v == nil {
 			meta.Logger().Trace("using column default value", "column", c.Name, "default", c.Default)
 			v = c.Default
