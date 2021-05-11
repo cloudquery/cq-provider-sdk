@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/faker/v3"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/tmccombs/hcl2json/convert"
-	"os"
-	"testing"
 
 	"github.com/georgysavva/scany/pgxscan"
 
@@ -45,7 +46,7 @@ func TestResource(t *testing.T, providerCreator func() *provider.Provider, resou
 	f.Body().AppendBlock(gohcl.EncodeAsBlock(resource.Config, "configuration"))
 	data, err := convert.Bytes(f.Bytes(), "config.json", convert.Options{})
 	hack := map[string]interface{}{}
-	json.Unmarshal(data, &hack)
+	_ = json.Unmarshal(data, &hack)
 	data, _ = json.Marshal(hack["configuration"].([]interface{})[0])
 	assert.Nil(t, err)
 

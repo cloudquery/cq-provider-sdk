@@ -34,7 +34,7 @@ require (
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/thoas/go-funk v0.8.1-0.20210502090430-efae847b30ab
-	github.com/tmccombs/hcl2json v0.3.3 // indirect
+	github.com/tmccombs/hcl2json v0.3.3
 	github.com/zclconf/go-cty v1.8.3 // indirect
 	golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf // indirect
 	golang.org/x/net v0.0.0-20210510120150-4163338589ed // indirect
