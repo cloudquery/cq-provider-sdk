@@ -8,10 +8,10 @@ require (
 	github.com/creasty/defaults v1.5.1
 	github.com/georgysavva/scany v0.2.7
 	github.com/gofrs/uuid v4.0.0+incompatible
-	github.com/golang/protobuf v1.5.0
 	github.com/google/uuid v1.2.0
 	github.com/hashicorp/go-hclog v0.16.0
 	github.com/hashicorp/go-plugin v1.4.1
+	github.com/hashicorp/hcl/v2 v2.10.0
 	github.com/huandu/go-sqlbuilder v1.12.0
 	github.com/iancoleman/strcase v0.1.2
 	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
@@ -25,5 +25,4 @@ require (
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/grpc v1.37.0
 	google.golang.org/protobuf v1.26.0
-	gopkg.in/yaml.v2 v2.3.0
 )
