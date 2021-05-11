@@ -2,8 +2,9 @@ package schema
 
 import (
 	"context"
-	"github.com/stretchr/testify/mock"
 	"testing"
+
+	"github.com/stretchr/testify/mock"
 
 	"github.com/cloudquery/cq-provider-sdk/logging"
 	"github.com/creasty/defaults"
