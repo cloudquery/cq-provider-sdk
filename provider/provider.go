@@ -37,7 +37,7 @@ type Provider struct {
 	ResourceMap map[string]*schema.Table
 	// Configuration decoded from configure request
 	Config func() Config
-	// Required Logger to call, this logger is passed to the serve.Serve Client
+	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger hclog.Logger
 	// Database connection
 	db schema.Database

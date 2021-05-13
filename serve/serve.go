@@ -3,9 +3,10 @@ package serve
 import (
 	"context"
 	"fmt"
-	"github.com/cloudquery/cq-provider-sdk/provider"
 	"log"
 	"os"
+
+	"github.com/cloudquery/cq-provider-sdk/provider"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"google.golang.org/grpc"
@@ -69,7 +70,7 @@ func Serve(opts *Options) {
 				// be filtered.
 				Level:      hclog.Trace,
 				JSONFormat: true,
-				Name: opts.Name,
+				Name:       opts.Name,
 			})
 			if opts.Logger == nil {
 				opts.Logger = p.Logger
