@@ -44,7 +44,7 @@ type ResourceIntegrationTestData struct {
 type ResourceIntegrationVerification struct {
 	Name           string
 	ForeignKeyName string
-	Values         map[string]interface{}
+	Values         []map[string]interface{}
 	Filter         func(sq squirrel.SelectBuilder, res *ResourceIntegrationTestData) squirrel.SelectBuilder
 	Children       []*ResourceIntegrationVerification
 }
@@ -162,12 +162,12 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Println(data)
-	if len(data) != 1 {
-		t.Fatalf("expected to have  1 entry at table %s got %d", resource.Table.Name, len(data))
+	//log.Println(data)
+	if len(data) != len(verification.Values) {
+		t.Fatalf("expected to have %d entry at table %s got %d", len(verification.Values), resource.Table.Name, len(data))
 	}
 
-	if err = compareData(verification.Values, data[0]); err != nil {
+	if err = compareManyToMany(verification.Values, data); err != nil {
 		t.Fatal(fmt.Errorf("verification failed for table %s; err: %s", resource.Table.Name, err))
 	}
 	if err = verifyChildren(verification.Children, data[0], resource.Table.Name, conn); err != nil {
@@ -196,13 +196,30 @@ func verifyChildren(children []*ResourceIntegrationVerification, parrent map[str
 		if err != nil {
 			return err
 		}
-		if err = compareData(child.Values, data[0]); err != nil {
+		if len(data) != len(child.Values) {
+			return fmt.Errorf("expected to have %d entries of %s but got %d", len(child.Values), child.Name, len(data))
+		}
+		if err = compareManyToMany(child.Values, data); err != nil {
 			return err
 		}
 		err = verifyChildren(child.Children, data[0], child.Name, conn)
 		if err != nil {
 			return fmt.Errorf("%s -> %s", child.Name, err)
 		}
+	}
+	return nil
+}
+
+func compareManyToMany(verifications, rows []map[string]interface{}) error {
+outer:
+	for _, verification := range verifications {
+		for _, row := range rows {
+			err := compareData(verification, row)
+			if err == nil {
+				continue outer
+			}
+		}
+		return fmt.Errorf("failed to match verifications and columns")
 	}
 	return nil
 }
