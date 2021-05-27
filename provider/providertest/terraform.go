@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -44,12 +45,14 @@ type ResourceIntegrationTestData struct {
 type ResourceIntegrationVerification struct {
 	Name           string
 	ForeignKeyName string
-	Values         []map[string]interface{}
+	Values         []VerificationRow
 	Filter         func(sq squirrel.SelectBuilder, res *ResourceIntegrationTestData) squirrel.SelectBuilder
-	Children       []*ResourceIntegrationVerification
+	Relations      []*ResourceIntegrationVerification
 }
+type VerificationRow map[string]interface{}
 
 func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, resource ResourceIntegrationTestData) {
+	t.Parallel()
 	workdir, err := copyTfFiles(resource)
 	if err != nil {
 		t.Fatal(err)
@@ -67,6 +70,11 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 		t.Fatal(err)
 	}
 
+	err = enableTerraformLog(tf, workdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	name, err := os.Hostname()
 	if err != nil {
 		t.Fatal(err)
@@ -76,20 +84,20 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	testSuffix := fmt.Sprintf("test_suffix=%s", resource.Suffix)
 	testPrefix := fmt.Sprintf("test_prefix=%s", resource.Prefix)
 
-	log.Println("tf init")
+	log.Printf("%s tf init\n", resource.Table.Name)
 	err = tf.Init(ctx, tfexec.Upgrade(true))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	log.Println("tf apply")
+	log.Printf("%s tf apply\n", resource.Table.Name)
 	err = tf.Apply(ctx, tfexec.Var(testPrefix), tfexec.Var(testSuffix))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	defer func() {
-		log.Println("tf destroy")
+		log.Printf("%s tf destroy\n", resource.Table.Name)
 		err = tf.Destroy(ctx, tfexec.Var(testPrefix), tfexec.Var(testSuffix))
 		if err != nil {
 			t.Fatal(err)
@@ -98,14 +106,10 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 		if err != nil {
 			t.Fatal(err)
 		}
-		log.Println("done")
+		log.Printf("%s done\n", resource.Table.Name)
 	}()
 
-	log.Println("setup database")
-	conn, err := setupDatabase()
-	assert.Nil(t, err)
-
-	log.Println("fetch resources")
+	log.Printf("%s fetch resources\n", resource.Table.Name)
 	testProvider := providerCreator()
 
 	testProvider.Logger = logging.New(hclog.DefaultOptions)
@@ -136,12 +140,31 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	_ = testProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)}}, fakeResourceSender{})
 	assert.Nil(t, err)
 
-	log.Println("verify fields")
+	log.Printf("%s verify fields\n", resource.Table.Name)
+	conn, err := setupDatabase()
+	assert.Nil(t, err)
 	err = verifyFields(t, resource, conn)
 	assert.Nil(t, err)
 }
 
+func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
+	abs, err := filepath.Abs(workdir)
+	if err != nil {
+		return err
+	}
+	dst := abs + string(os.PathSeparator) + "tflog"
+
+	if _, err = os.Create(dst); err != nil {
+		return err
+	}
+	if err = tf.SetLogPath(dst); err != nil {
+		return err
+	}
+	return nil
+}
+
 func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.Conn) error {
+
 	//get first root object
 	var query string
 	psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
@@ -170,47 +193,69 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 	if err = compareManyToMany(verification.Values, data); err != nil {
 		t.Fatal(fmt.Errorf("verification failed for table %s; err: %s", resource.Table.Name, err))
 	}
-	if err = verifyChildren(verification.Children, data[0], resource.Table.Name, conn); err != nil {
+	if err = verifyRelations(verification.Relations, data[0], resource.Table.Name, conn); err != nil {
 		t.Fatal(fmt.Errorf("verification failed for children of table %s; err: %s", resource.Table.Name, err))
 	}
 	return nil
 }
 
-func verifyChildren(children []*ResourceIntegrationVerification, parrent map[string]interface{}, parrentName string, conn *pgx.Conn) error {
-	for _, child := range children {
+func verifyRelations(relations []*ResourceIntegrationVerification, parrent map[string]interface{}, parrentName string, conn *pgx.Conn) error {
+	for _, relation := range relations {
 		psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 		id, ok := parrent["id"].(string)
 		if !ok {
-			return fmt.Errorf("failed to get parrent id for %s", child.Name)
+			return fmt.Errorf("failed to get parrent id for %s", relation.Name)
 		}
-		query, args, err := psql.Select(fmt.Sprintf("json_agg(%s)", child.Name)).
-			From(child.Name).
-			LeftJoin(fmt.Sprintf("%[1]s on %[1]s.id = %[3]s.%[2]s", parrentName, child.ForeignKeyName, child.Name)).
+		//// todo it can be redundant, don't forget to remove it
+		//for _, verification := range relation.Values {
+		//	or := squirrel.Or{}
+		//	for k, v := range verification {
+		//		or = append(or, squirrel.Eq{fmt.Sprintf("r.%s", k): v})
+		//	}
+		//
+		//	sql := psql.Select("count(*)").
+		//		From(fmt.Sprintf("%s as r", relation.Name)).
+		//		LeftJoin(fmt.Sprintf("%s as p ON p.id = r.%s", parrentName, relation.ForeignKeyName)).
+		//		Where(squirrel.And{or, squirrel.Eq{"p.id": id}})
+		//	fmt.Println(squirrel.DebugSqlizer(sql.PlaceholderFormat(squirrel.Question)))
+		//	query, args, err := sql.ToSql()
+		//	fmt.Println(query, args, err)
+		//	row := conn.QueryRow(context.Background(), query, args...)
+		//	var count int
+		//	if err := row.Scan(&count); err != nil {
+		//		fmt.Printf("failed to get data from sql %s\n", err)
+		//	}
+		//	fmt.Printf("count = %d\n", count)
+		//}
+
+		query, args, err := psql.Select(fmt.Sprintf("json_agg(%s)", relation.Name)).
+			From(relation.Name).
+			LeftJoin(fmt.Sprintf("%[1]s on %[1]s.id = %[3]s.%[2]s", parrentName, relation.ForeignKeyName, relation.Name)).
 			Where(squirrel.Eq{fmt.Sprintf("%s.id", parrentName): id}).
 			ToSql()
 		if err != nil {
-			return fmt.Errorf("failed to build child sql for %s", child.Name)
+			return fmt.Errorf("failed to build child sql for %s", relation.Name)
 		}
 		row := conn.QueryRow(context.Background(), query, args...)
 		data, err := getDataFromRow(row)
 		if err != nil {
 			return err
 		}
-		if len(data) != len(child.Values) {
-			return fmt.Errorf("expected to have %d entries of %s but got %d", len(child.Values), child.Name, len(data))
+		if len(data) != len(relation.Values) {
+			return fmt.Errorf("expected to have %d entries of %s but got %d", len(relation.Values), relation.Name, len(data))
 		}
-		if err = compareManyToMany(child.Values, data); err != nil {
+		if err = compareManyToMany(relation.Values, data); err != nil {
 			return err
 		}
-		err = verifyChildren(child.Children, data[0], child.Name, conn)
+		err = verifyRelations(relation.Relations, data[0], relation.Name, conn)
 		if err != nil {
-			return fmt.Errorf("%s -> %s", child.Name, err)
+			return fmt.Errorf("%s -> %s", relation.Name, err)
 		}
 	}
 	return nil
 }
 
-func compareManyToMany(verifications, rows []map[string]interface{}) error {
+func compareManyToMany(verifications []VerificationRow, rows []map[string]interface{}) error {
 outer:
 	for _, verification := range verifications {
 		for _, row := range rows {
