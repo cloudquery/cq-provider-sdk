@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-test/deep"
-	"github.com/jackc/pgx/v4"
 	"io"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -17,10 +16,12 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/logging"
 	"github.com/cloudquery/cq-provider-sdk/provider"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+	"github.com/go-test/deep"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/jackc/pgx/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/tmccombs/hcl2json/convert"
 )
@@ -30,28 +31,23 @@ const (
 	tfOrigin = "./resources/testData/"
 )
 
-type Checker struct {
-	TableName string
-	Fields    map[string]interface{}
-}
-
 type ResourceIntegrationTestData struct {
-	Table        *schema.Table
-	Config       interface{}
-	Resources    []string
-	Configure    func(logger hclog.Logger, data interface{}) (schema.ClientMeta, error)
-	Suffix       string
-	Prefix       string
-	Verification ResourceIntegrationVerification
+	Table               *schema.Table
+	Config              interface{}
+	Resources           []string
+	Configure           func(logger hclog.Logger, data interface{}) (schema.ClientMeta, error)
+	Suffix              string
+	Prefix              string
+	VerificationBuilder func(res *ResourceIntegrationTestData) ResourceIntegrationVerification
 }
 
 type ResourceIntegrationVerification struct {
 	Name           string
-	ForeginKeyName string
+	ForeignKeyName string
 	Values         map[string]interface{}
 	Filter         func(sq squirrel.SelectBuilder, res *ResourceIntegrationTestData) squirrel.SelectBuilder
 	Children       []*ResourceIntegrationVerification
-} //todo add queriing parameter builder
+}
 
 func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, resource ResourceIntegrationTestData) {
 	workdir, err := copyTfFiles(resource)
@@ -75,9 +71,10 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	if err != nil {
 		t.Fatal(err)
 	}
-	resource.Suffix = name
+	resource.Suffix = simplifyString(name)
+	resource.Prefix = simplifyString(resource.Table.Name)
 	testSuffix := fmt.Sprintf("test_suffix=%s", resource.Suffix)
-	testPrefix := fmt.Sprintf("test_prefix=%s", strings.Replace(resource.Table.Name, "_", "", -1))
+	testPrefix := fmt.Sprintf("test_prefix=%s", resource.Prefix)
 
 	log.Println("tf init")
 	err = tf.Init(ctx, tfexec.Upgrade(true))
@@ -150,8 +147,9 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 	psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 	sq := psql.Select(fmt.Sprintf("json_agg(%s)", resource.Table.Name)).From(resource.Table.Name)
 
-	if resource.Verification.Filter != nil {
-		sq = resource.Verification.Filter(sq, &resource)
+	verification := resource.VerificationBuilder(&resource)
+	if verification.Filter != nil {
+		sq = verification.Filter(sq, &resource)
 	} else {
 		sq = sq.Where(squirrel.Eq{"tags->>'TestId'": resource.Suffix})
 	}
@@ -161,15 +159,18 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 	}
 	row := conn.QueryRow(context.Background(), query, args...)
 	data, err := getDataFromRow(row)
+	if err != nil {
+		t.Fatal(err)
+	}
 	log.Println(data)
 	if len(data) != 1 {
 		t.Fatalf("expected to have  1 entry at table %s got %d", resource.Table.Name, len(data))
 	}
 
-	if err = compareData(resource.Verification.Values, data[0]); err != nil {
+	if err = compareData(verification.Values, data[0]); err != nil {
 		t.Fatal(fmt.Errorf("verification failed for table %s; err: %s", resource.Table.Name, err))
 	}
-	if err = verifyChildren(resource.Verification.Children, data[0], resource.Table.Name, conn); err != nil {
+	if err = verifyChildren(verification.Children, data[0], resource.Table.Name, conn); err != nil {
 		t.Fatal(fmt.Errorf("verification failed for children of table %s; err: %s", resource.Table.Name, err))
 	}
 	return nil
@@ -184,7 +185,7 @@ func verifyChildren(children []*ResourceIntegrationVerification, parrent map[str
 		}
 		query, args, err := psql.Select(fmt.Sprintf("json_agg(%s)", child.Name)).
 			From(child.Name).
-			LeftJoin(fmt.Sprintf("%[1]s on %[1]s.id = %[3]s.%[2]s", parrentName, child.ForeginKeyName, child.Name)).
+			LeftJoin(fmt.Sprintf("%[1]s on %[1]s.id = %[3]s.%[2]s", parrentName, child.ForeignKeyName, child.Name)).
 			Where(squirrel.Eq{fmt.Sprintf("%s.id", parrentName): id}).
 			ToSql()
 		if err != nil {
@@ -216,6 +217,12 @@ func compareData(verification, row map[string]interface{}) error {
 	return nil
 }
 
+func simplifyString(in string) string {
+	// Make a Regex to say we only want letters and numbers
+	reg := regexp.MustCompile("[^a-zA-Z0-9]+")
+	return strings.ToLower(reg.ReplaceAllString(in, ""))
+}
+
 func getDataFromRow(row pgx.Row) ([]map[string]interface{}, error) {
 	var resp []map[string]interface{}
 	var data string
@@ -223,7 +230,7 @@ func getDataFromRow(row pgx.Row) ([]map[string]interface{}, error) {
 	if err := row.Scan(&data); err != nil {
 		return nil, err
 	}
-	json.Unmarshal([]byte(data), &resp)
+	_ = json.Unmarshal([]byte(data), &resp)
 	return resp, nil
 }
 
@@ -231,7 +238,7 @@ func getDataFromRow(row pgx.Row) ([]map[string]interface{}, error) {
 func copyTfFiles(resource ResourceIntegrationTestData) (string, error) {
 	workdir := tfDir + resource.Table.Name + "/"
 	if _, err := os.Stat(workdir); os.IsNotExist(err) {
-		os.MkdirAll(workdir, os.ModePerm)
+		_ = os.MkdirAll(workdir, os.ModePerm)
 	}
 
 	err := copy(tfOrigin+resource.Table.Name+".tf", workdir+resource.Table.Name+".tf")
@@ -280,12 +287,4 @@ func copy(src, dst string) error {
 		return err
 	}
 	return out.Close()
-}
-
-func getResourceNameFromTableName(table string) string {
-	//extract resource naname to fetch from table name
-	parts := strings.Split(table, "_")
-	resourceName := strings.Replace(table, parts[0]+"_", "", 1)
-	return strings.Replace(resourceName, "_", ".", 1)
-	//hack["configuration"].([]interface{})[0].(map[string]interface{})["resources"] = []string{resourceName}
 }
