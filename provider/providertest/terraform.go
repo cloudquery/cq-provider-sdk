@@ -28,7 +28,7 @@ import (
 
 const (
 	tfDir    = "./int_test/tf/"
-	tfOrigin = "./resources/testData/"
+	tfOrigin = "./testData/"
 )
 
 type ResourceIntegrationTestData struct {
