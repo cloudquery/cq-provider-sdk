@@ -76,7 +76,10 @@ func findResourceFromTableName(table *schema.Table, tables map[string]*schema.Ta
 
 type fakeResourceSender struct{}
 
-func (f fakeResourceSender) Send(_ *cqproto.FetchResourcesResponse) error {
+func (f fakeResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
+	if r.Error != "" {
+		fmt.Printf(r.Error)
+	}
 	return nil
 }
 
