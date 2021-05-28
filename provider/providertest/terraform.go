@@ -45,11 +45,15 @@ type ResourceIntegrationTestData struct {
 type ResourceIntegrationVerification struct {
 	Name           string
 	ForeignKeyName string
-	Values         []VerificationRow
+	ExpectedValues []ExpectedValue
 	Filter         func(sq squirrel.SelectBuilder, res *ResourceIntegrationTestData) squirrel.SelectBuilder
 	Relations      []*ResourceIntegrationVerification
 }
-type VerificationRow map[string]interface{}
+
+type ExpectedValue struct {
+	Count int                    // expected count of items
+	Data  map[string]interface{} // expected data of items
+}
 
 func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, resource ResourceIntegrationTestData) {
 	t.Parallel()
@@ -60,11 +64,11 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 
 	ctx := context.Background()
 	execPath := os.Getenv("TF_EXEC")
-	//execPath := os.Getenv("PATH")
-	//execPath, err := tfinstall.Find(ctx)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
+	// execPath := os.Getenv("PATH")
+	// execPath, err := tfinstall.Find(ctx)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
 	tf, err := tfexec.NewTerraform(workdir, execPath)
 	if err != nil {
 		t.Fatal(err)
@@ -114,11 +118,11 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 
 	testProvider.Logger = logging.New(hclog.DefaultOptions)
 
-	//cfg, err := testProvider.GetProviderConfig(context.Background(), &cqproto.GetProviderConfigRequest{})
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//data := cfg.Config
+	// cfg, err := testProvider.GetProviderConfig(context.Background(), &cqproto.GetProviderConfigRequest{})
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	// data := cfg.Config
 
 	f := hclwrite.NewFile()
 	f.Body().AppendBlock(gohcl.EncodeAsBlock(resource.Config, "configuration"))
@@ -164,8 +168,7 @@ func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
 }
 
 func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.Conn) error {
-
-	//get first root object
+	// get first root object
 	var query string
 	psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 	sq := psql.Select(fmt.Sprintf("json_agg(%s)", resource.Table.Name)).From(resource.Table.Name)
@@ -185,16 +188,18 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 	if err != nil {
 		t.Fatal(err)
 	}
-	//log.Println(data)
-	if len(data) != len(verification.Values) {
-		t.Fatalf("expected to have %d entry at table %s got %d", len(verification.Values), resource.Table.Name, len(data))
+	// log.Println(data)
+	if len(data) != len(verification.ExpectedValues) {
+		t.Fatalf("expected to have %d entry at table %s got %d", len(verification.ExpectedValues), resource.Table.Name, len(data))
 	}
 
-	if err = compareManyToMany(verification.Values, data); err != nil {
+	if err = compareManyToMany(verification.ExpectedValues, data); err != nil {
 		t.Fatal(fmt.Errorf("verification failed for table %s; err: %s", resource.Table.Name, err))
 	}
-	if err = verifyRelations(verification.Relations, data[0], resource.Table.Name, conn); err != nil {
-		t.Fatal(fmt.Errorf("verification failed for children of table %s; err: %s", resource.Table.Name, err))
+	for _, e := range data {
+		if err = verifyRelations(verification.Relations, e, resource.Table.Name, conn); err != nil {
+			t.Fatal(fmt.Errorf("verification failed for children of table %s; err: %s", resource.Table.Name, err))
+		}
 	}
 	return nil
 }
@@ -206,27 +211,34 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parrent map[s
 		if !ok {
 			return fmt.Errorf("failed to get parrent id for %s", relation.Name)
 		}
-		//// todo it can be redundant, don't forget to remove it
-		//for _, verification := range relation.Values {
-		//	or := squirrel.Or{}
-		//	for k, v := range verification {
-		//		or = append(or, squirrel.Eq{fmt.Sprintf("r.%s", k): v})
-		//	}
+		//  // todo it can be redundant, don't forget to remove it
+		//  for _, verification := range relation.ExpectedValues {
+		//  	and := squirrel.And{}
+		//  	for k, v := range verification.Data {
+		//  		switch v.(type) {
+		//  		case map[string]interface{}:
+		//  			and = append(and, squirrel.Eq{fmt.Sprintf("r.%s", k): v})
+		//  		default:
+		//  			and = append(and, squirrel.Eq{fmt.Sprintf("r.%s", k): v})
+		//  		}
+		//  		and = append(and, squirrel.Eq{fmt.Sprintf("r."+
+		//  			"%s", k): v})
+		//  	}
 		//
-		//	sql := psql.Select("count(*)").
-		//		From(fmt.Sprintf("%s as r", relation.Name)).
-		//		LeftJoin(fmt.Sprintf("%s as p ON p.id = r.%s", parrentName, relation.ForeignKeyName)).
-		//		Where(squirrel.And{or, squirrel.Eq{"p.id": id}})
-		//	fmt.Println(squirrel.DebugSqlizer(sql.PlaceholderFormat(squirrel.Question)))
-		//	query, args, err := sql.ToSql()
-		//	fmt.Println(query, args, err)
-		//	row := conn.QueryRow(context.Background(), query, args...)
-		//	var count int
-		//	if err := row.Scan(&count); err != nil {
-		//		fmt.Printf("failed to get data from sql %s\n", err)
-		//	}
-		//	fmt.Printf("count = %d\n", count)
-		//}
+		//  	sql := psql.Select("count(*)").
+		//  		From(fmt.Sprintf("%s as r", relation.Name)).
+		//  		LeftJoin(fmt.Sprintf("%s as p ON p.id = r.%s", parrentName, relation.ForeignKeyName)).
+		//  		Where(squirrel.And{and, squirrel.Eq{"p.id": id}})
+		//  	fmt.Println(squirrel.DebugSqlizer(sql.PlaceholderFormat(squirrel.Question)))
+		//  	query, args, err := sql.ToSql()
+		//  	fmt.Println(query, args, err)
+		//  	row := conn.QueryRow(context.Background(), query, args...)
+		//  	var count int
+		//  	if err := row.Scan(&count); err != nil {
+		//  		fmt.Printf("failed to get data from sql %s\n", err)
+		//  	}
+		//  	fmt.Printf("count = %d\n", count)
+		//  }
 
 		query, args, err := psql.Select(fmt.Sprintf("json_agg(%s)", relation.Name)).
 			From(relation.Name).
@@ -241,11 +253,11 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parrent map[s
 		if err != nil {
 			return err
 		}
-		if len(data) != len(relation.Values) {
-			return fmt.Errorf("expected to have %d entries of %s but got %d", len(relation.Values), relation.Name, len(data))
-		}
-		if err = compareManyToMany(relation.Values, data); err != nil {
-			return err
+		// if len(data) != len(relation.ExpectedValues) {
+		// 	return fmt.Errorf("expected to have %d entries of %s but got %d", len(relation.ExpectedValues), relation.Name, len(data))
+		// }
+		if err = compareManyToMany(relation.ExpectedValues, data); err != nil {
+			return fmt.Errorf("%s -> %v", relation.Name, err)
 		}
 		err = verifyRelations(relation.Relations, data[0], relation.Name, conn)
 		if err != nil {
@@ -255,16 +267,36 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parrent map[s
 	return nil
 }
 
-func compareManyToMany(verifications []VerificationRow, rows []map[string]interface{}) error {
-outer:
-	for _, verification := range verifications {
-		for _, row := range rows {
-			err := compareData(verification, row)
-			if err == nil {
-				continue outer
-			}
+func compareManyToMany(verifications []ExpectedValue, rows []map[string]interface{}) error {
+	var errors []error
+	// clone []map that will be compared
+	toCompare := make([]map[string]interface{}, len(rows))
+	for i, row := range rows {
+		toCompare[i] = make(map[string]interface{})
+		for key, value := range row {
+			toCompare[i][key] = value
 		}
-		return fmt.Errorf("failed to match verifications and columns")
+	}
+
+	for _, verification := range verifications {
+		found := 0
+		for i := 0; i < len(toCompare); i++ {
+			if toCompare[i] == nil {
+				// this row is already verified - skip
+				continue
+			}
+			err := compareData(verification.Data, toCompare[i])
+			if err == nil {
+				toCompare[i] = nil // row passed verification - it won't be used
+				found++
+			} else {
+				errors = append(errors, err)
+			}
+
+		}
+		if verification.Count != found {
+			return fmt.Errorf("expected to have %d but got %d entries with one of the %v\nerrors: %v", verification.Count, found, verification.Data, errors)
+		}
 	}
 	return nil
 }
@@ -296,29 +328,29 @@ func getDataFromRow(row pgx.Row) ([]map[string]interface{}, error) {
 	return resp, nil
 }
 
-//copies necessary for current test files
+// copies necessary for current test files
 func copyTfFiles(resource ResourceIntegrationTestData) (string, error) {
 	workdir := tfDir + resource.Table.Name + "/"
 	if _, err := os.Stat(workdir); os.IsNotExist(err) {
 		_ = os.MkdirAll(workdir, os.ModePerm)
 	}
 
-	err := copy(tfOrigin+resource.Table.Name+".tf", workdir+resource.Table.Name+".tf")
+	err := cp(tfOrigin+resource.Table.Name+".tf", workdir+resource.Table.Name+".tf")
 	if err != nil {
 		return workdir, err
 	}
 
-	err = copy(tfOrigin+"variables.tf", workdir+"variables.tf")
+	err = cp(tfOrigin+"variables.tf", workdir+"variables.tf")
 	if err != nil {
 		return workdir, err
 	}
 
-	err = copy(tfOrigin+"provider.tf", workdir+"provider.tf")
+	err = cp(tfOrigin+"provider.tf", workdir+"provider.tf")
 	if err != nil {
 		return workdir, err
 	}
 
-	err = copy(tfOrigin+"versions.tf", workdir+"versions.tf")
+	err = cp(tfOrigin+"versions.tf", workdir+"versions.tf")
 	if err != nil {
 		return workdir, err
 	}
@@ -326,9 +358,8 @@ func copyTfFiles(resource ResourceIntegrationTestData) (string, error) {
 	return workdir, nil
 }
 
-func copy(src, dst string) error {
+func cp(src, dst string) error {
 	if _, err := os.Stat(src); err != nil {
-		//fmt.Printf("File does not exist\n");
 		return err
 	}
 
