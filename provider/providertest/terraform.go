@@ -209,7 +209,7 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 			return fmt.Errorf("failed to get parent id for %s", resource.Table.Name)
 		}
 		if err = verifyRelations(verification.Relations, id, resource.Table.Name, conn); err != nil {
-			t.Fatal(fmt.Errorf("verification failed for children of table entry %s; id: %v; %s", resource.Table.Name, id, err))
+			t.Fatal(fmt.Errorf("verification failed for relations of table entry %s; id: %v -> %s", resource.Table.Name, id, err))
 		}
 	}
 	return nil
