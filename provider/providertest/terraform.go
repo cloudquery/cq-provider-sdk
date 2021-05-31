@@ -42,7 +42,7 @@ type ResourceIntegrationTestData struct {
 	VerificationBuilder func(res *ResourceIntegrationTestData) ResourceIntegrationVerification
 }
 
-//ResourceIntegrationVerification - a set of verification rules to query and check test related data
+// ResourceIntegrationVerification - a set of verification rules to query and check test related data
 type ResourceIntegrationVerification struct {
 	Name           string
 	ForeignKeyName string
@@ -51,13 +51,13 @@ type ResourceIntegrationVerification struct {
 	Relations      []*ResourceIntegrationVerification
 }
 
-//ExpectedValue - describes the data that expected to be in database after fetch
+// ExpectedValue - describes the data that expected to be in database after fetch
 type ExpectedValue struct {
 	Count int                    // expected count of items
 	Data  map[string]interface{} // expected data of items
 }
 
-//IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
+// IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
 func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, resource ResourceIntegrationTestData) {
 	t.Parallel()
 	workdir, err := copyTfFiles(resource.Table.Name)
@@ -119,7 +119,7 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	testProvider := providerCreator()
 	testProvider.Logger = logging.New(hclog.DefaultOptions)
 
-	//generate a config for provider
+	// generate a config for provider
 	f := hclwrite.NewFile()
 	f.Body().AppendBlock(gohcl.EncodeAsBlock(resource.Config, "configuration"))
 	data, err := convert.Bytes(f.Bytes(), "config.json", convert.Options{})
@@ -157,7 +157,7 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	}
 }
 
-//enableTerraformLog - sets the path for terraform log files for current test
+// enableTerraformLog - sets the path for terraform log files for current test
 func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
 	abs, err := filepath.Abs(workdir)
 	if err != nil {
@@ -174,15 +174,15 @@ func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
 	return nil
 }
 
-//verifyFields - gets the root db entry and check all its expected relations
+// verifyFields - gets the root db entry and check all its expected relations
 func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.Conn) error {
 	var query string
 	verification := resource.VerificationBuilder(&resource)
 
-	//build query to get the root object
+	// build query to get the root object
 	psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 	sq := psql.Select(fmt.Sprintf("json_agg(%s)", resource.Table.Name)).From(verification.Name)
-	//use special filter if it is set.
+	// use special filter if it is set.
 	if verification.Filter != nil {
 		sq = verification.Filter(sq, &resource)
 	} else {
@@ -202,7 +202,7 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 		t.Fatal(fmt.Errorf("verification failed for table %s; %s", resource.Table.Name, err))
 	}
 
-	//verify root entry relations
+	// verify root entry relations
 	for _, e := range data {
 		id, ok := e["id"]
 		if !ok {
@@ -215,7 +215,7 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 	return nil
 }
 
-//verifyRelations - recursively runs through all the relations and compares their values with expected data
+// verifyRelations - recursively runs through all the relations and compares their values with expected data
 func verifyRelations(relations []*ResourceIntegrationVerification, parentId interface{}, parentName string, conn *pgx.Conn) error {
 	for _, relation := range relations {
 		// build query to get relation
@@ -238,7 +238,7 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 			return fmt.Errorf("%s -> %s", relation.Name, err)
 		}
 
-		//verify relation entry relations
+		// verify relation entry relations
 		for _, e := range data {
 			id, ok := e["id"]
 			if !ok {
@@ -253,7 +253,7 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 	return nil
 }
 
-//compareDataWithExpected - runs through expected values and checks if they are satisfied with received data
+// compareDataWithExpected - runs through expected values and checks if they are satisfied with received data
 func compareDataWithExpected(expected []ExpectedValue, received []map[string]interface{}) error {
 	var errors []error
 	// clone []map that will be compared
@@ -287,7 +287,7 @@ func compareDataWithExpected(expected []ExpectedValue, received []map[string]int
 	return nil
 }
 
-//compareData - checks if the second argument has all the entries of the first argument. arguments are jsons - map[string]interface{}
+// compareData - checks if the second argument has all the entries of the first argument. arguments are jsons - map[string]interface{}
 func compareData(verification, row map[string]interface{}) error {
 	for k, v := range verification {
 		diff := deep.Equal(row[k], v)
@@ -298,14 +298,14 @@ func compareData(verification, row map[string]interface{}) error {
 	return nil
 }
 
-//simplifyString - prepares the string to be used in resources names
+// simplifyString - prepares the string to be used in resources names
 func simplifyString(in string) string {
 	// Make a Regex to say we only want letters and numbers
 	reg := regexp.MustCompile("[^a-zA-Z0-9]+")
 	return strings.ToLower(reg.ReplaceAllString(in, ""))
 }
 
-//getDataFromRow - reads the row from db into an array jsons: []map[string]interface{}
+// getDataFromRow - reads the row from db into an array jsons: []map[string]interface{}
 func getDataFromRow(row pgx.Row) ([]map[string]interface{}, error) {
 	var resp []map[string]interface{}
 	var data string
@@ -317,7 +317,7 @@ func getDataFromRow(row pgx.Row) ([]map[string]interface{}, error) {
 	return resp, nil
 }
 
-//copyTfFiles - copies tf files that are related to current test
+// copyTfFiles - copies tf files that are related to current test
 func copyTfFiles(name string) (string, error) {
 	workdir := tfDir + name + string(os.PathSeparator)
 	if _, err := os.Stat(workdir); os.IsNotExist(err) {
@@ -347,7 +347,7 @@ func copyTfFiles(name string) (string, error) {
 	return workdir, nil
 }
 
-//cp - copies file
+// cp - copies file
 func cp(src, dst string) error {
 	if _, err := os.Stat(src); err != nil {
 		return err
