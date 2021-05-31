@@ -78,7 +78,6 @@ type fakeResourceSender struct{}
 
 func (f fakeResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 	if r.Error != "" {
-		// todo maybe add a channel and send errors to it to handle them on a test side
 		fmt.Printf(r.Error)
 	}
 	return nil
