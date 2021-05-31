@@ -97,6 +97,9 @@ enum ColumnType {
   TIMESTAMP = 11;
   JSON = 12;
   UUID_ARRAY = 13;
+  INET = 14;
+  CIDR = 15;
+  MAC_ADDR = 16;
 }
 
 

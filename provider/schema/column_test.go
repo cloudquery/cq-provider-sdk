@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"net"
 	"testing"
 	"time"
 
@@ -64,6 +65,30 @@ var validateFixtures = []validateFixture{
 		Column:     Column{Type: TypeStringArray},
 		TestValues: []interface{}{[]string{"a", "b", "c"}, []*string{funk.PtrOf("a").(*string)}, []SomeString{SomeString("lol")}},
 		BadValues:  []interface{}{[]interface{}{1, 2, 3}},
+	},
+	{
+		Column:     Column{Type: TypeMacAddr},
+		TestValues: []interface{}{func() net.HardwareAddr {
+			mac, _ := net.ParseMAC("00:00:5e:00:53:01")
+			return mac	
+		}()},
+		BadValues:  []interface{}{"asdasdsadads", -55, 44, "00:33:44:55:77:55"},
+	},
+	{
+		Column:     Column{Type: TypeInet},
+		TestValues: []interface{}{net.ParseIP("127.0.0.1"), net.ParseIP("2b15:800f:a66b:0:1278:b7ad:6052:f444")},
+		BadValues:  []interface{}{"asdasdsadads", "127.0.0.1", "333"},
+	},
+	{
+		Column:     Column{Type: TypeCIDR},
+		TestValues: []interface{}{func() *net.IPNet {
+			_, net, _ := net.ParseCIDR("127.0.0.1")
+			return net
+		}(), func() *net.IPNet {
+			_, net, _ := net.ParseCIDR("10.0.0.1/24")
+			return net
+		}()},
+		BadValues:  []interface{}{"asdasdsadads", 555, "127.0.0.1/24"},
 	},
 }
 
