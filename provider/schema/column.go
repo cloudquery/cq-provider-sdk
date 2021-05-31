@@ -34,7 +34,6 @@ const (
 	TypeInet
 	TypeCIDR
 	TypeMacAddr
-
 )
 
 func (v ValueType) String() string {

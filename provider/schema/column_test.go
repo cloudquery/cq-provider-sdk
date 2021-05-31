@@ -67,12 +67,12 @@ var validateFixtures = []validateFixture{
 		BadValues:  []interface{}{[]interface{}{1, 2, 3}},
 	},
 	{
-		Column:     Column{Type: TypeMacAddr},
+		Column: Column{Type: TypeMacAddr},
 		TestValues: []interface{}{func() net.HardwareAddr {
 			mac, _ := net.ParseMAC("00:00:5e:00:53:01")
-			return mac	
+			return mac
 		}()},
-		BadValues:  []interface{}{"asdasdsadads", -55, 44, "00:33:44:55:77:55"},
+		BadValues: []interface{}{"asdasdsadads", -55, 44, "00:33:44:55:77:55"},
 	},
 	{
 		Column:     Column{Type: TypeInet},
@@ -80,7 +80,7 @@ var validateFixtures = []validateFixture{
 		BadValues:  []interface{}{"asdasdsadads", "127.0.0.1", "333"},
 	},
 	{
-		Column:     Column{Type: TypeCIDR},
+		Column: Column{Type: TypeCIDR},
 		TestValues: []interface{}{func() *net.IPNet {
 			_, net, _ := net.ParseCIDR("127.0.0.1")
 			return net
@@ -88,7 +88,7 @@ var validateFixtures = []validateFixture{
 			_, net, _ := net.ParseCIDR("10.0.0.1/24")
 			return net
 		}()},
-		BadValues:  []interface{}{"asdasdsadads", 555, "127.0.0.1/24"},
+		BadValues: []interface{}{"asdasdsadads", 555, "127.0.0.1/24"},
 	},
 }
 
