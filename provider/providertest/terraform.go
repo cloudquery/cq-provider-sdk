@@ -102,18 +102,22 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		log.Printf("%s tf destroy\n", resource.Table.Name)
-		err = tf.Destroy(ctx, tfexec.Var(testPrefix), tfexec.Var(testSuffix))
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = os.RemoveAll(workdir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		log.Printf("%s done\n", resource.Table.Name)
-	}()
+
+	if os.Getenv("TF_NO_DESTROY") != "true" {
+		defer func() {
+			err = tf.Destroy(ctx, tfexec.Var(testPrefix),
+				tfexec.Var(testSuffix))
+			if err != nil {
+				t.Fatal(err)
+			}
+			log.Printf("%s cleanup\n", resource.Table.Name)
+			err = os.RemoveAll(workdir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			log.Printf("%s done\n", resource.Table.Name)
+		}()
+	}
 
 	log.Printf("%s fetch resources\n", resource.Table.Name)
 	testProvider := providerCreator()
@@ -151,7 +155,7 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = verifyFields(t, resource, conn)
+	err = verifyFields(resource, conn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +179,7 @@ func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
 }
 
 // verifyFields - gets the root db entry and check all its expected relations
-func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.Conn) error {
+func verifyFields(resource ResourceIntegrationTestData, conn *pgx.Conn) error {
 	var query string
 	verification := resource.VerificationBuilder(&resource)
 
@@ -190,16 +194,16 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 	}
 	query, args, err := sq.ToSql()
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	row := conn.QueryRow(context.Background(), query, args...)
 	data, err := getDataFromRow(row)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	if err = compareDataWithExpected(verification.ExpectedValues, data); err != nil {
-		t.Fatal(fmt.Errorf("verification failed for table %s; %s", resource.Table.Name, err))
+		return fmt.Errorf("verification failed for table %s; %s", resource.Table.Name, err)
 	}
 
 	// verify root entry relations
@@ -209,7 +213,7 @@ func verifyFields(t *testing.T, resource ResourceIntegrationTestData, conn *pgx.
 			return fmt.Errorf("failed to get parent id for %s", resource.Table.Name)
 		}
 		if err = verifyRelations(verification.Relations, id, resource.Table.Name, conn); err != nil {
-			t.Fatal(fmt.Errorf("verification failed for relations of table entry %s; id: %v -> %s", resource.Table.Name, id, err))
+			return fmt.Errorf("verification failed for relations of table entry %s; id: %v -> %s", resource.Table.Name, id, err)
 		}
 	}
 	return nil
