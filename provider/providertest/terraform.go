@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
@@ -97,11 +98,27 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	ticker := time.NewTicker(5 * time.Minute)
+	startTime := time.Now()
+	applyDone := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-applyDone:
+				return
+			case time := <-ticker.C:
+				log.Printf("%s applying for %v", resource.Table.Name, time.Sub(startTime))
+			}
+		}
+	}()
+
 	log.Printf("%s tf apply\n", resource.Table.Name)
 	err = tf.Apply(ctx, tfexec.Var(testPrefix), tfexec.Var(testSuffix))
 	if err != nil {
 		t.Fatal(err)
 	}
+	applyDone <- true
 
 	if os.Getenv("TF_NO_DESTROY") != "true" {
 		defer func() {
@@ -185,7 +202,7 @@ func verifyFields(resource ResourceIntegrationTestData, conn *pgx.Conn) error {
 
 	// build query to get the root object
 	psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
-	sq := psql.Select(fmt.Sprintf("json_agg(%s)", resource.Table.Name)).From(verification.Name)
+	sq := psql.Select(fmt.Sprintf("json_agg(%s)", verification.Name)).From(verification.Name)
 	// use special filter if it is set.
 	if verification.Filter != nil {
 		sq = verification.Filter(sq, &resource)
@@ -194,12 +211,12 @@ func verifyFields(resource ResourceIntegrationTestData, conn *pgx.Conn) error {
 	}
 	query, args, err := sq.ToSql()
 	if err != nil {
-		return err
+		return fmt.Errorf("%s -> %s", verification.Name, err)
 	}
 	row := conn.QueryRow(context.Background(), query, args...)
 	data, err := getDataFromRow(row)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s -> %s", verification.Name, err)
 	}
 
 	if err = compareDataWithExpected(verification.ExpectedValues, data); err != nil {
@@ -230,7 +247,7 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 			Where(squirrel.Eq{fmt.Sprintf("%s.id", parentName): parentId})
 		query, args, err := sq.ToSql()
 		if err != nil {
-			return fmt.Errorf("failed to build query for %s", relation.Name)
+			return fmt.Errorf("%s -> %s", relation.Name, err)
 		}
 		row := conn.QueryRow(context.Background(), query, args...)
 		data, err := getDataFromRow(row)
