@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +33,11 @@ const (
 	tfOrigin = "./testData/"
 )
 
+var (
+	// Make a Regex to say we only want letters and numbers
+	tfVarRegex = regexp.MustCompile("[^a-zA-Z0-9]+")
+)
+
 type ResourceIntegrationTestData struct {
 	Table               *schema.Table
 	Config              interface{}
@@ -41,6 +46,7 @@ type ResourceIntegrationTestData struct {
 	Suffix              string
 	Prefix              string
 	VerificationBuilder func(res *ResourceIntegrationTestData) ResourceIntegrationVerification
+	workdir             string
 }
 
 // ResourceIntegrationVerification - a set of verification rules to query and check test related data
@@ -61,42 +67,108 @@ type ExpectedValue struct {
 // IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
 func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, resource ResourceIntegrationTestData) {
 	t.Parallel()
-	workdir, err := copyTfFiles(resource.Table.Name)
+	tf, err := setup(&resource)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	teardown, err := deploy(tf, &resource)
+	if teardown != nil && os.Getenv("TF_NO_DESTROY") != "true" {
+		defer func() {
+			if err = teardown(); err != nil {
+				t.Fatal(err)
+			}
+		}()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = fetch(providerCreator, &resource)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log.Printf("%s verify fields\n", resource.Table.Name)
+	conn, err := setupDatabase()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+
+	err = verifyFields(resource, conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// setup - puts *.tf files into isolated test dir and creates the instance of terraform
+func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
+	w, err := copyTfFiles(resource.Table.Name)
+	if err != nil {
+		// remove workdir
+		if e := os.RemoveAll(resource.workdir); e != nil {
+			return nil, fmt.Errorf("failed to RemoveAll after: %s\n reason:%s", err, e)
+		}
+		return nil, err
+	}
+	resource.workdir = w
+
 	lookPath := os.Getenv("TF_EXEC_PATH")
 	if lookPath == "" {
 		lookPath = "terraform"
 	}
 	execPath, err := exec.LookPath(lookPath)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	tf, err := tfexec.NewTerraform(workdir, execPath)
+	tf, err := tfexec.NewTerraform(resource.workdir, execPath)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	err = enableTerraformLog(tf, workdir)
-	if err != nil {
-		t.Fatal(err)
+	if err = enableTerraformLog(tf, resource.workdir); err != nil {
+		return nil, err
 	}
+	return tf, nil
+}
 
+// deploy - uses terraform to deploy resources and builds teardown function. deployment timeout can be set via TF_EXEC_TIMEOUT env variable
+func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func() error, error) {
 	// prepare terraform variables
 	hostname, err := os.Hostname()
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
+
 	resource.Suffix = simplifyString(hostname)
 	resource.Prefix = simplifyString(resource.Table.Name)
 	testSuffix := fmt.Sprintf("test_suffix=%s", resource.Suffix)
 	testPrefix := fmt.Sprintf("test_prefix=%s", resource.Prefix)
 
+	teardown := func() error {
+		err = tf.Destroy(context.Background(), tfexec.Var(testPrefix),
+			tfexec.Var(testSuffix))
+		if err != nil {
+			return err
+		}
+		log.Printf("%s cleanup\n", resource.Table.Name)
+		if err := os.RemoveAll(resource.workdir); err != nil {
+			return err
+		}
+		log.Printf("%s done\n", resource.Table.Name)
+		return nil
+	}
+
 	ctx := context.Background()
+	if i, err := strconv.Atoi(os.Getenv("TF_EXEC_TIMEOUT")); err == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(i)*time.Minute)
+		defer cancel()
+	}
+
 	log.Printf("%s tf init\n", resource.Table.Name)
-	err = tf.Init(ctx, tfexec.Upgrade(true))
-	if err != nil {
-		t.Fatal(err)
+	if err = tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
+		return teardown, err
 	}
 
 	ticker := time.NewTicker(5 * time.Minute)
@@ -113,29 +185,17 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 		}
 	}()
 
-	log.Printf("%s tf apply\n", resource.Table.Name)
-	err = tf.Apply(ctx, tfexec.Var(testPrefix), tfexec.Var(testSuffix))
-	if err != nil {
-		t.Fatal(err)
+	log.Printf("%s tf apply -var test_prefix=%s -var test_suffix=%s\n", resource.Table.Name, resource.Prefix, resource.Suffix)
+	if err = tf.Apply(ctx, tfexec.Var(testPrefix), tfexec.Var(testSuffix)); err != nil {
+		return teardown, err
 	}
 	applyDone <- true
 
-	if os.Getenv("TF_NO_DESTROY") != "true" {
-		defer func() {
-			err = tf.Destroy(ctx, tfexec.Var(testPrefix),
-				tfexec.Var(testSuffix))
-			if err != nil {
-				t.Fatal(err)
-			}
-			log.Printf("%s cleanup\n", resource.Table.Name)
-			err = os.RemoveAll(workdir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			log.Printf("%s done\n", resource.Table.Name)
-		}()
-	}
+	return teardown, nil
+}
 
+// fetch - fetches resources from the cloud and puts them into database. database config can be specified via DATABASE_URL env variable
+func fetch(providerCreator func() *provider.Provider, resource *ResourceIntegrationTestData) error {
 	log.Printf("%s fetch resources\n", resource.Table.Name)
 	testProvider := providerCreator()
 	testProvider.Logger = logging.New(hclog.DefaultOptions)
@@ -148,34 +208,26 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	_ = json.Unmarshal(data, &hack)
 	data, _ = json.Marshal(hack["configuration"].([]interface{})[0])
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	testProvider.Configure = resource.Configure
 	_, err = testProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
 		CloudQueryVersion: "",
-		Connection:        cqproto.ConnectionDetails{DSN: "host=localhost user=postgres password=pass DB.hostname=postgres port=5432"},
-		Config:            data,
+		Connection: cqproto.ConnectionDetails{DSN: getEnv("DATABASE_URL",
+			"host=localhost user=postgres password=pass DB.name=postgres port=5432")},
+		Config: data,
 	})
-
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
-	_ = testProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)}}, fakeResourceSender{})
+	err = testProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)}}, fakeResourceSender{})
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
-	log.Printf("%s verify fields\n", resource.Table.Name)
-	conn, err := setupDatabase()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = verifyFields(resource, conn)
-	if err != nil {
-		t.Fatal(err)
-	}
+	return nil
 }
 
 // enableTerraformLog - sets the path for terraform log files for current test
@@ -184,8 +236,7 @@ func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
 	if err != nil {
 		return err
 	}
-	dst := abs + string(os.PathSeparator) + "tflog"
-
+	dst := filepath.Join(abs, string(os.PathSeparator), "tflog")
 	if _, err = os.Create(dst); err != nil {
 		return err
 	}
@@ -197,7 +248,6 @@ func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
 
 // verifyFields - gets the root db entry and check all its expected relations
 func verifyFields(resource ResourceIntegrationTestData, conn *pgx.Conn) error {
-	var query string
 	verification := resource.VerificationBuilder(&resource)
 
 	// build query to get the root object
@@ -265,8 +315,7 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 			if !ok {
 				return fmt.Errorf("failed to get parent id for %s", relation.Name)
 			}
-			err = verifyRelations(relation.Relations, id, relation.Name, conn)
-			if err != nil {
+			if err = verifyRelations(relation.Relations, id, relation.Name, conn); err != nil {
 				return fmt.Errorf("%s id: %v -> %s", relation.Name, id, err)
 			}
 		}
@@ -321,9 +370,7 @@ func compareData(verification, row map[string]interface{}) error {
 
 // simplifyString - prepares the string to be used in resources names
 func simplifyString(in string) string {
-	// Make a Regex to say we only want letters and numbers
-	reg := regexp.MustCompile("[^a-zA-Z0-9]+")
-	return strings.ToLower(reg.ReplaceAllString(in, ""))
+	return strings.ToLower(tfVarRegex.ReplaceAllString(in, ""))
 }
 
 // getDataFromRow - reads the row from db into an array jsons: []map[string]interface{}
@@ -334,33 +381,39 @@ func getDataFromRow(row pgx.Row) ([]map[string]interface{}, error) {
 	if err := row.Scan(&data); err != nil {
 		return nil, err
 	}
-	_ = json.Unmarshal([]byte(data), &resp)
+	if err := json.Unmarshal([]byte(data), &resp); err != nil {
+		return nil, err
+	}
 	return resp, nil
 }
 
 // copyTfFiles - copies tf files that are related to current test
 func copyTfFiles(name string) (string, error) {
-	workdir := tfDir + name + string(os.PathSeparator)
+	workdir := filepath.Join(tfDir, name)
 	if _, err := os.Stat(workdir); os.IsNotExist(err) {
-		_ = os.MkdirAll(workdir, os.ModePerm)
+		if err := os.MkdirAll(workdir, os.ModePerm); err != nil {
+			return workdir, err
+		}
+	} else {
+		return workdir, err
 	}
 
-	err := cp(tfOrigin+name+".tf", workdir+name+".tf")
+	err := cp(filepath.Join(tfOrigin, name+".tf"), filepath.Join(workdir, name+".tf"))
 	if err != nil {
 		return workdir, err
 	}
 
-	err = cp(tfOrigin+"variables.tf", workdir+"variables.tf")
+	err = cp(filepath.Join(tfOrigin, "variables.tf"), filepath.Join(workdir, "variables.tf"))
 	if err != nil {
 		return workdir, err
 	}
 
-	err = cp(tfOrigin+"provider.tf", workdir+"provider.tf")
+	err = cp(filepath.Join(tfOrigin, "provider.tf"), filepath.Join(workdir, "provider.tf"))
 	if err != nil {
 		return workdir, err
 	}
 
-	err = cp(tfOrigin+"versions.tf", workdir+"versions.tf")
+	err = cp(filepath.Join(tfOrigin, "versions.tf"), filepath.Join(workdir, "versions.tf"))
 	if err != nil {
 		return workdir, err
 	}
@@ -374,21 +427,12 @@ func cp(src, dst string) error {
 		return err
 	}
 
-	in, err := os.Open(src)
+	in, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
+	if err := os.WriteFile(dst, in, 0644); err != nil {
 		return err
 	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
-	}
-	return out.Close()
+	return nil
 }
