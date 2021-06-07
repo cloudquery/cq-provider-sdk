@@ -179,8 +179,8 @@ func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func()
 			select {
 			case <-applyDone:
 				return
-			case time := <-ticker.C:
-				log.Printf("%s applying for %v", resource.Table.Name, time.Sub(startTime))
+			case timestamp := <-ticker.C:
+				log.Printf("%s applying for %v", resource.Table.Name, timestamp.Sub(startTime))
 			}
 		}
 	}()
@@ -419,20 +419,4 @@ func copyTfFiles(name string) (string, error) {
 	}
 
 	return workdir, nil
-}
-
-// cp - copies file
-func cp(src, dst string) error {
-	if _, err := os.Stat(src); err != nil {
-		return err
-	}
-
-	in, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(dst, in, 0644); err != nil {
-		return err
-	}
-	return nil
 }
