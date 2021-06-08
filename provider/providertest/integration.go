@@ -81,7 +81,7 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 		}()
 	} else {
 		defer func() {
-			log.Printf("%s RESOURCES WERE NOT DESTROYTED. destry them manually.\n", resource.Table.Name)
+			log.Printf("%s RESOURCES WERE NOT DESTROYTED. destroy them manually.\n", resource.Table.Name)
 		}()
 	}
 	if err != nil {
@@ -149,6 +149,7 @@ func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func()
 	testPrefix := fmt.Sprintf("test_prefix=%s", resource.Prefix)
 
 	teardown := func() error {
+		log.Printf("%s destroy\n", resource.Table.Name)
 		err = tf.Destroy(context.Background(), tfexec.Var(testPrefix),
 			tfexec.Var(testSuffix))
 		if err != nil {
@@ -180,6 +181,8 @@ func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func()
 	go func() {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-applyDone:
 				return
 			case timestamp := <-ticker.C:
@@ -274,13 +277,9 @@ func verifyFields(resource ResourceIntegrationTestData, conn pgxscan.Querier) er
 		return fmt.Errorf("%s -> %w", verification.Name, err)
 	}
 
-	var s []string
-	if err := pgxscan.Select(context.Background(), conn, &s, query, args...); err != nil {
-		return fmt.Errorf("%s -> %w", verification.Name, err)
-	}
 	var data []map[string]interface{}
-	if err := json.Unmarshal([]byte(s[0]), &data); err != nil {
-		return err
+	if err := pgxscan.Get(context.Background(), conn, &data, query, args...); err != nil {
+		return fmt.Errorf("%s -> %w", verification.Name, err)
 	}
 
 	if err = compareDataWithExpected(verification.ExpectedValues, data); err != nil {
@@ -304,8 +303,8 @@ func verifyFields(resource ResourceIntegrationTestData, conn pgxscan.Querier) er
 func verifyRelations(relations []*ResourceIntegrationVerification, parentId interface{}, parentName string, conn pgxscan.Querier) error {
 	for _, relation := range relations {
 		// build query to get relation
-		psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
-		sq := psql.Select(fmt.Sprintf("json_agg(%s)", relation.Name)).
+		sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar).
+			Select(fmt.Sprintf("json_agg(%s)", relation.Name)).
 			From(relation.Name).
 			LeftJoin(fmt.Sprintf("%[1]s on %[1]s.id = %[3]s.%[2]s", parentName, relation.ForeignKeyName, relation.Name)).
 			Where(squirrel.Eq{fmt.Sprintf("%s.id", parentName): parentId})
@@ -314,14 +313,15 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 			return fmt.Errorf("%s -> %w", relation.Name, err)
 		}
 
-		var s string
-		if err := pgxscan.Select(context.Background(), conn, &s, query, args...); err != nil {
+		//var s string
+		var data []map[string]interface{}
+		if err := pgxscan.Get(context.Background(), conn, &data, query, args...); err != nil {
 			return fmt.Errorf("%s -> %w", relation.Name, err)
 		}
-		var data []map[string]interface{}
-		if err := json.Unmarshal([]byte(s), &data); err != nil {
-			return err
-		}
+		//var data []map[string]interface{}
+		//if err := json.Unmarshal([]byte(s), &data); err != nil {
+		//	return err
+		//}
 
 		if err = compareDataWithExpected(relation.ExpectedValues, data); err != nil {
 			return fmt.Errorf("%s -> %w", relation.Name, err)
