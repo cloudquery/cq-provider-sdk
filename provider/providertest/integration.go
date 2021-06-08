@@ -313,15 +313,10 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 			return fmt.Errorf("%s -> %w", relation.Name, err)
 		}
 
-		//var s string
 		var data []map[string]interface{}
 		if err := pgxscan.Get(context.Background(), conn, &data, query, args...); err != nil {
 			return fmt.Errorf("%s -> %w", relation.Name, err)
 		}
-		//var data []map[string]interface{}
-		//if err := json.Unmarshal([]byte(s), &data); err != nil {
-		//	return err
-		//}
 
 		if err = compareDataWithExpected(relation.ExpectedValues, data); err != nil {
 			return fmt.Errorf("%s -> %w", relation.Name, err)
