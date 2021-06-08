@@ -19,12 +19,12 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/logging"
 	"github.com/cloudquery/cq-provider-sdk/provider"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+	"github.com/georgysavva/scany/pgxscan"
 	"github.com/go-test/deep"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/hashicorp/terraform-exec/tfexec"
-	"github.com/jackc/pgx/v4"
 	"github.com/tmccombs/hcl2json/convert"
 )
 
@@ -73,19 +73,22 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	}
 
 	teardown, err := deploy(tf, &resource)
-	if teardown != nil && os.Getenv("TF_NO_DESTROY") != "true" {
+	if teardown != nil && getEnv("TF_NO_DESTROY", "") != "true" {
 		defer func() {
 			if err = teardown(); err != nil {
 				t.Fatal(err)
 			}
+		}()
+	} else {
+		defer func() {
+			log.Printf("%s RESOURCES WERE NOT DESTROYTED. destry them manually.\n", resource.Table.Name)
 		}()
 	}
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = fetch(providerCreator, &resource)
-	if err != nil {
+	if err = fetch(providerCreator, &resource); err != nil {
 		t.Fatal(err)
 	}
 
@@ -104,17 +107,17 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 
 // setup - puts *.tf files into isolated test dir and creates the instance of terraform
 func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
-	w, err := copyTfFiles(resource.Table.Name)
+	var err error
+	resource.workdir, err = copyTfFiles(resource.Table.Name)
 	if err != nil {
 		// remove workdir
 		if e := os.RemoveAll(resource.workdir); e != nil {
-			return nil, fmt.Errorf("failed to RemoveAll after: %s\n reason:%s", err, e)
+			return nil, fmt.Errorf("failed to RemoveAll after: %w\n reason:%s", err, e)
 		}
 		return nil, err
 	}
-	resource.workdir = w
 
-	lookPath := os.Getenv("TF_EXEC_PATH")
+	lookPath := getEnv("TF_EXEC_PATH", "")
 	if lookPath == "" {
 		lookPath = "terraform"
 	}
@@ -160,7 +163,7 @@ func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func()
 	}
 
 	ctx := context.Background()
-	if i, err := strconv.Atoi(os.Getenv("TF_EXEC_TIMEOUT")); err == nil {
+	if i, err := strconv.Atoi(getEnv("TF_EXEC_TIMEOUT", "")); err == nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(i)*time.Minute)
 		defer cancel()
@@ -204,29 +207,34 @@ func fetch(providerCreator func() *provider.Provider, resource *ResourceIntegrat
 	f := hclwrite.NewFile()
 	f.Body().AppendBlock(gohcl.EncodeAsBlock(resource.Config, "configuration"))
 	data, err := convert.Bytes(f.Bytes(), "config.json", convert.Options{})
-	hack := map[string]interface{}{}
-	_ = json.Unmarshal(data, &hack)
-	data, _ = json.Marshal(hack["configuration"].([]interface{})[0])
+	if err != nil {
+		return err
+	}
+	c := map[string]interface{}{}
+	_ = json.Unmarshal(data, &c)
+	data, err = json.Marshal(c["configuration"].([]interface{})[0])
 	if err != nil {
 		return err
 	}
 
 	testProvider.Configure = resource.Configure
-	_, err = testProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
+	if _, err = testProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
 		CloudQueryVersion: "",
 		Connection: cqproto.ConnectionDetails{DSN: getEnv("DATABASE_URL",
 			"host=localhost user=postgres password=pass DB.name=postgres port=5432")},
 		Config: data,
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
-	err = testProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)}}, fakeResourceSender{})
-	if err != nil {
+	if err = testProvider.FetchResources(context.Background(),
+		&cqproto.FetchResourcesRequest{
+			Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)},
+		},
+		fakeResourceSender{},
+	); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -247,12 +255,14 @@ func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
 }
 
 // verifyFields - gets the root db entry and check all its expected relations
-func verifyFields(resource ResourceIntegrationTestData, conn *pgx.Conn) error {
+func verifyFields(resource ResourceIntegrationTestData, conn pgxscan.Querier) error {
 	verification := resource.VerificationBuilder(&resource)
 
 	// build query to get the root object
-	psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
-	sq := psql.Select(fmt.Sprintf("json_agg(%s)", verification.Name)).From(verification.Name)
+	sq := squirrel.StatementBuilder.
+		PlaceholderFormat(squirrel.Dollar).
+		Select(fmt.Sprintf("json_agg(%s)", verification.Name)).
+		From(verification.Name)
 	// use special filter if it is set.
 	if verification.Filter != nil {
 		sq = verification.Filter(sq, &resource)
@@ -261,16 +271,20 @@ func verifyFields(resource ResourceIntegrationTestData, conn *pgx.Conn) error {
 	}
 	query, args, err := sq.ToSql()
 	if err != nil {
-		return fmt.Errorf("%s -> %s", verification.Name, err)
+		return fmt.Errorf("%s -> %w", verification.Name, err)
 	}
-	row := conn.QueryRow(context.Background(), query, args...)
-	data, err := getDataFromRow(row)
-	if err != nil {
-		return fmt.Errorf("%s -> %s", verification.Name, err)
+
+	var s []string
+	if err := pgxscan.Select(context.Background(), conn, &s, query, args...); err != nil {
+		return fmt.Errorf("%s -> %w", verification.Name, err)
+	}
+	var data []map[string]interface{}
+	if err := json.Unmarshal([]byte(s[0]), &data); err != nil {
+		return err
 	}
 
 	if err = compareDataWithExpected(verification.ExpectedValues, data); err != nil {
-		return fmt.Errorf("verification failed for table %s; %s", resource.Table.Name, err)
+		return fmt.Errorf("verification failed for table %s; %w", resource.Table.Name, err)
 	}
 
 	// verify root entry relations
@@ -280,14 +294,14 @@ func verifyFields(resource ResourceIntegrationTestData, conn *pgx.Conn) error {
 			return fmt.Errorf("failed to get parent id for %s", resource.Table.Name)
 		}
 		if err = verifyRelations(verification.Relations, id, resource.Table.Name, conn); err != nil {
-			return fmt.Errorf("verification failed for relations of table entry %s; id: %v -> %s", resource.Table.Name, id, err)
+			return fmt.Errorf("verification failed for relations of table entry %s; id: %v -> %w", resource.Table.Name, id, err)
 		}
 	}
 	return nil
 }
 
 // verifyRelations - recursively runs through all the relations and compares their values with expected data
-func verifyRelations(relations []*ResourceIntegrationVerification, parentId interface{}, parentName string, conn *pgx.Conn) error {
+func verifyRelations(relations []*ResourceIntegrationVerification, parentId interface{}, parentName string, conn pgxscan.Querier) error {
 	for _, relation := range relations {
 		// build query to get relation
 		psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
@@ -297,16 +311,20 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 			Where(squirrel.Eq{fmt.Sprintf("%s.id", parentName): parentId})
 		query, args, err := sq.ToSql()
 		if err != nil {
-			return fmt.Errorf("%s -> %s", relation.Name, err)
+			return fmt.Errorf("%s -> %w", relation.Name, err)
 		}
-		row := conn.QueryRow(context.Background(), query, args...)
-		data, err := getDataFromRow(row)
-		if err != nil {
-			return fmt.Errorf("%s -> %s", relation.Name, err)
+
+		var s string
+		if err := pgxscan.Select(context.Background(), conn, &s, query, args...); err != nil {
+			return fmt.Errorf("%s -> %w", relation.Name, err)
+		}
+		var data []map[string]interface{}
+		if err := json.Unmarshal([]byte(s), &data); err != nil {
+			return err
 		}
 
 		if err = compareDataWithExpected(relation.ExpectedValues, data); err != nil {
-			return fmt.Errorf("%s -> %s", relation.Name, err)
+			return fmt.Errorf("%s -> %w", relation.Name, err)
 		}
 
 		// verify relation entry relations
@@ -316,7 +334,7 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 				return fmt.Errorf("failed to get parent id for %s", relation.Name)
 			}
 			if err = verifyRelations(relation.Relations, id, relation.Name, conn); err != nil {
-				return fmt.Errorf("%s id: %v -> %s", relation.Name, id, err)
+				return fmt.Errorf("%s id: %v -> %w", relation.Name, id, err)
 			}
 		}
 	}
@@ -342,13 +360,12 @@ func compareDataWithExpected(expected []ExpectedValue, received []map[string]int
 				continue // this row is already verified - skip
 			}
 			err := compareData(verification.Data, toCompare[i])
-			if err == nil {
-				toCompare[i] = nil // row passed verification - it won't be used
-				found++
-			} else {
+			if err != nil {
 				errors = append(errors, err)
+				continue
 			}
-
+			toCompare[i] = nil // row passed verification - it won't be used
+			found++
 		}
 		if verification.Count != found {
 			return fmt.Errorf("expected to have %d but got %d entries with one of the %v\nerrors: %v", verification.Count, found, verification.Data, errors)
@@ -373,20 +390,6 @@ func simplifyString(in string) string {
 	return strings.ToLower(tfVarRegex.ReplaceAllString(in, ""))
 }
 
-// getDataFromRow - reads the row from db into an array jsons: []map[string]interface{}
-func getDataFromRow(row pgx.Row) ([]map[string]interface{}, error) {
-	var resp []map[string]interface{}
-	var data string
-
-	if err := row.Scan(&data); err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal([]byte(data), &resp); err != nil {
-		return nil, err
-	}
-	return resp, nil
-}
-
 // copyTfFiles - copies tf files that are related to current test
 func copyTfFiles(name string) (string, error) {
 	workdir := filepath.Join(tfDir, name)
@@ -394,29 +397,28 @@ func copyTfFiles(name string) (string, error) {
 		if err := os.MkdirAll(workdir, os.ModePerm); err != nil {
 			return workdir, err
 		}
-	} else {
-		return workdir, err
+	} else if err != nil {
+		return "", err
 	}
 
-	err := cp(filepath.Join(tfOrigin, name+".tf"), filepath.Join(workdir, name+".tf"))
-	if err != nil {
-		return workdir, err
-	}
+	files := make(map[string]string)
+	files[filepath.Join(tfOrigin, name+".tf")] = filepath.Join(workdir, name+".tf")
+	files[filepath.Join(tfOrigin, "variables.tf")] = filepath.Join(workdir, "variables.tf")
+	files[filepath.Join(tfOrigin, "provider.tf")] = filepath.Join(workdir, "provider.tf")
+	files[filepath.Join(tfOrigin, "versions.tf")] = filepath.Join(workdir, "versions.tf")
 
-	err = cp(filepath.Join(tfOrigin, "variables.tf"), filepath.Join(workdir, "variables.tf"))
-	if err != nil {
-		return workdir, err
-	}
+	for src, dst := range files {
+		if _, err := os.Stat(src); err != nil {
+			return "", err
+		}
 
-	err = cp(filepath.Join(tfOrigin, "provider.tf"), filepath.Join(workdir, "provider.tf"))
-	if err != nil {
-		return workdir, err
+		in, err := os.ReadFile(src)
+		if err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(dst, in, 0644); err != nil {
+			return "", err
+		}
 	}
-
-	err = cp(filepath.Join(tfOrigin, "versions.tf"), filepath.Join(workdir, "versions.tf"))
-	if err != nil {
-		return workdir, err
-	}
-
 	return workdir, nil
 }
