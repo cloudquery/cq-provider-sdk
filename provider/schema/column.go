@@ -28,6 +28,7 @@ const (
 	TypeStringArray
 	TypeIntArray
 	TypeTimestamp
+	TypeInterval
 	TypeJSON
 	TypeUUIDArray
 )
@@ -56,6 +57,8 @@ func (v ValueType) String() string {
 		return "TypeStringArray"
 	case TypeTimestamp:
 		return "TypeTimestamp"
+	case TypeInterval:
+		return "TypeInterval"
 	case TypeByteArray:
 		return "TypeByteArray"
 	case TypeUUIDArray:
@@ -93,6 +96,8 @@ func ValueTypeFromString(s string) ValueType {
 		return TypeByteArray
 	case "timestamp", "TypeTimestamp":
 		return TypeTimestamp
+	case "interval", "TypeInterval":
+		return TypeInterval
 	case "uuidarray", "TypeUUIDArray":
 		return TypeUUIDArray
 	case "invalid", "TypeInvalid":
@@ -156,7 +161,7 @@ func (c Column) checkType(v interface{}) bool {
 	case uint16, int32, *int32:
 		return c.Type == TypeInt
 	case int, *int, uint32, *uint32, int64, *int64:
-		return c.Type == TypeBigInt
+		return c.Type == TypeBigInt || c.Type == TypeInterval
 	case []byte:
 		if c.Type == TypeUUID {
 			if _, err := uuid.FromBytes(val); err != nil {
@@ -189,12 +194,16 @@ func (c Column) checkType(v interface{}) bool {
 		return c.Type == TypeIntArray
 	case time.Time, *time.Time:
 		return c.Type == TypeTimestamp
+	case time.Duration, *time.Duration:
+		return c.Type == TypeInterval
 	case uuid.UUID, *uuid.UUID:
 		return c.Type == TypeUUID
 	case gofrs.UUID, *gofrs.UUID:
 		return c.Type == TypeUUID
 	case [16]byte:
 		return c.Type == TypeUUID
+	case []interface{}:
+		return c.Type == TypeJSON
 	case interface{}:
 		kindName := reflect2.TypeOf(v).Kind()
 		if kindName == reflect.String && c.Type == TypeString {
@@ -221,6 +230,7 @@ func (c Column) checkType(v interface{}) bool {
 		if c.Type == TypeBigInt && (kindName == reflect.Int || kindName == reflect.Int64 || kindName == reflect.Uint || kindName == reflect.Uint32 || kindName == reflect.Uint64) {
 			return true
 		}
+		return c.Type == TypeJSON
 	}
 
 	return false
