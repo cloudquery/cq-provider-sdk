@@ -18,6 +18,7 @@ func GenerateDocs(p *provider.Provider, outputPath string) error {
 	for _, table := range p.ResourceMap {
 		if err := renderAllTables(table, outputPath); err != nil {
 			fmt.Printf("render table error: %s", err)
+			return err
 		}
 	}
 	return nil
