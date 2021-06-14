@@ -4,12 +4,13 @@ package docs
 import (
 	"bytes"
 	"fmt"
-	"github.com/cloudquery/cq-provider-sdk/provider"
-	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/cloudquery/cq-provider-sdk/provider"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 )
 
 // GenerateDocs creates table documentation for the provider based on it's ResourceMap
@@ -53,7 +54,6 @@ func renderTable(table *schema.Table, path string) error {
 	}
 	return ioutil.WriteFile(filepath.Join(path, "tables", fmt.Sprintf("%s.md", table.Name)), buf.Bytes(), 0644)
 }
-
 
 const tableTmpl = `
 # Table: {{.Name}}
