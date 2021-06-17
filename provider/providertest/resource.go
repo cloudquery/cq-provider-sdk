@@ -24,10 +24,11 @@ import (
 )
 
 type ResourceTestData struct {
-	Table     *schema.Table
-	Config    interface{}
-	Resources []string
-	Configure func(logger hclog.Logger, data interface{}) (schema.ClientMeta, error)
+	Table          *schema.Table
+	Config         interface{}
+	Resources      []string
+	Configure      func(logger hclog.Logger, data interface{}) (schema.ClientMeta, error)
+	SkipEmptyJsonB bool
 }
 
 func TestResource(t *testing.T, providerCreator func() *provider.Provider, resource ResourceTestData) {
@@ -55,12 +56,13 @@ func TestResource(t *testing.T, providerCreator func() *provider.Provider, resou
 	testProvider.Configure = resource.Configure
 	_, err = testProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
 		CloudQueryVersion: "",
-		Connection:        cqproto.ConnectionDetails{DSN: "host=localhost user=postgres password=pass DB.name=postgres port=5432"},
-		Config:            data,
+		Connection: cqproto.ConnectionDetails{DSN: getEnv("DATABASE_URL",
+			"host=localhost user=postgres password=pass DB.name=postgres port=5432")},
+		Config: data,
 	})
 	assert.Nil(t, err)
 
-	_ = testProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)}}, fakeResourceSender{})
+	err = testProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)}}, fakeResourceSender{})
 	assert.Nil(t, err)
 	verifyNoEmptyColumns(t, resource, conn)
 }
@@ -76,7 +78,10 @@ func findResourceFromTableName(table *schema.Table, tables map[string]*schema.Ta
 
 type fakeResourceSender struct{}
 
-func (f fakeResourceSender) Send(_ *cqproto.FetchResourcesResponse) error {
+func (f fakeResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
+	if r.Error != "" {
+		fmt.Printf(r.Error)
+	}
 	return nil
 }
 
@@ -116,6 +121,9 @@ func verifyNoEmptyColumns(t *testing.T, tc ResourceTestData, conn pgxscan.Querie
 		}
 		if count < 1 {
 			t.Fatalf("expected to have at least 1 entry at table %s got %d", table, count)
+		}
+		if tc.SkipEmptyJsonB {
+			continue
 		}
 		query = fmt.Sprintf("select t.* FROM %s as t WHERE to_jsonb(t) = jsonb_strip_nulls(to_jsonb(t))", table)
 		rows, err = conn.Query(context.Background(), query)
