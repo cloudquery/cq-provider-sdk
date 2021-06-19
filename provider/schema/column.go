@@ -32,8 +32,11 @@ const (
 	TypeJSON
 	TypeUUIDArray
 	TypeInet
+	TypeInetArray
 	TypeCIDR
+	TypeCIDRArray
 	TypeMacAddr
+	TypeMacAddrArray
 )
 
 func (v ValueType) String() string {
@@ -64,10 +67,16 @@ func (v ValueType) String() string {
 		return "TypeByteArray"
 	case TypeUUIDArray:
 		return "TypeUUIDArray"
+	case TypeInetArray:
+		return "TypeInetArray"
 	case TypeInet:
 		return "TypeInet"
+	case TypeMacAddrArray:
+		return "TypeMacAddrArray"
 	case TypeMacAddr:
 		return "TypeMacAddr"
+	case TypeCIDRArray:
+		return "TypeCIDRArray"
 	case TypeCIDR:
 		return "TypeCIDR"
 	case TypeInvalid:
@@ -107,10 +116,16 @@ func ValueTypeFromString(s string) ValueType {
 		return TypeUUIDArray
 	case "typeinet", "TypeInet":
 		return TypeInet
+	case "typeinetrarray", "TypeInetArray":
+		return TypeInetArray
 	case "typemacaddr", "TypeMacAddr":
 		return TypeMacAddr
+	case "typemacaddrarray", "TypeMacAddrArray":
+		return TypeMacAddrArray
 	case "typecidr", "TypeCIDR":
 		return TypeCIDR
+	case "typecidrarray", "TypeCIDRArray":
+		return TypeCIDRArray
 	case "invalid", "TypeInvalid":
 		return TypeInvalid
 	default:
@@ -213,10 +228,16 @@ func (c Column) checkType(v interface{}) bool {
 		return c.Type == TypeUUID
 	case net.HardwareAddr, *net.HardwareAddr:
 		return c.Type == TypeMacAddr
+	case []net.HardwareAddr, []*net.HardwareAddr:
+		return c.Type == TypeMacAddrArray
 	case net.IPAddr, *net.IPAddr, *net.IP, net.IP:
 		return c.Type == TypeInet
+	case []net.IPAddr, []*net.IPAddr, []*net.IP, []net.IP:
+		return c.Type == TypeIntArray
 	case net.IPNet, *net.IPNet:
 		return c.Type == TypeCIDR
+	case []net.IPNet, []*net.IPNet:
+		return c.Type == TypeCIDRArray
 	case interface{}:
 		kindName := reflect2.TypeOf(v).Kind()
 		if kindName == reflect.String && c.Type == TypeString {

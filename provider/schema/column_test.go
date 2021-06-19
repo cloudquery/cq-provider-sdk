@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"github.com/cloudquery/faker/v3"
 	"net"
 	"testing"
 	"time"
@@ -22,6 +23,15 @@ type SomeString string
 type SomeInt int
 
 type SomeInt16 int16
+
+func GenerateMac() net.HardwareAddr {
+	mac, _ := net.ParseMAC(faker.MacAddress())
+	return mac
+}
+func GenerateMacPtr() *net.HardwareAddr {
+	mac, _ := net.ParseMAC(faker.MacAddress())
+	return &mac
+}
 
 var validateFixtures = []validateFixture{
 	{
@@ -68,10 +78,12 @@ var validateFixtures = []validateFixture{
 	},
 	{
 		Column: Column{Type: TypeMacAddr},
-		TestValues: []interface{}{func() net.HardwareAddr {
-			mac, _ := net.ParseMAC("00:00:5e:00:53:01")
-			return mac
-		}()},
+		TestValues: []interface{}{GenerateMac(), GenerateMac(), GenerateMacPtr()},
+		BadValues: []interface{}{"asdasdsadads", -55, 44, "00:33:44:55:77:55"},
+	},
+	{
+		Column: Column{Type: TypeMacAddrArray},
+		TestValues: []interface{}{[]net.HardwareAddr{GenerateMac(), GenerateMac()}, []*net.HardwareAddr{GenerateMacPtr(), GenerateMacPtr()}},
 		BadValues: []interface{}{"asdasdsadads", -55, 44, "00:33:44:55:77:55"},
 	},
 	{
@@ -79,6 +91,7 @@ var validateFixtures = []validateFixture{
 		TestValues: []interface{}{net.ParseIP("127.0.0.1"), net.ParseIP("2b15:800f:a66b:0:1278:b7ad:6052:f444")},
 		BadValues:  []interface{}{"asdasdsadads", "127.0.0.1", "333"},
 	},
+
 	{
 		Column: Column{Type: TypeCIDR},
 		TestValues: []interface{}{func() *net.IPNet {
