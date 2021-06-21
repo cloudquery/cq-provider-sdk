@@ -114,17 +114,17 @@ func ValueTypeFromString(s string) ValueType {
 		return TypeTimestamp
 	case "uuidarray", "TypeUUIDArray":
 		return TypeUUIDArray
-	case "typeinet", "TypeInet":
+	case "inet", "TypeInet":
 		return TypeInet
-	case "typeinetrarray", "TypeInetArray":
+	case "inetrarray", "TypeInetArray":
 		return TypeInetArray
-	case "typemacaddr", "TypeMacAddr":
+	case "macaddr", "TypeMacAddr":
 		return TypeMacAddr
-	case "typemacaddrarray", "TypeMacAddrArray":
+	case "macaddrarray", "TypeMacAddrArray":
 		return TypeMacAddrArray
-	case "typecidr", "TypeCIDR":
+	case "cidr", "TypeCIDR":
 		return TypeCIDR
-	case "typecidrarray", "TypeCIDRArray":
+	case "cidrarray", "TypeCIDRArray":
 		return TypeCIDRArray
 	case "invalid", "TypeInvalid":
 		return TypeInvalid
