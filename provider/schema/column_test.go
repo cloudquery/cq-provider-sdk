@@ -2,11 +2,12 @@ package schema
 
 import (
 	"fmt"
-	"github.com/cloudquery/faker/v3"
 	"math/rand"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/cloudquery/faker/v3"
 
 	"github.com/thoas/go-funk"
 
@@ -94,14 +95,14 @@ var validateFixtures = []validateFixture{
 		BadValues:  []interface{}{[]interface{}{1, 2, 3}},
 	},
 	{
-		Column: Column{Type: TypeMacAddr},
+		Column:     Column{Type: TypeMacAddr},
 		TestValues: []interface{}{GenerateMac(), GenerateMac(), GenerateMacPtr()},
-		BadValues: []interface{}{"asdasdsadads", -55, 44, "00:33:44:55:77:55"},
+		BadValues:  []interface{}{"asdasdsadads", -55, 44, "00:33:44:55:77:55"},
 	},
 	{
-		Column: Column{Type: TypeMacAddrArray},
+		Column:     Column{Type: TypeMacAddrArray},
 		TestValues: []interface{}{[]net.HardwareAddr{GenerateMac(), GenerateMac()}, []*net.HardwareAddr{GenerateMacPtr(), GenerateMacPtr()}},
-		BadValues: []interface{}{"asdasdsadads", -55, 44, "00:33:44:55:77:55"},
+		BadValues:  []interface{}{"asdasdsadads", -55, 44, "00:33:44:55:77:55"},
 	},
 	{
 		Column:     Column{Type: TypeInet},
@@ -112,17 +113,17 @@ var validateFixtures = []validateFixture{
 	{
 		Column:     Column{Type: TypeInetArray},
 		TestValues: []interface{}{[]net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("2b15:800f:a66b:0:1278:b7ad:6052:f444")}, []*net.IP{GenerateIPv4Ptr(), GenerateIPv6Ptr()}},
-		BadValues:  []interface{}{"asdasdsadads", "127.0.0.1", net.ParseIP("127.0.0.1"),  []*net.HardwareAddr{GenerateMacPtr(), GenerateMacPtr()}},
+		BadValues:  []interface{}{"asdasdsadads", "127.0.0.1", net.ParseIP("127.0.0.1"), []*net.HardwareAddr{GenerateMacPtr(), GenerateMacPtr()}},
 	},
 	{
-		Column: Column{Type: TypeCIDR},
+		Column:     Column{Type: TypeCIDR},
 		TestValues: []interface{}{GenerateCIDR(), GenerateCIDR()},
-		BadValues: []interface{}{"asdasdsadads", 555, "127.0.0.1/24", net.IP{}},
+		BadValues:  []interface{}{"asdasdsadads", 555, "127.0.0.1/24", net.IP{}},
 	},
 	{
-		Column: Column{Type: TypeCIDRArray},
+		Column:     Column{Type: TypeCIDRArray},
 		TestValues: []interface{}{[]*net.IPNet{GenerateCIDR(), GenerateCIDR()}, []*net.IPNet{}, []net.IPNet{}},
-		BadValues: []interface{}{"asdasdsadads", 555, "127.0.0.1/24", net.IPNet{}, net.IP{}},
+		BadValues:  []interface{}{"asdasdsadads", 555, "127.0.0.1/24", net.IPNet{}, net.IP{}},
 	},
 }
 
