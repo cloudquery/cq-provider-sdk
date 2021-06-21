@@ -233,7 +233,7 @@ func (c Column) checkType(v interface{}) bool {
 	case net.IPAddr, *net.IPAddr, *net.IP, net.IP:
 		return c.Type == TypeInet
 	case []net.IPAddr, []*net.IPAddr, []*net.IP, []net.IP:
-		return c.Type == TypeIntArray
+		return c.Type == TypeInetArray
 	case net.IPNet, *net.IPNet:
 		return c.Type == TypeCIDR
 	case []net.IPNet, []*net.IPNet:
