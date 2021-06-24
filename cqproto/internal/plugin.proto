@@ -27,7 +27,7 @@ message ConfigureProvider {
     bytes config = 3;
     // Disables auto delete of table data before fetch of resources
     bool disableDelete = 4;
-    // Allows to inject inject & override fields into resource tables, use this carefully to override fields
+    // Allows to inject & override fields into resource tables, use this carefully to override fields
     bytes extraFields = 5;
   }
   message Response {

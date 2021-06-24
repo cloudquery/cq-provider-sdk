@@ -111,8 +111,10 @@ func (g *GRPCServer) GetProviderConfig(ctx context.Context, _ *internal.GetProvi
 func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.ConfigureProvider_Request) (*internal.ConfigureProvider_Response, error) {
 
 	var eFields = make(map[string]interface{})
-	if err := json.Unmarshal(request.GetExtraFields(), &eFields); err != nil {
-		return nil, err
+	if request.GetExtraFields() != nil {
+		if err := json.Unmarshal(request.GetExtraFields(), &eFields); err != nil {
+			return nil, err
+		}
 	}
 	resp, err := g.Impl.ConfigureProvider(ctx, &ConfigureProviderRequest{
 		CloudQueryVersion: request.GetCloudqueryVersion(),

@@ -4,7 +4,7 @@ var (
 	cqIdColumn = Column{
 		Name:        "cq_id",
 		Type:        TypeUUID,
-		Description: "Unique CloudQuery Id given to the resource",
+		Description: "Unique CloudQuery Id added to every resource",
 	}
 )
 
