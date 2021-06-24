@@ -18,7 +18,6 @@ require (
 	github.com/hashicorp/hcl/v2 v2.10.0
 	github.com/hashicorp/terraform-exec v0.13.3
 	github.com/hashicorp/yamux v0.0.0-20210316155119-a95892c5f864 // indirect
-	github.com/huandu/go-sqlbuilder v1.12.1
 	github.com/iancoleman/strcase v0.1.3
 	github.com/jackc/pgmock v0.0.0-20201204152224-4fe30f7445fd // indirect
 	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
@@ -26,6 +25,7 @@ require (
 	github.com/jhump/protoreflect v1.8.2 // indirect
 	github.com/lib/pq v1.10.1 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
+	github.com/mitchellh/hashstructure v1.1.0
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/stretchr/objx v0.3.0 // indirect
