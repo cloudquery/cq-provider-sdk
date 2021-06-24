@@ -18,7 +18,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"id", "some_string"},
+		ExpectedColumnNames: []string{"cq_id", "some_string"},
 		ExpectedHasId:       false,
 	},
 	{
@@ -36,7 +36,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"id", "some_string", "some_int"},
+		ExpectedColumnNames: []string{"cq_id", "some_string", "some_int"},
 		ExpectedHasId:       true,
 	},
 	{
@@ -62,7 +62,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"id", "some_string", "some_int", "embedded_some_string", "embedded_some_int"},
+		ExpectedColumnNames: []string{"cq_id", "some_string", "some_int", "embedded_some_string", "embedded_some_int"},
 	},
 
 	{
@@ -84,7 +84,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"id", "some_int", "embedded_some_string", "embedded_inner_some_int"},
+		ExpectedColumnNames: []string{"cq_id", "some_int", "embedded_some_string", "embedded_inner_some_int"},
 	},
 	{
 		Name: "simpleTableWithEmbedded",
@@ -109,7 +109,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"id", "some_string", "some_int", "some_string_no_prefix", "some_int_no_prefix"},
+		ExpectedColumnNames: []string{"cq_id", "some_string", "some_int", "some_string_no_prefix", "some_int_no_prefix"},
 	},
 }
 
