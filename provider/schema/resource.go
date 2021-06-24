@@ -3,6 +3,7 @@ package schema
 import (
 	"crypto"
 	"fmt"
+
 	"github.com/mitchellh/hashstructure"
 	"github.com/thoas/go-funk"
 
@@ -106,7 +107,7 @@ func hashUUID(objs interface{}) (uuid.UUID, error) {
 
 func getResourceColumns(t *Table, fields map[string]interface{}) []string {
 	columns := t.ColumnNames()
-	for k, _ := range fields {
+	for k := range fields {
 		columns = append(columns, k)
 	}
 	return columns

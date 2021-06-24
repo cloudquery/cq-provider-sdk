@@ -32,11 +32,11 @@ type ExecutionData struct {
 // NewExecutionData Create a new execution data
 func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDelete bool, extraFields map[string]interface{}) ExecutionData {
 	return ExecutionData{
-		Table:  table,
-		Db:     db,
-		Logger: logger,
+		Table:         table,
+		Db:            db,
+		Logger:        logger,
 		disableDelete: disableDelete,
-		extraFields: extraFields,
+		extraFields:   extraFields,
 	}
 }
 
@@ -65,11 +65,11 @@ func (e ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, parent
 
 func (e ExecutionData) WithTable(t *Table) ExecutionData {
 	return ExecutionData{
-		Table:  t,
-		Db:     e.Db,
-		Logger: e.Logger,
+		Table:         t,
+		Db:            e.Db,
+		Logger:        e.Logger,
 		disableDelete: e.disableDelete,
-		extraFields: e.extraFields,
+		extraFields:   e.extraFields,
 	}
 }
 
@@ -181,7 +181,6 @@ func (e ExecutionData) resolveColumns(ctx context.Context, meta ClientMeta, reso
 	}
 	return nil
 }
-
 
 func interfaceSlice(slice interface{}) []interface{} {
 	// if value is nil return nil

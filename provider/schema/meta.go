@@ -1,10 +1,10 @@
 package schema
 
 var (
-	cqIdColumn =  Column{
-		Name:            "cq_id",
-		Type:            TypeUUID,
-		Description:     "Unique CloudQuery Id given to the resource",
+	cqIdColumn = Column{
+		Name:        "cq_id",
+		Type:        TypeUUID,
+		Description: "Unique CloudQuery Id given to the resource",
 	}
 )
 

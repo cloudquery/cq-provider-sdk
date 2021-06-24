@@ -72,4 +72,3 @@ type TableCreationOptions struct {
 	// and a "id" column will be created for the table. If this nil a random unique Id is generated.
 	PrimaryKeys []string
 }
-

@@ -229,7 +229,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Equal(t, 1, expectedResource.extraFields["injected_field"])
 		values, err := expectedResource.Values()
 		assert.Nil(t, err)
-		assert.Equal(t,[]string{"cq_id", "name", "name_no_prefix", "prefix_name", "injected_field"}, expectedResource.columns)
+		assert.Equal(t, []string{"cq_id", "name", "name_no_prefix", "prefix_name", "injected_field"}, expectedResource.columns)
 		assert.Equal(t, []interface{}{expectedResource.cqId, "other", "name_no_prefix", "prefix_name", 1}, values)
 	})
 }
