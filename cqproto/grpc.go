@@ -51,7 +51,7 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 		},
 		Config:        request.Config,
 		DisableDelete: request.DisableDelete,
-		ExtraFields:  fieldsData,
+		ExtraFields:   fieldsData,
 	})
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 		},
 		Config:        request.Config,
 		DisableDelete: request.DisableDelete,
-		ExtraFields:  eFields,
+		ExtraFields:   eFields,
 	})
 	if err != nil {
 		return nil, err
