@@ -8,14 +8,13 @@ package internal
 
 import (
 	context "context"
-	reflect "reflect"
-	sync "sync"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -578,7 +577,7 @@ type ConfigureProvider_Request struct {
 	Config []byte `protobuf:"bytes,3,opt,name=config,proto3" json:"config,omitempty"`
 	// Disables auto delete of table data before fetch of resources
 	DisableDelete bool `protobuf:"varint,4,opt,name=disableDelete,proto3" json:"disableDelete,omitempty"`
-	// Allows to inject inject & override fields into resource tables, use this carefully to override fields
+	// Allows to inject & override fields into resource tables, use this carefully to override fields
 	ExtraFields []byte `protobuf:"bytes,5,opt,name=extraFields,proto3" json:"extraFields,omitempty"`
 }
 
