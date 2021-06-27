@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jackc/pgx/v4/pgxpool"
+
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/faker/v3"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -19,7 +21,6 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/hashicorp/go-hclog"
-	"github.com/jackc/pgx/v4"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,9 +39,21 @@ func TestResource(t *testing.T, providerCreator func() *provider.Provider, resou
 	if err := faker.SetRandomMapAndSliceMaxSize(1); err != nil {
 		t.Fatal(err)
 	}
-	conn, err := setupDatabase()
+	ctx := context.Background()
+
+	pool, err := setupDatabase()
 	if err != nil {
 		t.Fatal(err)
+	}
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	l := logging.New(hclog.DefaultOptions)
+	migrator := provider.NewMigrator(l)
+	if err := migrator.CreateTable(ctx, conn, resource.Table, nil); err != nil {
+		assert.FailNow(t, "failed to create tables %s", err)
 	}
 	// Write configuration as a block and extract it out passing that specific block data as part of the configure provider
 	f := hclwrite.NewFile()
@@ -52,7 +65,7 @@ func TestResource(t *testing.T, providerCreator func() *provider.Provider, resou
 	assert.Nil(t, err)
 
 	testProvider := providerCreator()
-	testProvider.Logger = logging.New(hclog.DefaultOptions)
+	testProvider.Logger = l
 	testProvider.Configure = resource.Configure
 	_, err = testProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
 		CloudQueryVersion: "",
@@ -85,18 +98,18 @@ func (f fakeResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 	return nil
 }
 
-func setupDatabase() (*pgx.Conn, error) {
-	dbCfg, err := pgx.ParseConfig(getEnv("DATABASE_URL",
+func setupDatabase() (*pgxpool.Pool, error) {
+	dbCfg, err := pgxpool.ParseConfig(getEnv("DATABASE_URL",
 		"host=localhost user=postgres password=pass DB.name=postgres port=5432"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config. %w", err)
 	}
 	ctx := context.Background()
-	conn, err := pgx.ConnectConfig(ctx, dbCfg)
+	pool, err := pgxpool.ConnectConfig(ctx, dbCfg)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database. %w", err)
 	}
-	return conn, nil
+	return pool, nil
 
 }
 

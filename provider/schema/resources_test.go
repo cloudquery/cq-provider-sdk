@@ -87,7 +87,7 @@ func TestResourcePrimaryKey(t *testing.T) {
 // TestResourcePrimaryKey checks resource id generation when primary key is set on table
 func TestResourceAddColumns(t *testing.T) {
 	r := NewResourceData(testPrimaryKeyTable, nil, nil, map[string]interface{}{"new_field": 1})
-	assert.Equal(t, []string{"cq_id", "primary_key_str", "new_field"}, r.columns)
+	assert.Equal(t, []string{"primary_key_str", "cq_id", "meta", "new_field"}, r.columns)
 }
 
 func TestResourceColumns(t *testing.T) {
@@ -98,7 +98,7 @@ func TestResourceColumns(t *testing.T) {
 	assert.Equal(t, r.Get("name"), "test")
 	v, err := r.Values()
 	assert.Nil(t, err)
-	assert.Equal(t, v, []interface{}{r.Id(), "test", nil, nil})
+	assert.Equal(t, v, []interface{}{"test", nil, nil, nil, nil})
 	// Set invalid type to resource
 	errf = r.Set("name", 5)
 	assert.Nil(t, errf)
@@ -115,7 +115,7 @@ func TestResourceColumns(t *testing.T) {
 	assert.Nil(t, errf)
 	v, err = r.Values()
 	assert.Nil(t, err)
-	assert.Equal(t, v, []interface{}{r.cqId, "test", "name_no_prefix", "prefix_name"})
+	assert.Equal(t, v, []interface{}{"test", "name_no_prefix", "prefix_name", nil, nil})
 
 	// check non existing col
 	err = r.Set("non_exist_col", "test")
@@ -147,7 +147,7 @@ func TestResourceResolveColumns(t *testing.T) {
 		assert.Nil(t, err)
 		v, err := r.Values()
 		assert.Nil(t, err)
-		assert.Equal(t, v, []interface{}{r.cqId, "test", "name_no_prefix", "prefix_name"})
+		assert.Equal(t, v, []interface{}{"test", "name_no_prefix", "prefix_name", nil, nil})
 	})
 
 	t.Run("test resolve zero columns", func(t *testing.T) {
@@ -166,16 +166,18 @@ func TestResourceResolveColumns(t *testing.T) {
 		assert.Nil(t, err)
 		v, err := r.Values()
 		assert.Nil(t, err)
-		assert.Equal(t, []interface{}{r.cqId, false, 0, true}, v[:4])
-		assert.Equal(t, 0, *v[5].(*int))
-		assert.Equal(t, 5, *v[6].(*int))
-		assert.Equal(t, "", v[7].(string))
+		assert.Equal(t, []interface{}{false, 0, true}, v[:3])
+		assert.Equal(t, 0, *v[4].(*int))
+		assert.Equal(t, 5, *v[5].(*int))
+		assert.Equal(t, "", v[6].(string))
+		assert.Equal(t, nil, v[7])
+		assert.Equal(t, nil, v[8])
 
 		object.ZeroIntPtr = nil
 		r = NewResourceData(testZeroTable, nil, object, nil)
 		err = exec.resolveColumns(context.TODO(), mockedClient, r, testZeroTable.Columns)
 		assert.Nil(t, err)
 		v, _ = r.Values()
-		assert.Equal(t, nil, v[5])
+		assert.Equal(t, nil, v[4])
 	})
 }

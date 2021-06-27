@@ -152,8 +152,10 @@ func (e ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMet
 		}
 	}
 	// Finally generate cq_id for resource
-	if err := resource.GenerateCQId(); err != nil {
-		return err
+	for _, c := range GetDefaultSDKColumns() {
+		if err := c.Resolver(ctx, meta, resource, c); err != nil {
+			return err
+		}
 	}
 	return nil
 }

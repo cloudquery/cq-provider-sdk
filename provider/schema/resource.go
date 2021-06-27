@@ -56,8 +56,7 @@ func (r *Resource) Id() uuid.UUID {
 
 func (r *Resource) Values() ([]interface{}, error) {
 	values := make([]interface{}, 0)
-	values = append(values, r.Id())
-	for _, c := range r.table.Columns {
+	for _, c := range append(r.table.Columns, GetDefaultSDKColumns()...) {
 		v := r.Get(c.Name)
 		if err := c.ValidateType(v); err != nil {
 			return nil, err

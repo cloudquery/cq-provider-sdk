@@ -47,7 +47,10 @@ func (t Table) ColumnNames() []string {
 	for i, c := range t.Columns {
 		cn[i] = c.Name
 	}
-	return append([]string{"cq_id"}, cn...)
+	for _, c := range GetDefaultSDKColumns() {
+		cn = append(cn, c.Name)
+	}
+	return cn
 }
 
 func (t Table) Column(name string) *Column {
