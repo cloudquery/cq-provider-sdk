@@ -2,6 +2,8 @@ package schema
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
 	"sync/atomic"
 
 	"github.com/hashicorp/go-hclog"
@@ -80,7 +82,14 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	res := make(chan interface{})
 	var resolverErr error
 	go func() {
-		defer close(res)
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Print(string(debug.Stack()))
+				e.Logger.Error("Fetch task exited with panic", e.Table.Name, string(debug.Stack()))
+			}
+			close(res)
+		}()
+
 		resolverErr = e.Table.Resolver(ctx, client, parent, res)
 	}()
 
