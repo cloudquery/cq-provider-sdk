@@ -3,6 +3,7 @@ package schema
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime/debug"
 	"sync/atomic"
 
@@ -84,7 +85,7 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Print(string(debug.Stack()))
+				fmt.Fprintf(os.Stderr, "Fetch task exited with panic:\n%s\n", debug.Stack())
 				e.Logger.Error("Fetch task exited with panic", e.Table.Name, string(debug.Stack()))
 			}
 			close(res)
