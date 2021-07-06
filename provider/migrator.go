@@ -22,7 +22,7 @@ const (
 	maxTableName      = 60
 	queryTableColumns = `SELECT array_agg(column_name::text) as columns FROM information_schema.columns WHERE table_name = $1`
 	addColumnToTable  = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %v %v;`
-	createCQIdIndex   = `CREATE INDEX IF NOT EXISTS idx_cq_id ON %s(cq_id)`
+	createCQIdIndex   = `CREATE UNIQUE INDEX IF NOT EXISTS idx_cq_id ON %s(cq_id)`
 )
 
 // Migrator handles creation of schema.Table in database if they don't exist, and migration of tables if provider was upgraded.
