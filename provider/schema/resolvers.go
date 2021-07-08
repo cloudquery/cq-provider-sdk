@@ -24,9 +24,17 @@ func ParentIdResolver(_ context.Context, _ ClientMeta, r *Resource, c Column) er
 	return r.Set(c.Name, r.Parent.Id())
 }
 
-// ParentFieldResolver resolves a field from the parent
-func ParentFieldResolver(name string) ColumnResolver {
+// ParentResourceFieldResolver resolves a field from the parent's resource, the value is expected to be set
+// if name isn't set the field will be set to null
+func ParentResourceFieldResolver(name string) ColumnResolver {
 	return func(_ context.Context, _ ClientMeta, r *Resource, c Column) error {
 		return r.Set(c.Name, r.Parent.Get(name))
+	}
+}
+
+// ParentPathResolver resolves a field from the parent
+func ParentPathResolver(path string) ColumnResolver {
+	return func(_ context.Context, _ ClientMeta, r *Resource, c Column) error {
+		return r.Set(c.Name, funk.Get(r.Parent.Item, path, funk.WithAllowZero()))
 	}
 }

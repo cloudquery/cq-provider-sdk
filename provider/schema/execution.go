@@ -78,12 +78,8 @@ func (e ExecutionData) WithTable(t *Table) ExecutionData {
 
 func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, parent *Resource) (uint64, error) {
 
-	if !e.disableDelete && parent == nil && e.Table.DeleteFilter != nil {
-		// Delete previous fetch
-		if err := e.Db.Delete(ctx, e.Table, e.Table.DeleteFilter(client)); err != nil {
-			client.Logger().Debug("cleaning table previous fetch", "table", e.Table.Name)
-			return 0, err
-		}
+	if err := e.truncateTable(ctx, client, parent); err != nil {
+		return 0, err
 	}
 
 	res := make(chan interface{})
@@ -96,7 +92,6 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 			}
 			close(res)
 		}()
-
 		resolverErr = e.Table.Resolver(ctx, client, parent, res)
 	}()
 
