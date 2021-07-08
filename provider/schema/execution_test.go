@@ -16,8 +16,7 @@ import (
 var alwaysDeleteTable = &Table{
 	Name:         "always_delete_test_table",
 	AlwaysDelete: true,
-	Columns: []Column{{Name: "name", Type: TypeString},
-	},
+	Columns:      []Column{{Name: "name", Type: TypeString}},
 }
 
 var testTable = &Table{

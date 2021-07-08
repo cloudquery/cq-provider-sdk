@@ -1,11 +1,12 @@
 package schema
 
 import (
+	"testing"
+
 	"github.com/cloudquery/cq-provider-sdk/logging"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
 )
 
 func TestDeleteParentId(t *testing.T) {
