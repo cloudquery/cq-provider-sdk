@@ -23,4 +23,6 @@ func TestDeleteParentId(t *testing.T) {
 	r := NewResourceData(testTable, nil, object, nil)
 	_ = r.Set("name", "test")
 	assert.Equal(t, []interface{}{"name", "test", "test2", nil}, f(mockedClient, r))
+
+	assert.Nil(t, f(mockedClient, nil))
 }

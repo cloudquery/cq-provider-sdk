@@ -175,6 +175,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 	})
 
 	t.Run("test resolving with default column values", func(t *testing.T) {
+		mockDb := new(mockDatabase)
 		execDefault := NewExecutionData(mockDb, logger, testDefaultsTable, false, nil)
 		mockDb.On("Insert", mock.Anything, testDefaultsTable, mock.Anything).Return(nil)
 		testDefaultsTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *Resource, res chan interface{}) error {
@@ -192,6 +193,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 	})
 
 	t.Run("disable delete", func(t *testing.T) {
+		mockDb := new(mockDatabase)
 		exec := NewExecutionData(mockDb, logger, testTable, true, nil)
 		testTable.Resolver = dataReturningSingleResolver
 		testTable.DeleteFilter = func(meta ClientMeta, r *Resource) []interface{} {
