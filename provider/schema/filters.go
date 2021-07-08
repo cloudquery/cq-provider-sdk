@@ -7,5 +7,6 @@ func DeleteParentIdFilter(id string) func(meta ClientMeta, parent *Resource) []i
 			return nil
 		}
 		return []interface{}{id, parent.Id()}
+
 	}
 }
