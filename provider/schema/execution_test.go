@@ -220,6 +220,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 	})
 
 	t.Run("always delete with disable delete", func(t *testing.T) {
+		mockDb := new(mockDatabase)
 		exec := NewExecutionData(mockDb, logger, alwaysDeleteTable, true, nil)
 		alwaysDeleteTable.Resolver = dataReturningSingleResolver
 		alwaysDeleteTable.DeleteFilter = func(meta ClientMeta, r *Resource) []interface{} {
@@ -242,8 +243,10 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 	})
 
 	t.Run("inject fields into execution", func(t *testing.T) {
+		mockDb := new(mockDatabase)
 		exec := NewExecutionData(mockDb, logger, testTable, false, map[string]interface{}{"injected_field": 1})
 		testTable.Resolver = dataReturningSingleResolver
+		testTable.DeleteFilter = nil
 		var expectedResource *Resource
 		testTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
 			err := parent.Set("name", "other")
