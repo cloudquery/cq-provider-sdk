@@ -118,7 +118,6 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 	})
 	mockedClient.On("Logger", mock.Anything).Return(logger)
 
-
 	t.Run("failing table resolver", func(t *testing.T) {
 		testTable.Resolver = failingTableResolver
 		mockDb := new(databaseMock)

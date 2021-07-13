@@ -97,6 +97,3 @@ func (_m *databaseMock) Query(ctx context.Context, query string, args ...interfa
 
 	return r0, r1
 }
-
-
-func TestR

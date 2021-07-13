@@ -3,6 +3,7 @@ package schema
 import (
 	"crypto"
 	"fmt"
+
 	"github.com/mitchellh/hashstructure"
 	"github.com/thoas/go-funk"
 

@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/modern-go/reflect2"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/modern-go/reflect2"
 
 	"github.com/doug-martin/goqu/v9"
 
@@ -77,7 +78,7 @@ func (p PgDatabase) Insert(ctx context.Context, t *Table, resources []*Resource)
 }
 
 // CopyFrom copies all resources from []*Resource
-func (p PgDatabase) CopyFrom(ctx context.Context, resources Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error {
+func (p PgDatabase) CopyFrom(ctx context.Context, resources Resources, shouldCascade bool, cascadeDeleteFilters map[string]interface{}) error {
 	if len(resources) == 0 {
 		return nil
 	}
@@ -88,7 +89,7 @@ func (p PgDatabase) CopyFrom(ctx context.Context, resources Resources, shouldCas
 	}, func(tx pgx.Tx) error {
 		if shouldCascade {
 			q := goqu.Dialect("postgres").Delete(resources.TableName()).Where(goqu.Ex{"cq_id": resources.GetIds()})
-			for k, v := range CascadeDeleteFilters {
+			for k, v := range cascadeDeleteFilters {
 				q = q.Where(goqu.Ex{k: goqu.Op{"eq": v}})
 			}
 			sql, args, err := q.Prepared(true).ToSQL()
