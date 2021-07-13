@@ -116,9 +116,6 @@ func (p PgDatabase) CopyFrom(ctx context.Context, resources Resources, shouldCas
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
 	return err
 }
 
