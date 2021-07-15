@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added a changelog :)
 * Added support for user defined Primary Keys in [#41](https://github.com/cloudquery/cq-provider-sdk/pull/41)
 * Added support to disable delete of data [#41](https://github.com/cloudquery/cq-provider-sdk/pull/41)
-* Added meta field, this field holds when row updated last. [#41](https://github.com/cloudquery/cq-provider-sdk/pull/41)
+* Added meta field, meta information on the resource, for example: when resource updated last. [#41](https://github.com/cloudquery/cq-provider-sdk/pull/41)
 
 ### Changed
 * Changed default insert in provider from Insert to Copy-From, this method improved insert performance [#48](https://github.com/cloudquery/cq-provider-sdk/pull/48)
