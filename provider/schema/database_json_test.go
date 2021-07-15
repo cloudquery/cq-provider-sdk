@@ -8,90 +8,83 @@ import (
 
 var (
 	stringJson = "{\"test\":true}"
-	r1         = Resource{
-		data: map[string]interface{}{
-			"test": stringJson,
-			"meta": make(map[string]string),
-		},
-		table: &Table{
-			Name: "test_table_validator",
-			Columns: []Column{
-				{
-					Name: "test",
-					Type: TypeJSON,
-				},
+	resources  = []Resource{
+		{
+			data: map[string]interface{}{
+				"test": stringJson,
+				"meta": make(map[string]string),
 			},
-		}}
-	r2 = Resource{
-		data: map[string]interface{}{
-			"test": &stringJson,
-			"meta": make(map[string]string),
-		},
-		table: &Table{
-			Name: "test_table_validator",
-			Columns: []Column{
-				{
-					Name: "test",
-					Type: TypeJSON,
+			table: &Table{
+				Name: "test_table_validator",
+				Columns: []Column{
+					{
+						Name: "test",
+						Type: TypeJSON,
+					},
 				},
+			}},
+		{
+			data: map[string]interface{}{
+				"test": &stringJson,
+				"meta": make(map[string]string),
 			},
-		}}
-
-	r3 = Resource{
-		data: map[string]interface{}{
-			"test": map[string]interface{}{
-				"test": 1,
-				"test1": map[string]interface{}{
+			table: &Table{
+				Name: "test_table_validator",
+				Columns: []Column{
+					{
+						Name: "test",
+						Type: TypeJSON,
+					},
+				},
+			}},
+		{
+			data: map[string]interface{}{
+				"test": map[string]interface{}{
 					"test": 1,
+					"test1": map[string]interface{}{
+						"test": 1,
+					},
 				},
+				"meta": make(map[string]string),
 			},
-			"meta": make(map[string]string),
-		},
-		table: &Table{
-			Name: "test_table_validator",
-			Columns: []Column{
-				{
-					Name: "test",
-					Type: TypeJSON,
+			table: &Table{
+				Name: "test_table_validator",
+				Columns: []Column{
+					{
+						Name: "test",
+						Type: TypeJSON,
+					},
 				},
+			}},
+		{
+			data: map[string]interface{}{
+				"test": []interface{}{
+					map[string]interface{}{
+						"test":  1,
+						"test1": true,
+					},
+					map[string]interface{}{
+						"test":  1,
+						"test1": true,
+					},
+				},
+				"meta": make(map[string]string),
 			},
-		}}
-
-	r4 = Resource{
-		data: map[string]interface{}{
-			"test": []interface{}{
-				map[string]interface{}{
-					"test":  1,
-					"test1": true,
+			table: &Table{
+				Name: "test_table_validator",
+				Columns: []Column{
+					{
+						Name: "test",
+						Type: TypeJSON,
+					},
 				},
-				map[string]interface{}{
-					"test":  1,
-					"test1": true,
-				},
-			},
-			"meta": make(map[string]string),
-		},
-		table: &Table{
-			Name: "test_table_validator",
-			Columns: []Column{
-				{
-					Name: "test",
-					Type: TypeJSON,
-				},
-			},
-		}}
+			}},
+	}
 )
 
 func TestJsonColumn(t *testing.T) {
-	_, err := getResourceValues(&r1)
-	assert.Nil(t, err)
-
-	_, err = getResourceValues(&r2)
-	assert.Nil(t, err)
-
-	_, err = getResourceValues(&r3)
-	assert.Nil(t, err)
-
-	_, err = getResourceValues(&r4)
-	assert.Nil(t, err)
+	for _, r := range resources {
+		_, err := getResourceValues(&r)
+		assert.Nil(t, err)
+	}
 }

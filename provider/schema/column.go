@@ -176,6 +176,11 @@ func (c Column) checkType(v interface{}) bool {
 		return c.checkType(funk.GetOrElse(v, nil))
 	}
 
+	// Maps or slices are jsons
+	if reflect2.TypeOf(v).Kind() == reflect.Map {
+		return c.Type == TypeJSON
+	}
+
 	switch val := v.(type) {
 	case int8, *int8, uint8, *uint8, int16, *int16:
 		return c.Type == TypeSmallInt
@@ -213,6 +218,8 @@ func (c Column) checkType(v interface{}) bool {
 		return c.Type == TypeStringArray || c.Type == TypeJSON
 	case []int, []*int, *[]int:
 		return c.Type == TypeIntArray || c.Type == TypeJSON
+	case []interface{}:
+		return c.Type == TypeJSON
 	case time.Time, *time.Time:
 		return c.Type == TypeTimestamp
 	case uuid.UUID, *uuid.UUID:
@@ -259,11 +266,6 @@ func (c Column) checkType(v interface{}) bool {
 		if c.Type == TypeBigInt && (kindName == reflect.Int || kindName == reflect.Int64 || kindName == reflect.Uint || kindName == reflect.Uint32 || kindName == reflect.Uint64) {
 			return true
 		}
-	}
-
-	// Maps or slices are jsons
-	if reflect2.TypeOf(v).Kind() == reflect.Map || reflect2.TypeOf(v).Kind() == reflect.Slice {
-		return c.Type == TypeJSON
 	}
 
 	return false
