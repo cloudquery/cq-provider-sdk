@@ -85,8 +85,8 @@ func (e ExecutionData) truncateTable(ctx context.Context, client ClientMeta, par
 		return nil
 	}
 	// Delete previous fetch
+	client.Logger().Debug("cleaning table previous fetch", "table", e.Table.Name, "always_delete", e.Table.AlwaysDelete)
 	if err := e.Db.Delete(ctx, e.Table, e.Table.DeleteFilter(client, parent)); err != nil {
-		client.Logger().Debug("cleaning table previous fetch", "table", e.Table.Name, "always_delete", e.Table.AlwaysDelete)
 		return err
 	}
 	return nil
@@ -94,6 +94,9 @@ func (e ExecutionData) truncateTable(ctx context.Context, client ClientMeta, par
 
 func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, parent *Resource) (uint64, error) {
 
+	if e.Table.Resolver == nil {
+		return 0, fmt.Errorf("table %s missing resolver, make sure table implements the resolver", e.Table.Name)
+	}
 	if err := e.truncateTable(ctx, client, parent); err != nil {
 		return 0, err
 	}
@@ -135,15 +138,19 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 }
 
 func (e ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) error {
-	var resources = make([]*Resource, len(objects))
+	var resources = make(Resources, len(objects))
 	for i, o := range objects {
 		resources[i] = NewResourceData(e.Table, parent, o, e.extraFields)
+		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resources[i]); err != nil {
 			return err
 		}
 	}
-	// Before inserting resolve all table column resolvers
-	if err := e.Db.Insert(ctx, e.Table, resources); err != nil {
+
+	// only top level tables should cascade, disable delete is turned on.
+	// if we didn't disable delete all data should be wiped before resolve)
+	shouldCascade := parent == nil && e.disableDelete
+	if err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields); err != nil {
 		e.Logger.Error("failed to insert to db", "error", err)
 		return err
 	}
