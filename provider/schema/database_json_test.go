@@ -1,42 +1,35 @@
 package schema
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 var (
-	stringJson = "{\"test\":true}"
-	resources  = []Resource{
+	stringJson    = "{\"test\":true}"
+	jsonTestTable = Table{
+		Name: "test_table_validator",
+		Columns: []Column{
+			{
+				Name: "test",
+				Type: TypeJSON,
+			},
+		},
+	}
+	resources = []Resource{
 		{
 			data: map[string]interface{}{
 				"test": stringJson,
 				"meta": make(map[string]string),
 			},
-			table: &Table{
-				Name: "test_table_validator",
-				Columns: []Column{
-					{
-						Name: "test",
-						Type: TypeJSON,
-					},
-				},
-			}},
+			table: &jsonTestTable,
+		},
 		{
 			data: map[string]interface{}{
 				"test": &stringJson,
-				"meta": make(map[string]string),
 			},
-			table: &Table{
-				Name: "test_table_validator",
-				Columns: []Column{
-					{
-						Name: "test",
-						Type: TypeJSON,
-					},
-				},
-			}},
+			table: &jsonTestTable,
+		},
 		{
 			data: map[string]interface{}{
 				"test": map[string]interface{}{
@@ -45,17 +38,9 @@ var (
 						"test": 1,
 					},
 				},
-				"meta": make(map[string]string),
 			},
-			table: &Table{
-				Name: "test_table_validator",
-				Columns: []Column{
-					{
-						Name: "test",
-						Type: TypeJSON,
-					},
-				},
-			}},
+			table: &jsonTestTable,
+		},
 		{
 			data: map[string]interface{}{
 				"test": []interface{}{
@@ -68,17 +53,23 @@ var (
 						"test1": true,
 					},
 				},
-				"meta": make(map[string]string),
 			},
-			table: &Table{
-				Name: "test_table_validator",
-				Columns: []Column{
-					{
-						Name: "test",
-						Type: TypeJSON,
-					},
+			table: &jsonTestTable,
+		},
+		{
+			data: map[string]interface{}{
+				"test": nil,
+			},
+			table: &jsonTestTable,
+		},
+		{
+			data: map[string]interface{}{
+				"test": []interface{}{
+					nil,
 				},
-			}},
+			},
+			table: &jsonTestTable,
+		},
 	}
 )
 
