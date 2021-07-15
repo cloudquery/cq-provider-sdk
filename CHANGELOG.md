@@ -14,11 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added support to disable delete of data [#41](https://github.com/cloudquery/cq-provider-sdk/pull/41)
 * Added meta field, this field holds when row updated last. [#41](https://github.com/cloudquery/cq-provider-sdk/pull/41)
 
-
-  
-  methods returning `(v, ok)` shaped values to support Prisma Go client. <br />
-  By [@steebchen](https://github.com/steebchen) in [#1449](https://github.com/99designs/gqlgen/pull/1449)
-
 ### Changed
 * Changed default insert in provider from Insert to Copy-From, this method improved insert performance [#48](https://github.com/cloudquery/cq-provider-sdk/pull/48)
 * **Breaking Change**: default CloudQuery "id" from `id` to `cq_id` [#41](https://github.com/cloudquery/cq-provider-sdk/pull/41)
