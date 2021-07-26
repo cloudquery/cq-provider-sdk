@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/modern-go/reflect2"
 
@@ -206,14 +205,6 @@ func quoteColumns(columns []string) []string {
 		columns[i] = strconv.Quote(v)
 	}
 	return columns
-}
-
-func buildReplaceColumns(columns []string) string {
-	replaceColumns := make([]string, len(columns))
-	for i, c := range columns {
-		replaceColumns[i] = fmt.Sprintf("%[1]s = EXCLUDED.%[1]s", c)
-	}
-	return strings.Join(replaceColumns, ",")
 }
 
 func TruncateTableConstraint(name string) string {
