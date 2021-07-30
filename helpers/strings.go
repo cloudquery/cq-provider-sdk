@@ -16,7 +16,6 @@ func FormatSlice(a []string) string {
 	return fmt.Sprintf("[\n\t%s\n]", strings.Join(q, ",\n\t"))
 }
 
-
 func HasDuplicates(resources []string) bool {
 	dups := make(map[string]bool, len(resources))
 	for _, r := range resources {
