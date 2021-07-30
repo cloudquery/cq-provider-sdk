@@ -3,7 +3,6 @@ package schema
 import (
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"runtime/debug"
 	"sync/atomic"
@@ -48,7 +47,7 @@ func (e ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, parent
 	clients = append(clients, meta)
 	if e.Table.Multiplex != nil {
 		clients = e.Table.Multiplex(meta)
-		meta.Logger().Debug("multiplexing client", "count", len(clients))
+		meta.Logger().Debug("multiplexing client", "count", len(clients), "table", e.Table.Name)
 	}
 	g, ctx := errgroup.WithContext(ctx)
 	var totalResources uint64
@@ -106,8 +105,8 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "Fetch task exited with panic:\n%s\n", debug.Stack())
-				e.Logger.Error("Fetch task exited with panic", "table", e.Table.Name, "stack", string(debug.Stack()))
+				e.Logger.Error("table resolver recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
+				resolverErr = fmt.Errorf("failed table %s fetch. Error: %s", e.Table.Name, r)
 			}
 			close(res)
 		}()
@@ -143,6 +142,7 @@ func (e ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, pa
 		resources[i] = NewResourceData(e.Table, parent, o, e.extraFields)
 		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resources[i]); err != nil {
+			e.Logger.Error("failed to resolve resource values", "error", err)
 			return err
 		}
 	}
@@ -151,8 +151,12 @@ func (e ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, pa
 	// if we didn't disable delete all data should be wiped before resolve)
 	shouldCascade := parent == nil && e.disableDelete
 	if err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields); err != nil {
-		e.Logger.Error("failed to insert to db", "error", err)
-		return err
+		e.Logger.Warn("failed copy-from to db", "error", err)
+		// fallback insert, copy from sometimes does problems so we fall back with insert
+		if err := e.Db.Insert(ctx, e.Table, resources); err != nil {
+			e.Logger.Error("failed insert to db", "error", err)
+			return err
+		}
 	}
 
 	// Finally resolve relations of each resource
@@ -169,23 +173,29 @@ func (e ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, pa
 	return nil
 }
 
-func (e ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMeta, resource *Resource) error {
-	if err := e.resolveColumns(ctx, meta, resource, resource.table.Columns); err != nil {
+func (e ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMeta, resource *Resource) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			e.Logger.Error("resolve resource recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
+			err = fmt.Errorf("failed resolve resource. Error: %s", r)
+		}
+	}()
+	if err = e.resolveColumns(ctx, meta, resource, resource.table.Columns); err != nil {
 		return err
 	}
 	// call PostRowResolver if defined after columns have been resolved
 	if resource.table.PostResourceResolver != nil {
-		if err := resource.table.PostResourceResolver(ctx, meta, resource); err != nil {
+		if err = resource.table.PostResourceResolver(ctx, meta, resource); err != nil {
 			return err
 		}
 	}
 	// Finally generate cq_id for resource
 	for _, c := range GetDefaultSDKColumns() {
-		if err := c.Resolver(ctx, meta, resource, c); err != nil {
+		if err = c.Resolver(ctx, meta, resource, c); err != nil {
 			return err
 		}
 	}
-	return nil
+	return err
 }
 
 func (e ExecutionData) resolveColumns(ctx context.Context, meta ClientMeta, resource *Resource, cols []Column) error {
