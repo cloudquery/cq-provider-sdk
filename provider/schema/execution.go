@@ -47,7 +47,7 @@ func (e ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, parent
 	clients = append(clients, meta)
 	if e.Table.Multiplex != nil {
 		clients = e.Table.Multiplex(meta)
-		meta.Logger().Debug("multiplexing client", "count", len(clients))
+		meta.Logger().Debug("multiplexing client", "count", len(clients), "table", e.Table.Name)
 	}
 	g, ctx := errgroup.WithContext(ctx)
 	var totalResources uint64
