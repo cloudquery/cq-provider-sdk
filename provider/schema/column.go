@@ -267,10 +267,6 @@ func (c Column) checkType(v interface{}) bool {
 			return true
 		}
 	}
-	//everything can be a json
-	if c.Type == TypeJSON {
-		return true
-	}
-
-	return false
+	// everything can be a json
+	return c.Type == TypeJSON
 }
