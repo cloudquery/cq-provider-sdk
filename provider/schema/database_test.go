@@ -10,6 +10,12 @@ import (
 	mock "github.com/stretchr/testify/mock"
 )
 
+type jsonTestType struct {
+	Name        string `json:"name"`
+	Description string `json:"decription"`
+	Version     int    `json:"version"`
+}
+
 var (
 	stringJson    = "{\"test\":true}"
 	jsonTestTable = Table{
@@ -71,6 +77,16 @@ var (
 			data: map[string]interface{}{
 				"test": []interface{}{
 					nil,
+				},
+			},
+			table: &jsonTestTable,
+		},
+		{
+			data: map[string]interface{}{
+				"test": jsonTestType{
+					Name:        "test",
+					Description: "test1",
+					Version:     10,
 				},
 			},
 			table: &jsonTestTable,
