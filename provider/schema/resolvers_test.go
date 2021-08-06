@@ -38,7 +38,7 @@ func TestPathResolver(t *testing.T) {
 	r1 := PathResolver("Inner.Value")
 	r2 := PathResolver("Value")
 	r3 := PathResolver("unexported")
-	resource := NewResourceData(pathTestTable, nil, testStruct{Inner: innerStruct{Value: "bla"}, Value: 5, unexported: false}, nil)
+	resource := NewResourceData(pathTestTable, nil, testStruct{Inner: innerStruct{Value: "bla"}, Value: 5, unexported: false}, nil, nil)
 	err := r1(context.TODO(), nil, resource, Column{Name: "test"})
 
 	assert.Nil(t, err)

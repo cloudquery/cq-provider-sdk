@@ -4,6 +4,8 @@ import (
 	"crypto"
 	"fmt"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/mitchellh/hashstructure"
 	"github.com/thoas/go-funk"
 
@@ -25,9 +27,11 @@ type Resource struct {
 	cqId        uuid.UUID
 	extraFields map[string]interface{}
 	columns     []string
+	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
+	Logger hclog.Logger
 }
 
-func NewResourceData(t *Table, parent *Resource, item interface{}, extraFields map[string]interface{}) *Resource {
+func NewResourceData(t *Table, parent *Resource, item interface{}, extraFields map[string]interface{}, logger hclog.Logger) *Resource {
 	return &Resource{
 		Item:        item,
 		Parent:      parent,
@@ -36,6 +40,7 @@ func NewResourceData(t *Table, parent *Resource, item interface{}, extraFields m
 		cqId:        uuid.New(),
 		columns:     getResourceColumns(t, extraFields),
 		extraFields: extraFields,
+		Logger:      logger,
 	}
 }
 
@@ -84,7 +89,7 @@ func (r *Resource) GenerateCQId() error {
 			if r.Parent == nil {
 				return fmt.Errorf("failed to generate cq_id for %s, pk field missing %s", r.table.Name, pk)
 			} else {
-				//todo log warning
+				r.Logger.Warn("failed to generate cq_id for %s, pk field missing %s, generating random cq_id", r.table.Name, pk)
 				pkIsNil = true
 			}
 		}

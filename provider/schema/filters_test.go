@@ -20,7 +20,7 @@ func TestDeleteParentId(t *testing.T) {
 	mockedClient.On("Logger", mock.Anything).Return(logger)
 
 	object := testTableStruct{}
-	r := NewResourceData(testTable, nil, object, nil)
+	r := NewResourceData(testTable, nil, object, nil, nil)
 	_ = r.Set("name", "test")
 	assert.Equal(t, []interface{}{"name", r.Id()}, f(mockedClient, r))
 

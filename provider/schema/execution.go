@@ -139,7 +139,7 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 func (e ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) error {
 	var resources = make(Resources, len(objects))
 	for i, o := range objects {
-		resources[i] = NewResourceData(e.Table, parent, o, e.extraFields)
+		resources[i] = NewResourceData(e.Table, parent, o, e.extraFields, e.Logger)
 		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resources[i]); err != nil {
 			e.Logger.Error("failed to resolve resource values", "error", err)
