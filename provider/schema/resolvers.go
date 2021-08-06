@@ -2,6 +2,7 @@ package schema
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -43,24 +44,39 @@ func ParentPathResolver(path string) ColumnResolver {
 	}
 }
 
-// DateResolver resolves the different date formats (ISODate - 2011-10-05T14:48:00.000Z is default) into *time.Time
+// DateUTCResolver resolves the different date formats (ISODate - 2011-10-05T14:48:00.000Z is default) into *time.Time and converts the date to utc timezone
 //
 // Examples:
-// DateResolver("Date", "") - resolves using RFC.RFC3339 as default
-//
-// DateResolver("InnerStruct.Field", time.RFC822)  - resolves using time.RFC822
-//
-// DateResolver("InnerStruct.Field", "2011-10-05")  - resolves using manually set format
-func DateResolver(path string, rfc string) ColumnResolver {
+// DateUTCResolver("Date") - resolves using RFC.RFC3339 as default
+// DateUTCResolver("InnerStruct.Field", time.RFC822)  - resolves using time.RFC822
+// DateUTCResolver("InnerStruct.Field", time.RFC822, "2011-10-05")  - resolves using a few resolvers one by one
+func DateUTCResolver(path string, rfcs ...string) ColumnResolver {
 	return func(_ context.Context, meta ClientMeta, r *Resource, c Column) error {
 		data, err := cast.ToStringE(funk.Get(r.Item, path, funk.WithAllowZero()))
 		if err != nil {
 			return err
 		}
-		if rfc == "" {
-			rfc = time.RFC3339
+		date, err := parseDate(data, rfcs...)
+		if err != nil {
+			return err
 		}
-		date, err := parseDate(data, rfc)
+		return r.Set(c.Name, date.UTC())
+	}
+}
+
+// DateResolver resolves the different date formats (ISODate - 2011-10-05T14:48:00.000Z is default) into *time.Time
+//
+// Examples:
+// DateResolver("Date") - resolves using RFC.RFC3339 as default
+// DateResolver("InnerStruct.Field", time.RFC822)  - resolves using time.RFC822
+// DateResolver("InnerStruct.Field", time.RFC822, "2011-10-05")  - resolves using a few resolvers one by one
+func DateResolver(path string, rfcs ...string) ColumnResolver {
+	return func(_ context.Context, meta ClientMeta, r *Resource, c Column) error {
+		data, err := cast.ToStringE(funk.Get(r.Item, path, funk.WithAllowZero()))
+		if err != nil {
+			return err
+		}
+		date, err := parseDate(data, rfcs...)
 		if err != nil {
 			return err
 		}
@@ -68,16 +84,25 @@ func DateResolver(path string, rfc string) ColumnResolver {
 	}
 }
 
-func parseDate(d string, rfc string) (*time.Time, error) {
-	if d == "" {
+func parseDate(dateStr string, rfcs ...string) (date *time.Time, err error) {
+	if dateStr == "" {
 		return nil, nil
 	}
 
-	date, err := time.Parse(rfc, d)
-	if err != nil {
-		return nil, err
+	// set default rfc
+	if len(rfcs) == 0 {
+		rfcs = append(rfcs, time.RFC3339)
 	}
-	return &date, err
+
+	var d time.Time
+	for _, rfc := range rfcs {
+		d, err = time.Parse(rfc, dateStr)
+		if err == nil {
+			date = &d
+			return
+		}
+	}
+	return
 }
 
 // IPAddressResolver resolves the ip string value and returns net.IP
@@ -90,7 +115,11 @@ func IPAddressResolver(path string) ColumnResolver {
 		if err != nil {
 			return err
 		}
-		return r.Set(c.Name, net.ParseIP(ipStr))
+		ip := net.ParseIP(ipStr)
+		if ipStr != "" && ip == nil {
+			return fmt.Errorf("failed to parse IP from %s", ipStr)
+		}
+		return r.Set(c.Name, ip)
 	}
 }
 

@@ -2,7 +2,6 @@ package schema
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
 
@@ -86,7 +85,7 @@ type testDateStruct struct {
 }
 
 func TestDateTimeResolver(t *testing.T) {
-	r1 := DateResolver("Date", "")
+	r1 := DateResolver("Date")
 	resource := NewResourceData(dateTestTable, nil, testDateStruct{Date: "2011-10-05T14:48:00.000Z"}, nil)
 	err := r1(context.TODO(), nil, resource, Column{Name: "date"})
 
@@ -107,7 +106,7 @@ func TestDateTimeResolver(t *testing.T) {
 	t2 := time.Date(2006, 1, 3, 15, 4, 0, 0, time.UTC)
 	assert.Equal(t, t2.Unix(), resource.Get("date").(*time.Time).UTC().Unix())
 
-	r3 := DateResolver("Date", "2006-01-02")
+	r3 := DateResolver("Date", time.RFC822, "2006-01-02")
 	resource = NewResourceData(dateTestTable, nil, testDateStruct{Date: "2011-10-05"}, nil)
 	err = r3(context.TODO(), nil, resource, Column{Name: "date"})
 	assert.Nil(t, err)
@@ -139,20 +138,38 @@ type testNetStruct struct {
 	Net string
 }
 
+var netTests = []testNetStruct{
+	{IP: "192.168.1.12", MAC: "2C:54:91:88:C9:E3", Net: "192.168.0.1/24"},
+	{IP: "2001:0db8:85a3:0000:0000:8a2e:0370:7334", MAC: "2C-54-91-88-C9-E3", Net: "2002::1234:abcd:ffff:c0a8:101/64"},
+	{IP: "::1234:5678", MAC: "2C-54-91-88-C9-E3", Net: "::1234:5678/12"},
+}
+var netTestsFails = []testNetStruct{
+	{IP: "192.168.1/", MAC: "2C:54:91:88:C9", Net: "192.168.0.1-24"},
+	{IP: "::1234:5678:", MAC: "2C:54-91-88-C9-E3", Net: "2002::1234:abcd:ffff:c0a8:101-64"},
+}
+
 func TestNetResolvers(t *testing.T) {
 	r1 := IPAddressResolver("IP")
 	r2 := MACAddressResolver("MAC")
 	r3 := IPNetResolver("Net")
-	resource := NewResourceData(networkTestTable, nil, testNetStruct{IP: "192.168.1.12", MAC: "2C:54:91:88:C9:E3", Net: "192.168.0.1/24"}, nil)
-	err := r1(context.TODO(), nil, resource, Column{Name: "ip"})
-	assert.Nil(t, err)
-	ip := net.ParseIP("192.168.1.12")
-	assert.Equal(t, resource.Get("ip"), ip)
-
-	err = r2(context.TODO(), nil, resource, Column{Name: "mac"})
-	assert.Nil(t, err)
-	err = r3(context.TODO(), nil, resource, Column{Name: "net"})
-	assert.Nil(t, err)
+	for _, r := range netTests {
+		resource := NewResourceData(networkTestTable, nil, r, nil)
+		err := r1(context.TODO(), nil, resource, Column{Name: "ip"})
+		assert.Nil(t, err)
+		err = r2(context.TODO(), nil, resource, Column{Name: "mac"})
+		assert.Nil(t, err)
+		err = r3(context.TODO(), nil, resource, Column{Name: "net"})
+		assert.Nil(t, err)
+	}
+	for _, r := range netTestsFails {
+		resource := NewResourceData(networkTestTable, nil, r, nil)
+		err := r1(context.TODO(), nil, resource, Column{Name: "ip"})
+		assert.Error(t, err)
+		err = r2(context.TODO(), nil, resource, Column{Name: "mac"})
+		assert.Error(t, err)
+		err = r3(context.TODO(), nil, resource, Column{Name: "net"})
+		assert.Error(t, err)
+	}
 }
 
 var TransformersTestTable = &Table{
