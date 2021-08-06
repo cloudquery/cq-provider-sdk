@@ -76,18 +76,30 @@ func (r *Resource) GenerateCQId() error {
 		return nil
 	}
 	objs := make([]interface{}, len(r.table.PrimaryKeys()))
+	pkIsNil := false
 	for i, pk := range r.table.PrimaryKeys() {
 		value := r.Get(pk)
 		if value == nil {
-			return fmt.Errorf("failed to generate cq_id for %s, pk field missing %s", r.table.Name, pk)
+			//return error because main table should have primary keys set
+			if r.Parent == nil {
+				return fmt.Errorf("failed to generate cq_id for %s, pk field missing %s", r.table.Name, pk)
+			} else {
+				//todo log warning
+				pkIsNil = true
+			}
 		}
 		objs[i] = value
 	}
-	id, err := hashUUID(objs)
-	if err != nil {
-		return err
+
+	if !pkIsNil {
+		id, err := hashUUID(objs)
+		if err != nil {
+			return err
+		}
+		r.cqId = id
+	} else {
+		r.cqId = uuid.New()
 	}
-	r.cqId = id
 	return nil
 }
 
