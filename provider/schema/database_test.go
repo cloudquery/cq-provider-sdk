@@ -16,6 +16,12 @@ type jsonTestType struct {
 	Version     int    `json:"version"`
 }
 
+type jsonTestFailType struct {
+	Name        string
+	Description string
+	Version     int
+}
+
 var (
 	stringJson    = "{\"test\":true}"
 	jsonTestTable = Table{
@@ -88,6 +94,37 @@ var (
 					Description: "test1",
 					Version:     10,
 				},
+			},
+			table: &jsonTestTable,
+		},
+	}
+
+	failResources = []Resource{
+		{
+			data: map[string]interface{}{
+				"test": jsonTestFailType{
+					Name:        "test",
+					Description: "test1",
+					Version:     10,
+				},
+			},
+			table: &jsonTestTable,
+		},
+		{
+			data: map[string]interface{}{
+				"test": true,
+			},
+			table: &jsonTestTable,
+		},
+		{
+			data: map[string]interface{}{
+				"test": 10.1,
+			},
+			table: &jsonTestTable,
+		},
+		{
+			data: map[string]interface{}{
+				"test": "true_test",
 			},
 			table: &jsonTestTable,
 		},
@@ -188,5 +225,10 @@ func TestJsonColumn(t *testing.T) {
 	for _, r := range resources {
 		_, err := getResourceValues(&r)
 		assert.Nil(t, err)
+	}
+
+	for _, r := range failResources {
+		_, err := getResourceValues(&r)
+		assert.Error(t, err)
 	}
 }

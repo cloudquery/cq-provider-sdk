@@ -267,6 +267,14 @@ func (c Column) checkType(v interface{}) bool {
 			return true
 		}
 	}
-	// everything can be a json
-	return c.Type == TypeJSON
+	// check if struct has json in it
+	if c.Type == TypeJSON {
+		t := reflect.TypeOf(v)
+		for i := 0; i < t.NumField(); i++ {
+			if _, ok := t.Field(i).Tag.Lookup("json"); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
