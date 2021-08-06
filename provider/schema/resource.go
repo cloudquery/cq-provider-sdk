@@ -85,7 +85,7 @@ func (r *Resource) GenerateCQId() error {
 	for i, pk := range r.table.PrimaryKeys() {
 		value := r.Get(pk)
 		if value == nil {
-			//return error because main table should have primary keys set
+			// main table should have primary keys set, relations can have randomly generated cq_id
 			if r.Parent == nil {
 				return fmt.Errorf("failed to generate cq_id for %s, pk field missing %s", r.table.Name, pk)
 			} else {
