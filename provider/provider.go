@@ -102,6 +102,34 @@ func (p *Provider) ConfigureProvider(ctx context.Context, request *cqproto.Confi
 	return &cqproto.ConfigureProviderResponse{}, nil
 }
 
+func (p *Provider) CheckDuplicates() error {
+	tables := make(map[string]string)
+
+	// getTableNames function for recursive collection of table names from shcema.Table
+	var getTableNames func(resource *schema.Table) []string
+	getTableNames = func(resource *schema.Table) []string {
+		names := make([]string, 0, len(resource.Relations)+1)
+		names = append(names, resource.Name)
+		for _, r := range resource.Relations {
+			subNames := getTableNames(r)
+			names = append(names, subNames...)
+		}
+		return names
+	}
+
+	for r, t := range p.ResourceMap {
+		names := getTableNames(t)
+		for _, n := range names {
+			if existing, ok := tables[n]; ok {
+				return fmt.Errorf("table name %s used more than once, duplicates are in %s and %s", n, existing, r)
+			} else {
+				tables[n] = r
+			}
+		}
+	}
+	return nil
+}
+
 func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchResourcesRequest, sender cqproto.FetchResourcesSender) error {
 
 	if p.meta == nil {
