@@ -3,9 +3,10 @@ package provider
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v4"
 	"strconv"
 	"strings"
+
+	"github.com/jackc/pgx/v4"
 
 	"github.com/huandu/go-sqlbuilder"
 
