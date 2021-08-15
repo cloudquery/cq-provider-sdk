@@ -2,15 +2,16 @@ package provider
 
 import (
 	"context"
+	"testing"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 const (
 	defaultQuery = "select 1;"
-	emptyQuery = ""
+	emptyQuery   = ""
 )
 
 var (
@@ -27,6 +28,7 @@ var (
 		"5_v0.0.4.down.sql":      []byte(defaultQuery),
 	}
 )
+
 func TestMigrations(t *testing.T) {
 	m, err := NewMigrator(hclog.Default(), data, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test")
 	assert.Nil(t, err)
@@ -80,7 +82,6 @@ func TestMultiProviderMigrations(t *testing.T) {
 	assert.Equal(t, err, migrate.ErrNoChange)
 	version, dirty, err := mtest.Version()
 	assert.Equal(t, []interface{}{"v0.0.4", false, nil}, []interface{}{version, dirty, err})
-
 
 	version, dirty, err = mtest2.Version()
 	assert.Equal(t, []interface{}{"v0.0.0", false, migrate.ErrNilVersion}, []interface{}{version, dirty, err})

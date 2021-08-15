@@ -4,6 +4,10 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"path"
+	"strconv"
+	"strings"
+
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -14,9 +18,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cast"
 	"github.com/xo/dburl"
-	"path"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -131,7 +132,7 @@ func (m *Migrator) DropProvider(ctx context.Context, schema map[string]*schema.T
 		return err
 	}
 	err = conn.BeginFunc(ctx, func(tx pgx.Tx) error {
-		q :=  fmt.Sprintf(dropTableSQL, strconv.Quote(fmt.Sprintf("%s_schema_migrations", m.provider)))
+		q := fmt.Sprintf(dropTableSQL, strconv.Quote(fmt.Sprintf("%s_schema_migrations", m.provider)))
 		if _, err := tx.Exec(ctx, q); err != nil {
 			return err
 		}
