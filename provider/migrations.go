@@ -70,6 +70,7 @@ func NewMigrator(log hclog.Logger, migrationFiles map[string][]byte, dsn string,
 	mm := afero.NewMemMapFs()
 	_ = mm.Mkdir("migrations", 0755)
 	for k, data := range migrationFiles {
+		log.Debug("adding migration file", "file", k)
 		if err := afero.WriteFile(mm, path.Join(migrationsEmbeddedDirectoryPath, k), data, 0644); err != nil {
 			return nil, err
 		}
@@ -113,6 +114,7 @@ func (m *Migrator) UpgradeProvider(version string) error {
 	if !ok {
 		return fmt.Errorf("version %s upgrade doesn't exist", version)
 	}
+	m.log.Debug("upgrading provider version", "version", version, "migrator_version", mv)
 	return m.m.Migrate(mv)
 }
 
@@ -121,6 +123,7 @@ func (m *Migrator) DowngradeProvider(version string) error {
 	if !ok {
 		return fmt.Errorf("version %s downgrade doesn't exist", version)
 	}
+	m.log.Debug("downgrading provider version", "version", version, "migrator_version", mv)
 	return m.m.Migrate(mv)
 }
 
