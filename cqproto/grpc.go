@@ -94,16 +94,15 @@ type GRPCServer struct {
 }
 
 func (g *GRPCServer) GetProviderSchema(ctx context.Context, request *internal.GetProviderSchema_Request) (*internal.GetProviderSchema_Response, error) {
-	resp, err := g.Impl.GetProviderSchema(ctx, &GetProviderSchemaRequest{
-	})
+	resp, err := g.Impl.GetProviderSchema(ctx, &GetProviderSchemaRequest{})
 	if err != nil {
 		return nil, err
 	}
 	return &internal.GetProviderSchema_Response{
-		Name: resp.Name,
-		Version: resp.Version,
+		Name:           resp.Name,
+		Version:        resp.Version,
 		ResourceTables: tablesToProto(resp.ResourceTables),
-		Migrations: resp.Migrations,
+		Migrations:     resp.Migrations,
 	}, nil
 
 }
