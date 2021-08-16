@@ -180,17 +180,6 @@ func (c Column) checkType(v interface{}) bool {
 	if reflect2.TypeOf(v).Kind() == reflect.Map {
 		return c.Type == TypeJSON
 	}
-	// check if it is a struct with json tags
-	if c.Type == TypeJSON {
-		if reflect.ValueOf(v).Kind() == reflect.Struct {
-			t := reflect.TypeOf(v)
-			for i := 0; i < t.NumField(); i++ {
-				if _, ok := t.Field(i).Tag.Lookup("json"); ok {
-					return true
-				}
-			}
-		}
-	}
 
 	switch val := v.(type) {
 	case int8, *int8, uint8, *uint8, int16, *int16:
@@ -277,6 +266,19 @@ func (c Column) checkType(v interface{}) bool {
 		if c.Type == TypeBigInt && (kindName == reflect.Int || kindName == reflect.Int64 || kindName == reflect.Uint || kindName == reflect.Uint32 || kindName == reflect.Uint64) {
 			return true
 		}
+	}
+
+	// check if it is a struct with json tags
+	if c.Type == TypeJSON {
+		return reflect.ValueOf(v).Kind() == reflect.Struct
+		//if reflect.ValueOf(v).Kind() == reflect.Struct {
+		//	t := reflect.TypeOf(v)
+		//	for i := 0; i < t.NumField(); i++ {
+		//		if _, ok := t.Field(i).Tag.Lookup("json"); ok {
+		//			return true
+		//		}
+		//	}
+		//}
 	}
 
 	return false

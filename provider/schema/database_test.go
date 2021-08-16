@@ -14,12 +14,14 @@ type jsonTestType struct {
 	Name        string `json:"name"`
 	Description string `json:"decription"`
 	Version     int    `json:"version"`
+	test        int
 }
 
-type jsonTestFailType struct {
+type jsonNoTags struct {
 	Name        string
 	Description string
 	Version     int
+	test        int
 }
 
 var (
@@ -89,7 +91,23 @@ var (
 		},
 		{
 			data: map[string]interface{}{
+				"test": "{\"hello\":123}",
+			},
+			table: &jsonTestTable,
+		},
+		{
+			data: map[string]interface{}{
 				"test": jsonTestType{
+					Name:        "test",
+					Description: "test1",
+					Version:     10,
+				},
+			},
+			table: &jsonTestTable,
+		},
+		{
+			data: map[string]interface{}{
+				"test": jsonNoTags{
 					Name:        "test",
 					Description: "test1",
 					Version:     10,
@@ -100,16 +118,6 @@ var (
 	}
 
 	failResources = []Resource{
-		{
-			data: map[string]interface{}{
-				"test": jsonTestFailType{
-					Name:        "test",
-					Description: "test1",
-					Version:     10,
-				},
-			},
-			table: &jsonTestTable,
-		},
 		{
 			data: map[string]interface{}{
 				"test": true,
@@ -125,6 +133,12 @@ var (
 		{
 			data: map[string]interface{}{
 				"test": "true_test",
+			},
+			table: &jsonTestTable,
+		},
+		{
+			data: map[string]interface{}{
+				"test": "{\"hello\":123}1",
 			},
 			table: &jsonTestTable,
 		},
