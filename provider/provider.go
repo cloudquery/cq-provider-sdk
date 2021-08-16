@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -46,13 +47,20 @@ type Provider struct {
 	disableDelete bool
 	// Add extra fields to all resources, these fields don't show up in documentation and are used for internal CQ testing.
 	extraFields map[string]interface{}
+	// Migrations embedded and passed by the provider to upgrade between versions
+	Migrations embed.FS
 }
 
 func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
+	m, err := readProviderMigrationFiles(p.Logger, p.Migrations)
+	if err != nil {
+		return nil, err
+	}
 	return &cqproto.GetProviderSchemaResponse{
 		Name:           p.Name,
 		Version:        p.Version,
 		ResourceTables: p.ResourceMap,
+		Migrations:     m,
 	}, nil
 }
 
@@ -98,6 +106,14 @@ func (p *Provider) ConfigureProvider(ctx context.Context, request *cqproto.Confi
 	if err != nil {
 		return &cqproto.ConfigureProviderResponse{}, err
 	}
+
+	tables := make(map[string]string)
+	for r, t := range p.ResourceMap {
+		if err := getTableDuplicates(r, t, tables); err != nil {
+			return &cqproto.ConfigureProviderResponse{}, err
+		}
+	}
+
 	p.meta = client
 	return &cqproto.ConfigureProviderResponse{}, nil
 }
@@ -154,4 +170,17 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		})
 	}
 	return g.Wait()
+}
+
+func getTableDuplicates(resource string, table *schema.Table, tableNames map[string]string) error {
+	for _, r := range table.Relations {
+		if err := getTableDuplicates(resource, r, tableNames); err != nil {
+			return err
+		}
+	}
+	if existing, ok := tableNames[table.Name]; ok {
+		return fmt.Errorf("table name %s used more than once, duplicates are in %s and %s", table.Name, existing, resource)
+	}
+	tableNames[table.Name] = resource
+	return nil
 }
