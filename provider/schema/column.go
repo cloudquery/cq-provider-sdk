@@ -256,6 +256,9 @@ func (c Column) checkType(v interface{}) bool {
 				return c.Type == TypeUUIDArray
 			}
 		}
+		if kindName == reflect.Struct {
+			return c.Type == TypeJSON
+		}
 		if c.Type == TypeSmallInt && (kindName == reflect.Int8 || kindName == reflect.Int16 || kindName == reflect.Uint8) {
 			return true
 		}
@@ -266,19 +269,6 @@ func (c Column) checkType(v interface{}) bool {
 		if c.Type == TypeBigInt && (kindName == reflect.Int || kindName == reflect.Int64 || kindName == reflect.Uint || kindName == reflect.Uint32 || kindName == reflect.Uint64) {
 			return true
 		}
-	}
-
-	// check if it is a struct with json tags
-	if c.Type == TypeJSON {
-		return reflect.ValueOf(v).Kind() == reflect.Struct
-		//if reflect.ValueOf(v).Kind() == reflect.Struct {
-		//	t := reflect.TypeOf(v)
-		//	for i := 0; i < t.NumField(); i++ {
-		//		if _, ok := t.Field(i).Tag.Lookup("json"); ok {
-		//			return true
-		//		}
-		//	}
-		//}
 	}
 
 	return false
