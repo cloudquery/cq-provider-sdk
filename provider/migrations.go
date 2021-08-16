@@ -207,11 +207,11 @@ func (m *Migrator) FindLatestMigration(requestedVersion string) (uint, error) {
 			if i == 0 {
 				return 0, nil
 			}
-			mv, _ := m.versionMapper[m.versions[i-1].Original()]
+			mv = m.versionMapper[m.versions[i-1].Original()]
 			return mv, nil
 		}
 	}
-	mv, _ = m.versionMapper[m.versions[len(m.versions)-1].Original()]
+	mv = m.versionMapper[m.versions[len(m.versions)-1].Original()]
 	return mv, nil
 }
 
