@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"log"
 	"os"
 	"os/exec"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
@@ -101,7 +102,6 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 		t.Fatal(err)
 	}
 	defer conn.Release()
-
 
 	l := logging.New(hclog.DefaultOptions)
 	migrator := provider.NewMigrator(l)
