@@ -302,7 +302,7 @@ func verifyFields(resource ResourceIntegrationTestData, conn pgxscan.Querier) er
 
 	// verify root entry relations
 	for _, e := range data {
-		id, ok := e["id"]
+		id, ok := e["cq_id"]
 		if !ok {
 			return fmt.Errorf("failed to get parent id for %s", resource.Table.Name)
 		}
