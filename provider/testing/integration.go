@@ -104,7 +104,7 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	defer conn.Release()
 
 	l := logging.New(hclog.DefaultOptions)
-	migrator := provider.NewMigrator(l)
+	migrator := provider.NewTableCreator(l)
 	if err := migrator.CreateTable(context.Background(), conn, resource.Table, nil); err != nil {
 		assert.FailNow(t, fmt.Sprintf("failed to create tables %s", resource.Table.Name), err)
 	}
