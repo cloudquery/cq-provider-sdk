@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"log"
 	"os"
 	"os/exec"
@@ -66,29 +67,28 @@ type ExpectedValue struct {
 // IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
 func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, resource ResourceIntegrationTestData) {
 	t.Parallel()
-	tf, err := setup(&resource)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	teardown, err := deploy(tf, &resource)
-	if teardown != nil && getEnv("TF_NO_DESTROY", "") != "true" {
-		defer func() {
-			if err = teardown(); err != nil {
-				t.Fatal(err)
-			}
-		}()
-	} else {
-		defer func() {
-			log.Printf("%s RESOURCES WERE NOT DESTROYTED. destroy them manually.\n", resource.Table.Name)
-		}()
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	if getEnv("TF_APPLY_RESOURCES", "") == "true" {
+		tf, err := setup(&resource)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if err = fetch(providerCreator, &resource); err != nil {
-		t.Fatal(err)
+		teardown, err := deploy(tf, &resource)
+		if teardown != nil && getEnv("TF_NO_DESTROY", "") != "true" {
+			defer func() {
+				if err = teardown(); err != nil {
+					t.Fatal(err)
+				}
+			}()
+		} else {
+			defer func() {
+				log.Printf("%s RESOURCES WERE NOT DESTROYTED. destroy them manually.\n", resource.Table.Name)
+			}()
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	log.Printf("%s verify fields\n", resource.Table.Name)
@@ -101,6 +101,17 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 		t.Fatal(err)
 	}
 	defer conn.Release()
+
+
+	l := logging.New(hclog.DefaultOptions)
+	migrator := provider.NewMigrator(l)
+	if err := migrator.CreateTable(context.Background(), conn, resource.Table, nil); err != nil {
+		assert.FailNow(t, fmt.Sprintf("failed to create tables %s", resource.Table.Name), err)
+	}
+
+	if err = fetch(providerCreator, &resource); err != nil {
+		t.Fatal(err)
+	}
 
 	err = verifyFields(resource, conn)
 	if err != nil {
