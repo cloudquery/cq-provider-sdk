@@ -134,4 +134,8 @@ func TestFindLatestMigration(t *testing.T) {
 	mv, err = mtest.FindLatestMigration("v0.0.1")
 	assert.Nil(t, err)
 	assert.Equal(t, uint(0), mv)
+
+	mv, err = mtest.FindLatestMigration("latest")
+	assert.Nil(t, err)
+	assert.Equal(t, uint(5), mv)
 }

@@ -184,6 +184,14 @@ func (m *Migrator) Version() (string, bool, error) {
 	return "v0.0.0", dirty, err
 }
 
+func (m *Migrator) SetVersion(requestedVersion string) error {
+	mv, err := m.FindLatestMigration(requestedVersion)
+	if err != nil {
+		return err
+	}
+	return m.m.Force(int(mv))
+}
+
 // FindLatestMigration finds closet migration to the requested version
 //  For example we have the following migrations:
 //  1_001, 2_005, 3_009
@@ -191,6 +199,10 @@ func (m *Migrator) Version() (string, bool, error) {
 // if we ask for 004 we get 001
 // if we ask for 005 we get 005
 func (m *Migrator) FindLatestMigration(requestedVersion string) (uint, error) {
+	if requestedVersion == "latest" {
+		mv := m.versionMapper[m.versions[len(m.versions)-1].Original()]
+		return mv, nil
+	}
 	// if we have a migration for specific version return that mv number
 	mv, ok := m.versionMapper[requestedVersion]
 	if ok {
