@@ -5,8 +5,11 @@ import (
 	"embed"
 	"fmt"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/hashicorp/go-version"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/golang-migrate/migrate/v4"
@@ -63,10 +66,12 @@ type Migrator struct {
 	driver      source.Driver
 	// maps between semantic version to the timestamp it was created at
 	versionMapper map[string]uint
+	versions      version.Collection
 }
 
 func NewMigrator(log hclog.Logger, migrationFiles map[string][]byte, dsn string, providerName string) (*Migrator, error) {
 	versionMapper := make(map[string]uint)
+	versions := make(version.Collection, 0)
 	mm := afero.NewMemMapFs()
 	_ = mm.Mkdir("migrations", 0755)
 	for k, data := range migrationFiles {
@@ -75,8 +80,17 @@ func NewMigrator(log hclog.Logger, migrationFiles map[string][]byte, dsn string,
 			return nil, err
 		}
 		raw := strings.Split(strings.TrimSuffix(strings.TrimSuffix(k, ".up.sql"), ".down.sql"), "_")
-		versionMapper[raw[1]] = cast.ToUint(raw[0])
+		// add version once to mapper, up/down should have same migration number anyway
+		if _, ok := versionMapper[raw[1]]; !ok {
+			versionMapper[raw[1]] = cast.ToUint(raw[0])
+			v, err := version.NewVersion(raw[1])
+			if err != nil {
+				return nil, err
+			}
+			versions = append(versions, v)
+		}
 	}
+	sort.Sort(versions)
 	driver, err := iofs.New(afero.NewIOFS(mm), migrationsEmbeddedDirectoryPath)
 	if err != nil {
 		return nil, err
@@ -103,6 +117,7 @@ func NewMigrator(log hclog.Logger, migrationFiles map[string][]byte, dsn string,
 		m:             m,
 		driver:        driver,
 		versionMapper: versionMapper,
+		versions:      versions,
 	}, nil
 }
 
@@ -167,6 +182,37 @@ func (m *Migrator) Version() (string, bool, error) {
 		}
 	}
 	return "v0.0.0", dirty, err
+}
+
+// FindLatestMigration finds closet migration to the requested version
+//  For example we have the following migrations:
+//  1_001, 2_005, 3_009
+// if we ask for 007 we get 005
+// if we ask for 004 we get 001
+// if we ask for 005 we get 005
+func (m *Migrator) FindLatestMigration(requestedVersion string) (uint, error) {
+	// if we have a migration for specific version return that mv number
+	mv, ok := m.versionMapper[requestedVersion]
+	if ok {
+		return mv, nil
+	}
+	ov, err := version.NewVersion(requestedVersion)
+	if err != nil {
+		return 0, err
+	}
+	// find closest migration level
+	for i, v := range m.versions {
+		if v.GreaterThan(ov) {
+			// edge case that requested version is smaller than ll migrations
+			if i == 0 {
+				return 0, nil
+			}
+			mv, _ := m.versionMapper[m.versions[i-1].Original()]
+			return mv, nil
+		}
+	}
+	mv, _ = m.versionMapper[m.versions[len(m.versions)-1].Original()]
+	return mv, nil
 }
 
 func dropTables(ctx context.Context, tx pgx.Tx, table *schema.Table) error {
