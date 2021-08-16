@@ -98,34 +98,28 @@ func (p *Provider) ConfigureProvider(ctx context.Context, request *cqproto.Confi
 	if err != nil {
 		return &cqproto.ConfigureProviderResponse{}, err
 	}
+
+	tables := make(map[string]string)
+	for r, t := range p.ResourceMap {
+		if err := getTableDuplicates(r, t, tables); err != nil {
+			return &cqproto.ConfigureProviderResponse{}, err
+		}
+	}
+
 	p.meta = client
 	return &cqproto.ConfigureProviderResponse{}, nil
 }
 
-func (p *Provider) CheckDuplicates() error {
-	tables := make(map[string]string)
-
-	// getTableNames function for recursive collection of table names from shcema.Table
-	var getTableNames func(resource *schema.Table) []string
-	getTableNames = func(resource *schema.Table) []string {
-		names := make([]string, 0, len(resource.Relations)+1)
-		names = append(names, resource.Name)
-		for _, r := range resource.Relations {
-			subNames := getTableNames(r)
-			names = append(names, subNames...)
+func getTableDuplicates(resource string, table *schema.Table, tableNames map[string]string) error {
+	for _, r := range table.Relations {
+		if err := getTableDuplicates(resource, r, tableNames); err != nil {
+			return err
 		}
-		return names
 	}
-
-	for r, t := range p.ResourceMap {
-		names := getTableNames(t)
-		for _, n := range names {
-			if existing, ok := tables[n]; ok {
-				return fmt.Errorf("table name %s used more than once, duplicates are in %s and %s", n, existing, r)
-			} else {
-				tables[n] = r
-			}
-		}
+	if existing, ok := tableNames[table.Name]; ok {
+		return fmt.Errorf("table name %s used more than once, duplicates are in %s and %s", table.Name, existing, resource)
+	} else {
+		tableNames[table.Name] = resource
 	}
 	return nil
 }

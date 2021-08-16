@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	resoruce = Provider{
+	provider = Provider{
 		ResourceMap: map[string]*schema.Table{
 			"test": {
 				Name: "sdk_test",
@@ -29,7 +29,7 @@ var (
 		},
 	}
 
-	failResoruce = Provider{
+	failProvider = Provider{
 		ResourceMap: map[string]*schema.Table{
 			"test": {
 				Name: "sdk_test",
@@ -47,9 +47,15 @@ var (
 )
 
 func TestTableDuplicates(t *testing.T) {
-	err := resoruce.CheckDuplicates()
+	tables := make(map[string]string)
+	var err error
+	for r, t := range provider.ResourceMap {
+		err = getTableDuplicates(r, t, tables)
+	}
 	assert.Nil(t, err)
 
-	err = failResoruce.CheckDuplicates()
+	for r, t := range failProvider.ResourceMap {
+		err = getTableDuplicates(r, t, tables)
+	}
 	assert.Error(t, err)
 }
