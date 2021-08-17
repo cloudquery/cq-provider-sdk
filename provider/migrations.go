@@ -4,11 +4,12 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"path"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/cloudquery/cq-provider-sdk/helpers"
 
 	"github.com/hashicorp/go-version"
 
@@ -57,8 +58,6 @@ func readProviderMigrationFiles(log hclog.Logger, migrationFiles embed.FS) (map[
 	}
 	return migrations, nil
 }
-
-
 
 type Migrator struct {
 	provider    string

@@ -3,8 +3,9 @@ package helpers
 import (
 	"errors"
 	"fmt"
-	"github.com/xo/dburl"
 	"strings"
+
+	"github.com/xo/dburl"
 )
 
 func ParseConnectionString(connString string) (*dburl.URL, error) {
@@ -92,7 +93,6 @@ func parseDSNSettings(s string) (map[string]string, error) {
 	}
 	return settings, nil
 }
-
 
 var nonQueryKeys = []string{"host", "port", "database", "password", "user"}
 
