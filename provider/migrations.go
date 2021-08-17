@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"path"
 	"sort"
 	"strconv"
@@ -57,6 +58,8 @@ func readProviderMigrationFiles(log hclog.Logger, migrationFiles embed.FS) (map[
 	return migrations, nil
 }
 
+
+
 type Migrator struct {
 	provider    string
 	dsn         string
@@ -95,7 +98,7 @@ func NewMigrator(log hclog.Logger, migrationFiles map[string][]byte, dsn string,
 	if err != nil {
 		return nil, err
 	}
-	u, err := dburl.Parse(dsn)
+	u, err := helpers.ParseConnectionString("postgres://postgres:pass@localhost:5432/postgres?sslmode=allow")
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -138,4 +139,13 @@ func TestFindLatestMigration(t *testing.T) {
 	mv, err = mtest.FindLatestMigration("latest")
 	assert.Nil(t, err)
 	assert.Equal(t, uint(5), mv)
+}
+
+func TestParseConnectionString(t *testing.T) {
+	url, err := helpers.ParseConnectionString("postgres://postgres:pass@localhost:5432/postgres?sslmode=allow")
+	assert.Nil(t, err)
+	assert.Equal(t,"postgres://postgres:pass@localhost:5432/postgres?sslmode=allow", url.String() )
+	url, err = helpers.ParseConnectionString(	"host=localhost user=postgres password=pass database=postgres port=5432 sslmode=allow")
+	assert.Nil(t, err)
+	assert.Equal(t,"postgres://postgres:pass@localhost:5432/postgres?sslmode=allow", url.String() )
 }
