@@ -23,6 +23,7 @@ func ParseConnectionString(connString string) (*dburl.URL, error) {
 var asciiSpace = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
 
 // ParseDSNSettings taken from https://github.com/jackc/pgconn
+//nolint
 func parseDSNSettings(s string) (map[string]string, error) {
 	settings := make(map[string]string)
 
@@ -119,7 +120,7 @@ func convertDSNToURL(connString string) (string, error) {
 	if len(settings) == 0 {
 		return baseURL, nil
 	}
-	var queryParams []string
+	queryParams := make([]string, 0)
 	for k, v := range settings {
 		queryParams = append(queryParams, fmt.Sprintf("%s=%s", k, v))
 

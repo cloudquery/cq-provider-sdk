@@ -143,10 +143,10 @@ func TestFindLatestMigration(t *testing.T) {
 }
 
 func TestParseConnectionString(t *testing.T) {
-	url, err := helpers.ParseConnectionString("postgres://postgres:pass@localhost:5432/postgres?sslmode=allow")
+	url, err := helpers.ParseConnectionString("postgres://postgres:pass@localhost:5432/postgres?sslmode=disable")
 	assert.Nil(t, err)
 	assert.Equal(t, "postgres://postgres:pass@localhost:5432/postgres?sslmode=allow", url.String())
-	url, err = helpers.ParseConnectionString("host=localhost user=postgres password=pass database=postgres port=5432 sslmode=allow")
+	url, err = helpers.ParseConnectionString("host=localhost user=postgres password=pass database=postgres port=5432 sslmode=disable")
 	assert.Nil(t, err)
 	assert.Equal(t, "postgres://postgres:pass@localhost:5432/postgres?sslmode=allow", url.String())
 }

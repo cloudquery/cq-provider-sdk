@@ -97,7 +97,7 @@ func NewMigrator(log hclog.Logger, migrationFiles map[string][]byte, dsn string,
 	if err != nil {
 		return nil, err
 	}
-	u, err := helpers.ParseConnectionString("postgres://postgres:pass@localhost:5432/postgres?sslmode=allow")
+	u, err := helpers.ParseConnectionString(dsn)
 	if err != nil {
 		return nil, err
 	}
