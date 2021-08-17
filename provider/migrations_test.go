@@ -148,5 +148,5 @@ func TestParseConnectionString(t *testing.T) {
 	assert.Equal(t, "postgres://postgres:pass@localhost:5432/postgres?sslmode=allow", url.String())
 	url, err = helpers.ParseConnectionString("host=localhost user=postgres password=pass database=postgres port=5432 sslmode=disable")
 	assert.Nil(t, err)
-	assert.Equal(t, "postgres://postgres:pass@localhost:5432/postgres?sslmode=allow", url.String())
+	assert.Equal(t, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", url.String())
 }
