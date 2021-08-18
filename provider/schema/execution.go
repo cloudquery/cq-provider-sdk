@@ -50,7 +50,7 @@ type PartialFetchFailedResource struct {
 }
 
 // partialFetchFailureBufferLength defines the buffer length for the partialFetchChan.
-const partialFetchFailureBufferLength = 20
+const partialFetchFailureBufferLength = 10
 
 // NewExecutionData Create a new execution data
 func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDelete bool, extraFields map[string]interface{}, partialFetch bool) ExecutionData {
@@ -65,7 +65,7 @@ func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDel
 	}
 }
 
-func (e ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, parent *Resource) (uint64, error) {
+func (e *ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, parent *Resource) (uint64, error) {
 	var clients []ClientMeta
 	clients = append(clients, meta)
 	if e.Table.Multiplex != nil {
@@ -75,16 +75,15 @@ func (e ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, parent
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Start the partial fetch failure result channel routine
+	finishedPartialFetchChan := make(chan bool)
 	if e.partialFetch {
 		e.partialFetchChan = make(chan PartialFetchFailedResource, partialFetchFailureBufferLength)
-		defer func() {
-			close(e.partialFetchChan)
-		}()
 		go func() {
 			for fetchResourceFailure := range e.partialFetchChan {
 				meta.Logger().Debug("received failed partial fetch resource", "resource", fetchResourceFailure)
 				e.PartialFetchFailureResult = append(e.PartialFetchFailureResult, fetchResourceFailure)
 			}
+			finishedPartialFetchChan <- true
 		}()
 	}
 	var totalResources uint64
@@ -99,11 +98,16 @@ func (e ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, parent
 			return nil
 		})
 	}
-	return totalResources, g.Wait()
+	err := g.Wait()
+	if e.partialFetch {
+		close(e.partialFetchChan)
+		<-finishedPartialFetchChan
+	}
+	return totalResources, err
 }
 
-func (e ExecutionData) WithTable(t *Table) ExecutionData {
-	return ExecutionData{
+func (e *ExecutionData) WithTable(t *Table) *ExecutionData {
+	return &ExecutionData{
 		Table:                     t,
 		Db:                        e.Db,
 		Logger:                    e.Logger,
@@ -175,7 +179,7 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	return nc, nil
 }
 
-func (e ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) error {
+func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) error {
 	var resources = make(Resources, len(objects))
 	for i, o := range objects {
 		resources[i] = NewResourceData(e.Table, parent, o, e.extraFields)
@@ -214,11 +218,16 @@ func (e ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, pa
 	return nil
 }
 
-func (e ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMeta, resource *Resource) (err error) {
+func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMeta, resource *Resource) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			e.Logger.Error("resolve resource recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
 			err = fmt.Errorf("failed resolve resource. Error: %s", r)
+			if partialFetchErr := e.checkPartialFetchError(err, resource, "resolve resource recovered from panic"); partialFetchErr != nil {
+				err = partialFetchErr
+			} else {
+				err = nil
+			}
 		}
 	}()
 	if err = e.resolveColumns(ctx, meta, resource, resource.table.Columns); err != nil {
@@ -243,7 +252,7 @@ func (e ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMet
 	return err
 }
 
-func (e ExecutionData) resolveColumns(ctx context.Context, meta ClientMeta, resource *Resource, cols []Column) error {
+func (e *ExecutionData) resolveColumns(ctx context.Context, meta ClientMeta, resource *Resource, cols []Column) error {
 	for _, c := range cols {
 		if c.Resolver != nil {
 			meta.Logger().Trace("using custom column resolver", "column", c.Name)
@@ -290,7 +299,7 @@ func interfaceSlice(slice interface{}) []interface{} {
 	return ret
 }
 
-func (e ExecutionData) checkPartialFetchError(err error, res *Resource, customMsg string) error {
+func (e *ExecutionData) checkPartialFetchError(err error, res *Resource, customMsg string) error {
 	// Fast path if partial fetch is disabled
 	if !e.partialFetch {
 		return err
