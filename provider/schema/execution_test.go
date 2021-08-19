@@ -317,7 +317,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Equal(t, []interface{}{"other", "name_no_prefix", "prefix_name", expectedResource.cqId, expectedResource.Get("meta"), 1}, values)
 	})
 
-	t.Run("test partial fetch", func(t *testing.T) {
+	t.Run("test partial fetch post resource resolver", func(t *testing.T) {
 		mockDb := new(databaseMock)
 		execDefault := NewExecutionData(mockDb, logger, testDefaultsTable, false, nil, true)
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, false, mock.Anything).Return(nil)
@@ -335,6 +335,66 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Equal(t, expectedResource.data["name"], "defaultValue")
 		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
 		assert.Equal(t, "post resource resolver failed: random failure", execDefault.PartialFetchFailureResult[0].Error)
+	})
+
+	t.Run("test partial fetch resolver", func(t *testing.T) {
+		mockDb := new(databaseMock)
+		execDefault := NewExecutionData(mockDb, logger, testDefaultsTable, false, nil, true)
+		mockDb.On("CopyFrom", mock.Anything, mock.Anything, false, mock.Anything).Return(nil)
+		testDefaultsTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *Resource, res chan interface{}) error {
+			res <- testDefaultsTableData{Name: nil}
+			return fmt.Errorf("random failure")
+		}
+		var expectedResource *Resource
+		testDefaultsTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
+			expectedResource = parent
+			return nil
+		}
+		_, err := execDefault.ResolveTable(context.Background(), mockedClient, nil)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedResource.data["name"], "defaultValue")
+		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
+		assert.Equal(t, "table resolve error: random failure", execDefault.PartialFetchFailureResult[0].Error)
+	})
+
+	t.Run("test partial fetch resolver panic", func(t *testing.T) {
+		mockDb := new(databaseMock)
+		execDefault := NewExecutionData(mockDb, logger, testDefaultsTable, false, nil, true)
+		mockDb.On("CopyFrom", mock.Anything, mock.Anything, false, mock.Anything).Return(nil)
+		testDefaultsTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *Resource, res chan interface{}) error {
+			res <- testDefaultsTableData{Name: nil}
+			panic("test panic")
+		}
+		var expectedResource *Resource
+		testDefaultsTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
+			expectedResource = parent
+			return nil
+		}
+		_, err := execDefault.ResolveTable(context.Background(), mockedClient, nil)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedResource.data["name"], "defaultValue")
+		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
+		assert.Equal(t, "table resolve error: failed table test_table fetch. Error: test panic", execDefault.PartialFetchFailureResult[0].Error)
+	})
+
+	t.Run("test partial fetch post resource resolver panic", func(t *testing.T) {
+		mockDb := new(databaseMock)
+		execDefault := NewExecutionData(mockDb, logger, testDefaultsTable, false, nil, true)
+		mockDb.On("CopyFrom", mock.Anything, mock.Anything, false, mock.Anything).Return(nil)
+		testDefaultsTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *Resource, res chan interface{}) error {
+			res <- testDefaultsTableData{Name: nil}
+			return nil
+		}
+		var expectedResource *Resource
+		testDefaultsTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
+			expectedResource = parent
+			panic("test panic")
+		}
+		_, err := execDefault.ResolveTable(context.Background(), mockedClient, nil)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedResource.data["name"], "defaultValue")
+		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
+		assert.Equal(t, "resolve resource recovered from panic: failed resolve resource. Error: test panic", execDefault.PartialFetchFailureResult[0].Error)
 	})
 }
 

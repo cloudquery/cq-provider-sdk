@@ -222,16 +222,15 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 	defer func() {
 		if r := recover(); r != nil {
 			e.Logger.Error("resolve resource recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
-			err = fmt.Errorf("failed resolve resource. Error: %s", r)
-			if partialFetchErr := e.checkPartialFetchError(err, resource, "resolve resource recovered from panic"); partialFetchErr != nil {
+			if partialFetchErr := e.checkPartialFetchError(fmt.Errorf("failed resolve resource. Error: %s", r), resource, "resolve resource recovered from panic"); partialFetchErr != nil {
 				err = partialFetchErr
-			} else {
-				err = nil
 			}
 		}
 	}()
 	if err = e.resolveColumns(ctx, meta, resource, resource.table.Columns); err != nil {
-		return err
+		if partialFetchErr := e.checkPartialFetchError(err, resource, "resolve column error"); partialFetchErr != nil {
+			return partialFetchErr
+		}
 	}
 	// call PostRowResolver if defined after columns have been resolved
 	if resource.table.PostResourceResolver != nil {
