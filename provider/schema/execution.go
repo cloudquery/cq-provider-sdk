@@ -91,11 +91,8 @@ func (e *ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, paren
 		client := client
 		g.Go(func() error {
 			count, err := e.callTableResolve(ctx, client, parent)
-			if err != nil && !(e.Table.IgnoreError != nil && e.Table.IgnoreError(err)) {
-				return err
-			}
 			atomic.AddUint64(&totalResources, count)
-			return nil
+			return err
 		})
 	}
 	err := g.Wait()
@@ -148,12 +145,17 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				e.Logger.Error("table resolver recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
+				client.Logger().Error("table resolver recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
 				resolverErr = fmt.Errorf("failed table %s fetch. Error: %s", e.Table.Name, r)
 			}
 			close(res)
 		}()
-		resolverErr = e.Table.Resolver(ctx, client, parent, res)
+		err := e.Table.Resolver(ctx, client, parent, res)
+		if err != nil && e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
+			client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
+			return
+		}
+		resolverErr = err
 	}()
 
 	nc := uint64(0)
@@ -193,13 +195,10 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 	// only top level tables should cascade, disable delete is turned on.
 	// if we didn't disable delete all data should be wiped before resolve)
 	shouldCascade := parent == nil && e.disableDelete
-	if err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields); err != nil {
-		e.Logger.Warn("failed copy-from to db", "error", err)
-		// fallback insert, copy from sometimes does problems so we fall back with insert
-		if err := e.Db.Insert(ctx, e.Table, resources); err != nil {
-			e.Logger.Error("failed insert to db", "error", err)
-			return err
-		}
+	var err error
+	resources, err = e.copyDataIntoDB(ctx, resources, shouldCascade)
+	if err != nil {
+		return err
 	}
 
 	// Finally, resolve relations of each resource
@@ -216,6 +215,39 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 		}
 	}
 	return nil
+}
+
+func (e *ExecutionData) copyDataIntoDB(ctx context.Context, resources Resources, shouldCascade bool) (Resources, error) {
+	partialFetchErrorOccurred := false
+	if err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields); err != nil {
+		e.Logger.Warn("failed copy-from to db", "error", err)
+		// fallback insert, copy from sometimes does problems so we fall back with insert
+		if err := e.Db.Insert(ctx, e.Table, resources); err != nil {
+			e.Logger.Error("failed insert to db", "error", err)
+			if partialFetchErr := e.checkPartialFetchError(err, nil, "failed to copy resources into the db"); partialFetchErr != nil {
+				return nil, err
+			}
+			// If we're here, partial fetching is enabled and notification has been sent
+			partialFetchErrorOccurred = true
+		}
+	}
+
+	// Fast-path exit here
+	if !partialFetchErrorOccurred {
+		return resources, nil
+	}
+
+	// Try to insert resource by resource if partial fetch is enabled and an error occurred
+	partialFetchResources := make(Resources, 0)
+	for id := range resources {
+		if err := e.Db.Insert(ctx, e.Table, Resources{resources[id]}); err != nil {
+			e.Logger.Error("failed to insert resource into db", "error", err, "resource", resources[id])
+		} else {
+			// If there is no error we add the resource to the final result
+			partialFetchResources = append(partialFetchResources, resources[id])
+		}
+	}
+	return partialFetchResources, nil
 }
 
 func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMeta, resource *Resource) (err error) {
