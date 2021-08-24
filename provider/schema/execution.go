@@ -225,7 +225,7 @@ func (e *ExecutionData) copyDataIntoDB(ctx context.Context, resources Resources,
 		if err := e.Db.Insert(ctx, e.Table, resources); err != nil {
 			e.Logger.Error("failed insert to db", "error", err)
 			if partialFetchErr := e.checkPartialFetchError(err, nil, "failed to copy resources into the db"); partialFetchErr != nil {
-				return nil, err
+				return nil, partialFetchErr
 			}
 			// If we're here, partial fetching is enabled and notification has been sent
 			partialFetchErrorOccurred = true
