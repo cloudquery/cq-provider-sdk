@@ -218,23 +218,22 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 }
 
 func (e *ExecutionData) copyDataIntoDB(ctx context.Context, resources Resources, shouldCascade bool) (Resources, error) {
-	partialFetchErrorOccurred := false
-	if err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields); err != nil {
-		e.Logger.Warn("failed copy-from to db", "error", err)
-		// fallback insert, copy from sometimes does problems so we fall back with insert
-		if err := e.Db.Insert(ctx, e.Table, resources); err != nil {
-			e.Logger.Error("failed insert to db", "error", err)
-			if partialFetchErr := e.checkPartialFetchError(err, nil, "failed to copy resources into the db"); partialFetchErr != nil {
-				return nil, partialFetchErr
-			}
-			// If we're here, partial fetching is enabled and notification has been sent
-			partialFetchErrorOccurred = true
-		}
-	}
-
-	// Fast-path exit here
-	if !partialFetchErrorOccurred {
+	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
+	if err == nil {
 		return resources, nil
+	}
+	e.Logger.Warn("failed copy-from to db", "error", err)
+
+	// fallback insert, copy from sometimes does problems so we fall back with insert
+	err = e.Db.Insert(ctx, e.Table, resources)
+	if err == nil {
+		return resources, nil
+	}
+	e.Logger.Error("failed insert to db", "error", err)
+
+	// Partial fetch check
+	if partialFetchErr := e.checkPartialFetchError(err, nil, "failed to copy resources into the db"); partialFetchErr != nil {
+		return nil, partialFetchErr
 	}
 
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
