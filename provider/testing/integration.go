@@ -76,30 +76,37 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 		t.Fatal(err)
 	}
 
+	// whether want TF to apply and create resources instead of running a fetch on existing resources
+	var tfApplyResources = getEnv("TF_APPLY_RESOURCES", "") == "1"
 	var varPrefix = simplifyString(resource.Table.Name)
 	var varSuffix = simplifyString(hostname)
 
 	prefix := getEnv("TF_VAR_PREFIX", "")
 	if prefix != "" {
 		varPrefix = prefix
+	} else if !tfApplyResources {
+		t.Fatalf("Missing resource TF_VAR_PREFIX either set this environment variable or use TF_APPLY_RESOURCES=1")
 	}
 
 	suffix := getEnv("TF_VAR_SUFFIX", "")
 	if suffix != "" {
 		varSuffix = suffix
+	} else if !tfApplyResources {
+		t.Fatalf("Missing resource TF_VAR_SUFFIX either set this environment or use TF_APPLY_RESOURCES=1")
 	}
 
+	// finally set picked prefix/suffix to resource
 	resource.Prefix = varPrefix
 	resource.Suffix = varSuffix
 
-	if getEnv("TF_APPLY_RESOURCES", "") == "true" {
+	if tfApplyResources {
 		tf, err := setup(&resource)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		teardown, err := deploy(tf, &resource)
-		if teardown != nil && getEnv("TF_NO_DESTROY", "") != "true" {
+		if teardown != nil && getEnv("TF_NO_DESTROY", "") != "1" {
 			defer func() {
 				if err = teardown(); err != nil {
 					t.Fatal(err)
@@ -145,7 +152,12 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 // setup - puts *.tf files into isolated test dir and creates the instance of terraform
 func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
 	var err error
-	resource.workdir, err = copyTfFiles(resource.Table.Name)
+	if resource.Resources != nil {
+		resource.workdir, err = copyTfFiles(resource.Table.Name, resource.Resources...)
+	} else {
+		resource.workdir, err = copyTfFiles(resource.Table.Name, fmt.Sprintf("%s.tf", resource.Table.Name))
+	}
+
 	if err != nil {
 		// remove workdir
 		if e := os.RemoveAll(resource.workdir); e != nil {
@@ -416,8 +428,8 @@ func simplifyString(in string) string {
 }
 
 // copyTfFiles - copies tf files that are related to current test
-func copyTfFiles(name string) (string, error) {
-	workdir := filepath.Join(tfDir, name)
+func copyTfFiles(testName string, tfTestFiles ...string) (string, error) {
+	workdir := filepath.Join(tfDir, testName)
 	if _, err := os.Stat(workdir); os.IsNotExist(err) {
 		if err := os.MkdirAll(workdir, os.ModePerm); err != nil {
 			return workdir, err
@@ -427,7 +439,9 @@ func copyTfFiles(name string) (string, error) {
 	}
 
 	files := make(map[string]string)
-	files[filepath.Join(infraFilesDir, name+".tf")] = filepath.Join(workdir, name+".tf")
+	for _, tftf := range tfTestFiles {
+		files[filepath.Join(infraFilesDir, tftf)] = filepath.Join(workdir, tftf)
+	}
 	files[filepath.Join(infraFilesDir, "terraform.tf")] = filepath.Join(workdir, "terraform.tf")
 	files[filepath.Join(infraFilesDir, "provider.tf")] = filepath.Join(workdir, "provider.tf")
 	files[filepath.Join(infraFilesDir, "variables.tf")] = filepath.Join(workdir, "variables.tf")

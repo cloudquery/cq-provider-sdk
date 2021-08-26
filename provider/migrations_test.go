@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cloudquery/cq-provider-sdk/helpers"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -77,6 +79,21 @@ func TestMigrations(t *testing.T) {
 	assert.Equal(t, []interface{}{"v0.0.4", false, nil}, []interface{}{version, dirty, err})
 }
 
+// TestMigrationJumps tests an edge case we request a higher version but latest migration is a previous version
+func TestMigrationJumps(t *testing.T) {
+	m, err := NewMigrator(hclog.Default(), complexMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test")
+	assert.Nil(t, err)
+
+	err = m.DropProvider(context.Background(), nil)
+	assert.Nil(t, err)
+
+	err = m.UpgradeProvider("v0.2.0")
+	assert.Nil(t, err)
+
+	version, dirty, err := m.Version()
+	assert.Equal(t, []interface{}{"v0.1.4", false, nil}, []interface{}{version, dirty, err})
+}
+
 func TestMultiProviderMigrations(t *testing.T) {
 	mtest, err := NewMigrator(hclog.Default(), simpleMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test")
 	assert.Nil(t, err)
@@ -138,4 +155,13 @@ func TestFindLatestMigration(t *testing.T) {
 	mv, err = mtest.FindLatestMigration("latest")
 	assert.Nil(t, err)
 	assert.Equal(t, uint(5), mv)
+}
+
+func TestParseConnectionString(t *testing.T) {
+	url, err := helpers.ParseConnectionString("postgres://postgres:pass@localhost:5432/postgres?sslmode=disable")
+	assert.Nil(t, err)
+	assert.Equal(t, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", url.String())
+	url, err = helpers.ParseConnectionString("host=localhost user=postgres password=pass database=postgres port=5432 sslmode=disable")
+	assert.Nil(t, err)
+	assert.Equal(t, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", url.String())
 }
