@@ -171,6 +171,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 			return nil
 		})
 	}
+	defer p.db.Close()
 	return g.Wait()
 }
 
