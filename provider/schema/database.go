@@ -156,7 +156,7 @@ func (p PgDatabase) Delete(ctx context.Context, t *Table, args []interface{}) er
 	return err
 }
 
-func (p PgDatabase) Close(){
+func (p PgDatabase) Close() {
 	p.pool.Close()
 }
 
