@@ -127,7 +127,10 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	}
 
 	// if resources ["*"] is requested we will fetch all resources
-	resources := p.interpolateAllResources(request.Resources)
+	resources, err := p.interpolateAllResources(request.Resources)
+	if err != nil {
+		return err
+	}
 
 	conn, err := schema.NewPgDatabase(ctx, p.dbURL)
 	if err != nil {
@@ -182,18 +185,21 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	return g.Wait()
 }
 
-func (p *Provider) interpolateAllResources(requestedResources []string) []string {
+func (p *Provider) interpolateAllResources(requestedResources []string) ([]string, error) {
 	if len(requestedResources) != 1 {
-		return requestedResources
+		if funk.ContainsString(requestedResources, "*") {
+			return nil, fmt.Errorf("invalid \"*\" resource, with explicit resources")
+		}
+		return requestedResources, nil
 	}
 	if requestedResources[0] != "*" {
-		return requestedResources
+		return requestedResources, nil
 	}
-	allResources := make([]string, 0)
-	for k, _ := range p.ResourceMap {
+	allResources := make([]string, 0, len(p.ResourceMap))
+	for k := range p.ResourceMap {
 		allResources = append(allResources, k)
 	}
-	return allResources
+	return allResources, nil
 }
 
 func getTableDuplicates(resource string, table *schema.Table, tableNames map[string]string) error {
