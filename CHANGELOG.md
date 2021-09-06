@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added support to fetch all resources with "*" [#87](https://github.com/cloudquery/cq-provider-sdk/pull/87)
 
 ### :gear: Changed
-* Partial fetch flag enabled by default on configuration (cq init <provider>) creation for new providers [#87](https://github.com/cloudquery/cq-provider-sdk/pull/87)
+* Partial fetch flag enabled by default on configuration (cq init [provider]) creation for new providers [#87](https://github.com/cloudquery/cq-provider-sdk/pull/87)
 
 
 ## [v0.4.2] - 2020-09-04
