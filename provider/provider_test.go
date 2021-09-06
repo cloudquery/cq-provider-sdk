@@ -49,18 +49,18 @@ var (
 func TestProviderInterpolate(t *testing.T) {
 	r, err := provider.interpolateAllResources([]string{"test"})
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"test"}, r)
+	assert.ElementsMatch(t, []string{"test"}, r)
 
 	r, err = provider.interpolateAllResources([]string{"test", "test1"})
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"test", "test1"}, r)
+	assert.ElementsMatch(t, []string{"test", "test1"}, r)
 
 	r, err = provider.interpolateAllResources([]string{"test", "test1", "*"})
 	assert.Error(t, err)
 	assert.Nil(t, r)
 	r, err = provider.interpolateAllResources([]string{"*"})
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"test", "test1"}, r)
+	assert.ElementsMatch(t, []string{"test", "test1"}, r)
 
 }
 
