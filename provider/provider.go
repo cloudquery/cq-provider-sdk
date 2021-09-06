@@ -72,7 +72,10 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 	data := fmt.Sprintf(`
 		provider "%s" {
 			%s
+			// list of resources to fetch
 			resources = %s
+			// enables partial fetching, allowing for any failures to not stop full resource pull
+			enable_partial_fetch = true
 		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
 
 	return &cqproto.GetProviderConfigResponse{Config: hclwrite.Format([]byte(data))}, nil
@@ -123,6 +126,9 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		return fmt.Errorf("provider has duplicate resources requested")
 	}
 
+	// if resources ["*"] is requested we will fetch all resources
+	resources := p.interpolateAllResources(request.Resources)
+
 	conn, err := schema.NewPgDatabase(ctx, p.dbURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database. %w", err)
@@ -131,10 +137,10 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	defer conn.Close()
 
 	g, gctx := errgroup.WithContext(ctx)
-	finishedResources := make(map[string]bool, len(request.Resources))
+	finishedResources := make(map[string]bool, len(resources))
 	l := sync.Mutex{}
 	var totalResourceCount uint64 = 0
-	for _, resource := range request.Resources {
+	for _, resource := range resources {
 		table, ok := p.ResourceMap[resource]
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
@@ -174,6 +180,20 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		})
 	}
 	return g.Wait()
+}
+
+func (p *Provider) interpolateAllResources(requestedResources []string) []string {
+	if len(requestedResources) != 1 {
+		return requestedResources
+	}
+	if requestedResources[0] != "*" {
+		return requestedResources
+	}
+	allResources := make([]string, 0)
+	for k, _ := range p.ResourceMap {
+		allResources = append(allResources, k)
+	}
+	return allResources
 }
 
 func getTableDuplicates(resource string, table *schema.Table, tableNames map[string]string) error {
