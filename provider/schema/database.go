@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/go-hclog"
+	"github.com/jackc/pgconn"
 	"reflect"
 	"strconv"
 
@@ -11,6 +13,7 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v4"
 
 	sq "github.com/Masterminds/squirrel"
@@ -35,9 +38,10 @@ type Database interface {
 
 type PgDatabase struct {
 	pool *pgxpool.Pool
+	log hclog.Logger
 }
 
-func NewPgDatabase(ctx context.Context, dsn string) (*PgDatabase, error) {
+func NewPgDatabase(ctx context.Context, logger hclog.Logger, dsn string) (*PgDatabase, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
@@ -46,7 +50,7 @@ func NewPgDatabase(ctx context.Context, dsn string) (*PgDatabase, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PgDatabase{pool: pool}, nil
+	return &PgDatabase{pool: pool, log: logger}, nil
 }
 
 // Insert inserts all resources to given table, table and resources are assumed from same table.
@@ -71,6 +75,10 @@ func (p PgDatabase) Insert(ctx context.Context, t *Table, resources Resources) e
 
 	s, args, err := sqlStmt.ToSql()
 	if err != nil {
+		// This should rarely occur, but if it does we want to print the SQL to debug it further
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
+			p.log.Error("insert syntax error", "sql", s)
+		}
 		return err
 	}
 	_, err = p.pool.Exec(ctx, s, args...)
