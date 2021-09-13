@@ -41,7 +41,7 @@ func NewResourceData(t *Table, parent *Resource, item interface{}, extraFields m
 func (r *Resource) String() string {
 	keys := make([]interface{}, len(r.table.PrimaryKeys()))
 	for _, pk := range r.table.PrimaryKeys() {
-		keys  = append(keys, r.Get(pk))
+		keys = append(keys, r.Get(pk))
 	}
 	return fmt.Sprintf("%s", keys)
 }

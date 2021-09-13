@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/go-hclog"
-	"github.com/jackc/pgconn"
 	"reflect"
 	"strconv"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/jackc/pgconn"
 
 	"github.com/modern-go/reflect2"
 
@@ -38,7 +39,7 @@ type Database interface {
 
 type PgDatabase struct {
 	pool *pgxpool.Pool
-	log hclog.Logger
+	log  hclog.Logger
 }
 
 func NewPgDatabase(ctx context.Context, logger hclog.Logger, dsn string) (*PgDatabase, error) {
