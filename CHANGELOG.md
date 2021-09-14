@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v0.4.5] - 2021-09-14
 
 ### :rocket: Added
-* Added support to allow close of migrator [#92](https://github.com/cloudquery/cq-provider-sdk/pull/92)
+* Added support to close migrator connetion [#92](https://github.com/cloudquery/cq-provider-sdk/pull/92)
 
 
 ## [v0.4.4] - 2021-09-13
