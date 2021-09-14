@@ -60,7 +60,7 @@ func Serve(opts *Options) {
 				// We send all output to CloudQuery. Go-plugin will take the output and
 				// pass it through another hclog.Logger on the client side where it can
 				// be filtered.
-				Level:      hclog.Trace,
+				Level:      hclog.Debug,
 				JSONFormat: true,
 				Name:       opts.Name,
 			})
@@ -79,10 +79,17 @@ func Serve(opts *Options) {
 		}
 		return
 	}
+
+	// If this flag is turned on the provider will print trace log, the trace log prints values inserted etc', turn this
+	// flag only if you are debugging locally and need more info on the provider while running it.
+	var providerLogLevel = hclog.Debug
+	if os.Getenv("CQ_PROVIDER_DEBUG_TRACE_LOG") == "1" {
+		providerLogLevel = hclog.Trace
+	}
 	// If not logger was set by provider create a new logger
 	if opts.Logger == nil {
 		opts.Logger = hclog.New(&hclog.LoggerOptions{
-			Level:      hclog.Trace,
+			Level:      providerLogLevel,
 			JSONFormat: true,
 		})
 	}
