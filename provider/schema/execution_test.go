@@ -183,6 +183,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		mockDb := new(DatabaseMock)
 		exec := NewExecutionData(mockDb, logger, testTable, false, nil, false)
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
+		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
 		testTable.Resolver = dataReturningResolver
 		exec.disableDelete = true
 		_, err := exec.ResolveTable(context.Background(), mockedClient, nil)
@@ -263,6 +264,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		}
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 		mockDb.On("Delete", mock.Anything, testTable, mock.Anything).Return(nil)
+		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
 		mockDb.AssertNumberOfCalls(t, "Delete", 0)
 		_, err := exec.ResolveTable(context.Background(), mockedClient, nil)
 		mockDb.AssertNumberOfCalls(t, "Delete", 0)
