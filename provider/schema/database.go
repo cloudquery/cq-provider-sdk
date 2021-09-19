@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/cast"
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/spf13/cast"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/jackc/pgconn"

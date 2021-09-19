@@ -3,11 +3,12 @@ package schema
 import (
 	"context"
 	"fmt"
-	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	"reflect"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
+
+	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
