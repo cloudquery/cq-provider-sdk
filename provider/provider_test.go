@@ -77,3 +77,8 @@ func TestTableDuplicates(t *testing.T) {
 	}
 	assert.Error(t, err)
 }
+
+
+func TestProvider_FetchResources(t *testing.T) {
+
+}

@@ -3,9 +3,11 @@ package schema
 import (
 	"context"
 	"fmt"
+	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	"reflect"
 	"runtime/debug"
 	"sync/atomic"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
@@ -35,6 +37,8 @@ type ExecutionData struct {
 	PartialFetchFailureResult []PartialFetchFailedResource
 	// partialFetchChan is the channel that is used to send failed resource fetches
 	partialFetchChan chan PartialFetchFailedResource
+	// When the execution started
+	executionStart time.Time
 }
 
 // PartialFetchFailedResource represents a single partial fetch failed resource
@@ -62,6 +66,7 @@ func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDel
 		extraFields:               extraFields,
 		PartialFetchFailureResult: []PartialFetchFailedResource{},
 		partialFetch:              partialFetch,
+		executionStart:            time.Now().Add(-1 * time.Minute),
 	}
 }
 
@@ -134,6 +139,22 @@ func (e ExecutionData) truncateTable(ctx context.Context, client ClientMeta, par
 	return nil
 }
 
+func (e ExecutionData) cleanupStaleData(ctx context.Context, client ClientMeta, parent *Resource) error {
+	// Only clean top level tables
+	if parent != nil {
+		return nil
+	}
+	if !e.disableDelete {
+		client.Logger().Debug("skipping stale data removal", "table", e.Table.Name)
+		return nil
+	}
+	client.Logger().Info("cleaning table table stale data", "table", e.Table.Name, "last_update", e.executionStart)
+	if e.Table.DeleteFilter != nil {
+		return e.Db.RemoveStaleData(ctx, e.Table, e.executionStart, e.Table.DeleteFilter(client, parent))
+	}
+	return e.Db.RemoveStaleData(ctx, e.Table, e.executionStart, nil)
+}
+
 func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, parent *Resource) (uint64, error) {
 
 	if e.Table.Resolver == nil {
@@ -180,6 +201,9 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	// Print only parent resources
 	if parent == nil {
 		client.Logger().Info("fetched successfully", "table", e.Table.Name, "count", nc)
+	}
+	if err := e.cleanupStaleData(ctx, client, parent); err != nil {
+		return nc, fmt.Errorf("failed to clean stale data: %w", err)
 	}
 	return nc, nil
 }
