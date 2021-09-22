@@ -56,6 +56,7 @@ var (
 
 	testProviderCreatorFunc = func() Provider {
 		return Provider{
+			Name: "unitest",
 			Config: func() Config {
 				return &testConfig{}
 			},
@@ -157,7 +158,7 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		DisableDelete: true,
 		ExtraFields:   nil,
 	})
-	assert.Equal(t, "provider logger not defined, make sure to run it with serve", resp.Error)
+	assert.Equal(t, "provider unitest logger not defined, make sure to run it with serve", resp.Error)
 	assert.Nil(t, err)
 	// set logger this time
 	tp.Logger = hclog.Default()
