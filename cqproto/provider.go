@@ -1,4 +1,4 @@
-//go:generate protoc --go_out=plugins=grpc:. --go_opt=paths=source_relative internal/plugin.proto
+//go:generate protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative internal/plugin.proto
 package cqproto
 
 import (
@@ -51,6 +51,8 @@ type GetProviderSchemaResponse struct {
 	Version string
 	// ResourceTables is a map of tables this provider creates
 	ResourceTables map[string]*schema.Table
+	// Migrations scripts available for the provider
+	Migrations map[string][]byte
 }
 
 // GetProviderConfigRequest represents a CloudQuery RPC request for provider's config
@@ -82,6 +84,9 @@ type ConfigureProviderResponse struct {
 // FetchResourcesRequest represents a CloudQuery RPC request of one or more resources
 type FetchResourcesRequest struct {
 	Resources []string
+
+	// PartialFetchingEnabled if true enables partial fetching
+	PartialFetchingEnabled bool
 }
 
 // FetchResourcesStream represents a CloudQuery RPC stream of fetch updates from the provider
@@ -101,6 +106,19 @@ type FetchResourcesResponse struct {
 	// Amount of resources collected so far
 	ResourceCount uint64
 	// Error value if any, if returned the stream will be canceled
+	Error string
+	// list of resources where the fetching failed
+	PartialFetchFailedResources []*PartialFetchFailedResource
+}
+
+type PartialFetchFailedResource struct {
+	// table name of the failed resource fetch
+	TableName string
+	// root/parent table name
+	RootTableName string
+	// root/parent primary key values
+	RootPrimaryKeyValues []string
+	// error message for this resource fetch failure
 	Error string
 }
 

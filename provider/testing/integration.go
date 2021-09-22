@@ -1,4 +1,4 @@
-package providertest
+package testing
 
 import (
 	"context"
@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
@@ -29,7 +31,8 @@ import (
 )
 
 const (
-	tfDir = "./.test/"
+	tfDir         = "./.test/"
+	infraFilesDir = "./infra/"
 )
 
 var (
@@ -66,29 +69,57 @@ type ExpectedValue struct {
 // IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
 func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, resource ResourceIntegrationTestData) {
 	t.Parallel()
-	tf, err := setup(&resource)
+
+	// prepare terraform variables
+	hostname, err := os.Hostname()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	teardown, err := deploy(tf, &resource)
-	if teardown != nil && getEnv("TF_NO_DESTROY", "") != "true" {
-		defer func() {
-			if err = teardown(); err != nil {
-				t.Fatal(err)
-			}
-		}()
-	} else {
-		defer func() {
-			log.Printf("%s RESOURCES WERE NOT DESTROYTED. destroy them manually.\n", resource.Table.Name)
-		}()
-	}
-	if err != nil {
-		t.Fatal(err)
+	// whether want TF to apply and create resources instead of running a fetch on existing resources
+	var tfApplyResources = getEnv("TF_APPLY_RESOURCES", "") == "1"
+	var varPrefix = simplifyString(resource.Table.Name)
+	var varSuffix = simplifyString(hostname)
+
+	prefix := getEnv("TF_VAR_PREFIX", "")
+	if prefix != "" {
+		varPrefix = prefix
+	} else if !tfApplyResources {
+		t.Fatalf("Missing resource TF_VAR_PREFIX either set this environment variable or use TF_APPLY_RESOURCES=1")
 	}
 
-	if err = fetch(providerCreator, &resource); err != nil {
-		t.Fatal(err)
+	suffix := getEnv("TF_VAR_SUFFIX", "")
+	if suffix != "" {
+		varSuffix = suffix
+	} else if !tfApplyResources {
+		t.Fatalf("Missing resource TF_VAR_SUFFIX either set this environment or use TF_APPLY_RESOURCES=1")
+	}
+
+	// finally set picked prefix/suffix to resource
+	resource.Prefix = varPrefix
+	resource.Suffix = varSuffix
+
+	if tfApplyResources {
+		tf, err := setup(&resource)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		teardown, err := deploy(tf, &resource)
+		if teardown != nil && getEnv("TF_NO_DESTROY", "") != "1" {
+			defer func() {
+				if err = teardown(); err != nil {
+					t.Fatal(err)
+				}
+			}()
+		} else {
+			defer func() {
+				log.Printf("%s RESOURCES WERE NOT DESTROYTED. destroy them manually.\n", resource.Table.Name)
+			}()
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	log.Printf("%s verify fields\n", resource.Table.Name)
@@ -96,14 +127,28 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn, err := pool.Acquire(context.Background())
+	ctx := context.Background()
+	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer conn.Release()
 
-	err = verifyFields(resource, conn)
-	if err != nil {
+	l := logging.New(hclog.DefaultOptions)
+	tableCreator := provider.NewTableCreator(l)
+	if err := tableCreator.CreateTable(context.Background(), conn, resource.Table, nil); err != nil {
+		assert.FailNow(t, fmt.Sprintf("failed to create tables %s", resource.Table.Name), err)
+	}
+
+	if err = fetch(providerCreator, &resource); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = verifyFields(resource, conn); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := conn.Conn().Close(ctx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -111,7 +156,12 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 // setup - puts *.tf files into isolated test dir and creates the instance of terraform
 func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
 	var err error
-	resource.workdir, err = copyTfFiles(resource.Table.Name)
+	if resource.Resources != nil {
+		resource.workdir, err = copyTfFiles(resource.Table.Name, resource.Resources...)
+	} else {
+		resource.workdir, err = copyTfFiles(resource.Table.Name, fmt.Sprintf("%s.tf", resource.Table.Name))
+	}
+
 	if err != nil {
 		// remove workdir
 		if e := os.RemoveAll(resource.workdir); e != nil {
@@ -140,20 +190,12 @@ func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
 
 // deploy - uses terraform to deploy resources and builds teardown function. deployment timeout can be set via TF_EXEC_TIMEOUT env variable
 func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func() error, error) {
-	// prepare terraform variables
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
-	resource.Suffix = simplifyString(hostname)
-	resource.Prefix = simplifyString(resource.Table.Name)
 	testSuffix := fmt.Sprintf("test_suffix=%s", resource.Suffix)
 	testPrefix := fmt.Sprintf("test_prefix=%s", resource.Prefix)
 
 	teardown := func() error {
 		log.Printf("%s destroy\n", resource.Table.Name)
-		err = tf.Destroy(context.Background(), tfexec.Var(testPrefix),
+		err := tf.Destroy(context.Background(), tfexec.Var(testPrefix),
 			tfexec.Var(testSuffix))
 		if err != nil {
 			return err
@@ -174,7 +216,7 @@ func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func()
 	}
 
 	log.Printf("%s tf init\n", resource.Table.Name)
-	if err = tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
+	if err := tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
 		return teardown, err
 	}
 
@@ -194,7 +236,7 @@ func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func()
 	}()
 
 	log.Printf("%s tf apply -var test_prefix=%s -var test_suffix=%s\n", resource.Table.Name, resource.Prefix, resource.Suffix)
-	err = tf.Apply(ctx, tfexec.Var(testPrefix), tfexec.Var(testSuffix))
+	err := tf.Apply(ctx, tfexec.Var(testPrefix), tfexec.Var(testSuffix))
 	applyDone <- true
 	if err != nil {
 		return teardown, err
@@ -233,14 +275,23 @@ func fetch(providerCreator func() *provider.Provider, resource *ResourceIntegrat
 		return err
 	}
 
+	var resourceSender = &fakeResourceSender{
+		Errors: []string{},
+	}
+
 	if err = testProvider.FetchResources(context.Background(),
 		&cqproto.FetchResourcesRequest{
 			Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)},
 		},
-		fakeResourceSender{},
+		resourceSender,
 	); err != nil {
 		return err
 	}
+
+	if len(resourceSender.Errors) > 0 {
+		return fmt.Errorf("error/s occur during test, %s", strings.Join(resourceSender.Errors, ", "))
+	}
+
 	return nil
 }
 
@@ -291,12 +342,12 @@ func verifyFields(resource ResourceIntegrationTestData, conn pgxscan.Querier) er
 
 	// verify root entry relations
 	for _, e := range data {
-		id, ok := e["id"]
+		id, ok := e["cq_id"]
 		if !ok {
 			return fmt.Errorf("failed to get parent id for %s", resource.Table.Name)
 		}
 		if err = verifyRelations(verification.Relations, id, resource.Table.Name, conn); err != nil {
-			return fmt.Errorf("verification failed for relations of table entry %s; id: %v -> %w", resource.Table.Name, id, err)
+			return fmt.Errorf("verification failed for relations of table entry %s; cq_id: %v -> %w", resource.Table.Name, id, err)
 		}
 	}
 	return nil
@@ -309,9 +360,10 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 		sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar).
 			Select(fmt.Sprintf("json_agg(%s)", relation.Name)).
 			From(relation.Name).
-			LeftJoin(fmt.Sprintf("%[1]s on %[1]s.id = %[3]s.%[2]s", parentName, relation.ForeignKeyName, relation.Name)).
-			Where(squirrel.Eq{fmt.Sprintf("%s.id", parentName): parentId})
+			LeftJoin(fmt.Sprintf("%[1]s on %[1]s.cq_id = %[3]s.%[2]s", parentName, relation.ForeignKeyName, relation.Name)).
+			Where(squirrel.Eq{fmt.Sprintf("%s.cq_id", parentName): parentId})
 		query, args, err := sq.ToSql()
+
 		if err != nil {
 			return fmt.Errorf("%s -> %w", relation.Name, err)
 		}
@@ -327,12 +379,12 @@ func verifyRelations(relations []*ResourceIntegrationVerification, parentId inte
 
 		// verify relation entry relations
 		for _, e := range data {
-			id, ok := e["id"]
+			id, ok := e["cq_id"]
 			if !ok {
 				return fmt.Errorf("failed to get parent id for %s", relation.Name)
 			}
 			if err = verifyRelations(relation.Relations, id, relation.Name, conn); err != nil {
-				return fmt.Errorf("%s id: %v -> %w", relation.Name, id, err)
+				return fmt.Errorf("%s cq_id: %v -> %w", relation.Name, id, err)
 			}
 		}
 	}
@@ -389,8 +441,8 @@ func simplifyString(in string) string {
 }
 
 // copyTfFiles - copies tf files that are related to current test
-func copyTfFiles(name string) (string, error) {
-	workdir := filepath.Join(tfDir, name)
+func copyTfFiles(testName string, tfTestFiles ...string) (string, error) {
+	workdir := filepath.Join(tfDir, testName)
 	if _, err := os.Stat(workdir); os.IsNotExist(err) {
 		if err := os.MkdirAll(workdir, os.ModePerm); err != nil {
 			return workdir, err
@@ -400,10 +452,12 @@ func copyTfFiles(name string) (string, error) {
 	}
 
 	files := make(map[string]string)
-	files[filepath.Join(name+".tf")] = filepath.Join(workdir, name+".tf")
-	files[filepath.Join("variables.tf")] = filepath.Join(workdir, "variables.tf")
-	files[filepath.Join("provider.tf")] = filepath.Join(workdir, "provider.tf")
-	files[filepath.Join("versions.tf")] = filepath.Join(workdir, "versions.tf")
+	for _, tftf := range tfTestFiles {
+		files[filepath.Join(infraFilesDir, tftf)] = filepath.Join(workdir, tftf)
+	}
+	files[filepath.Join(infraFilesDir, "terraform.tf")] = filepath.Join(workdir, "terraform.tf")
+	files[filepath.Join(infraFilesDir, "provider.tf")] = filepath.Join(workdir, "provider.tf")
+	files[filepath.Join(infraFilesDir, "variables.tf")] = filepath.Join(workdir, "variables.tf")
 
 	for src, dst := range files {
 		if _, err := os.Stat(src); err != nil {
