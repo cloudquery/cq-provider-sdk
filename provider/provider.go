@@ -86,7 +86,7 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s was already configured", p.Name)}, nil
 	}
 	if p.Logger == nil {
-		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider logger not defined, make sure to run it with serve")}, nil
+		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, nil
 	}
 	p.disableDelete = request.DisableDelete
 	p.extraFields = request.ExtraFields

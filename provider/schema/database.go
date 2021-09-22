@@ -84,6 +84,9 @@ func (p PgDatabase) Insert(ctx context.Context, t *Table, resources Resources) e
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
 			p.log.Error("insert syntax error", "sql", s)
 		}
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+			p.log.Error("insert integrity violation error", "constraint", pgErr.ConstraintName, "errMsg", pgErr.Message)
+		}
 		return err
 	}
 	_, err = p.pool.Exec(ctx, s, args...)

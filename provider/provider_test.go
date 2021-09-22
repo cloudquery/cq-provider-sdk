@@ -172,5 +172,4 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 	})
 	assert.Equal(t, "", resp.Error)
 	assert.Error(t, err)
-
 }
