@@ -281,7 +281,6 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 	t.Run("disable delete failed copy from", func(t *testing.T) {
 		mockDb := new(DatabaseMock)
 		exec := NewExecutionData(mockDb, logger, testTable, true, nil, false)
-		//mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 		testTable.Resolver = dataReturningSingleResolver
 		testTable.DeleteFilter = func(meta ClientMeta, r *Resource) []interface{} {
 			return nil
@@ -293,6 +292,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 			expectedResource = parent
 			return nil
 		}
+		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(fmt.Errorf("some error"))
 		mockDb.On("Insert", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockDb.On("Delete", mock.Anything, testTable, mock.Anything).Return(nil)
@@ -319,6 +319,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 			expectedResource = parent
 			return nil
 		}
+		mockDb.On("RemoveStaleData", mock.Anything, alwaysDeleteTable, exec.executionStart, mock.Anything).Return(nil)
 		mockDb.On("Delete", mock.Anything, alwaysDeleteTable, mock.Anything).Return(nil)
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 		mockDb.AssertNumberOfCalls(t, "Delete", 0)

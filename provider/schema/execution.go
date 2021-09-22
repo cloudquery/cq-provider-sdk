@@ -299,10 +299,10 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 			}
 		}
 	}
-	// Finally generate cq_id for resource
+	// Finally, resolve default SDK columns resource
 	for _, c := range GetDefaultSDKColumns() {
 		if err = c.Resolver(ctx, meta, resource, c); err != nil {
-			if partialFetchErr := e.checkPartialFetchError(err, resource, "column resolver execution failed"); partialFetchErr != nil {
+			if partialFetchErr := e.checkPartialFetchError(err, resource, "default column resolver execution failed"); partialFetchErr != nil {
 				return partialFetchErr
 			}
 		}
