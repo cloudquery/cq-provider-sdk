@@ -10,14 +10,12 @@ type jsonTestType struct {
 	Name        string `json:"name"`
 	Description string `json:"decription"`
 	Version     int    `json:"version"`
-	test        int
 }
 
 type jsonNoTags struct {
 	Name        string
 	Description string
 	Version     int
-	test        int
 }
 
 var (
