@@ -3,10 +3,11 @@ package provider
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/faker/v3"
 	"github.com/hashicorp/go-hclog"
-	"testing"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 
