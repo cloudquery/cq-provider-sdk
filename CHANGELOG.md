@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v0.4.7] - 2021-09-23
 
 ### :rocket: Added
-* Added support to remove stale data based on `last_updated` column that wasn't fetched in latest refresh, activate with `--disable-delete` in cloudquery [#95]https://github.com/cloudquery/cq-provider-sdk/pull/95)
+* Added support to remove stale data based on `last_updated` column that wasn't fetched in latest refresh, activate with `--disable-delete` in cloudquery [#95](https://github.com/cloudquery/cq-provider-sdk/pull/95)
 
 ### :gear: Changed
 * Integration tesing should fail if provider has internal error [#98](https://github.com/cloudquery/cq-provider-sdk/pull/98)
