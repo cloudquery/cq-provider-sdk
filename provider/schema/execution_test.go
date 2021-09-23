@@ -436,7 +436,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedResource.data["name"], "defaultValue")
 		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
-		assert.Equal(t, "post resource resolver failed: random failure", execDefault.PartialFetchFailureResult[0].Error)
+		assert.Equal(t, "failed to resolve resource: post resource resolver failed: random failure", execDefault.PartialFetchFailureResult[0].Error)
 	})
 
 	t.Run("test partial fetch resolver", func(t *testing.T) {
