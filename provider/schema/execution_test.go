@@ -496,7 +496,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedResource.data["name"], "defaultValue")
 		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
-		assert.Equal(t, "resolve resource recovered from panic: failed resolve resource. Error: test panic", execDefault.PartialFetchFailureResult[0].Error)
+		assert.Equal(t, "failed to resolve resource: recovered from panic: test panic", execDefault.PartialFetchFailureResult[0].Error)
 	})
 
 	t.Run("test table with multiplex", func(t *testing.T) {

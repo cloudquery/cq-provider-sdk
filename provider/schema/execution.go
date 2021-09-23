@@ -286,7 +286,7 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 	defer func() {
 		if r := recover(); r != nil {
 			e.Logger.Error("resolve resource recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
-			err = fmt.Errorf("resolve resource recovered from panic: %w", err)
+			err = fmt.Errorf("recovered from panic: %s", r)
 		}
 	}()
 	if err = e.resolveColumns(ctx, meta, resource, resource.table.Columns); err != nil {
