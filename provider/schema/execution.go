@@ -16,6 +16,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// executionJitter adds a -1 minute to execution of fetch, so if a user fetches only 1 resources and it finishes
+// faster than the <1s it won't be deleted by remove stale.
+const executionJitter = -1 * time.Minute
+
 type ClientMeta interface {
 	Logger() hclog.Logger
 }
@@ -28,7 +32,7 @@ type ExecutionData struct {
 	Db Database
 	// Logger associated with this execution
 	Logger hclog.Logger
-	// disableDelete allows to disable deletion of table data for this execution
+	// disableDelete allows disabling deletion of table data for this execution
 	disableDelete bool
 	// extraFields to be passed to each created resource in the execution
 	extraFields map[string]interface{}
@@ -67,7 +71,7 @@ func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDel
 		extraFields:               extraFields,
 		PartialFetchFailureResult: []PartialFetchFailedResource{},
 		partialFetch:              partialFetch,
-		executionStart:            time.Now().Add(-1 * time.Minute),
+		executionStart:            time.Now().Add(executionJitter),
 	}
 }
 
@@ -150,7 +154,7 @@ func (e ExecutionData) cleanupStaleData(ctx context.Context, client ClientMeta, 
 		client.Logger().Debug("skipping stale data removal", "table", e.Table.Name)
 		return nil
 	}
-	client.Logger().Info("cleaning table table stale data", "table", e.Table.Name, "last_update", e.executionStart)
+	client.Logger().Debug("cleaning table table stale data", "table", e.Table.Name, "last_update", e.executionStart)
 	if e.Table.DeleteFilter != nil {
 		return e.Db.RemoveStaleData(ctx, e.Table, e.executionStart, e.Table.DeleteFilter(client, parent))
 	}
