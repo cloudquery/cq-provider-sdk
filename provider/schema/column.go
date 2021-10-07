@@ -156,7 +156,9 @@ type Column struct {
 	Default interface{}
 	// Column Resolver allows to set you own data based on resolving this can be an API call or setting multiple embedded values etc'
 	Resolver ColumnResolver
-	// Creation options allow to modify how column is defined when table is created
+	// Ignore errors checks if returned error from column resolver should be ignored.
+	IgnoreError IgnoreErrorFunc
+	// Creation options allow modifying how column is defined when table is created
 	CreationOptions ColumnCreationOptions
 }
 
@@ -255,6 +257,9 @@ func (c Column) checkType(v interface{}) bool {
 			if c.Type == TypeUUIDArray && reflect2.TypeOf(v).String() == "uuid.UUID" || reflect2.TypeOf(v).String() == "*uuid.UUID" {
 				return c.Type == TypeUUIDArray
 			}
+		}
+		if kindName == reflect.Struct {
+			return c.Type == TypeJSON
 		}
 		if c.Type == TypeSmallInt && (kindName == reflect.Int8 || kindName == reflect.Int16 || kindName == reflect.Uint8) {
 			return true

@@ -6,11 +6,18 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
+
+	"github.com/spf13/cast"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/jackc/pgconn"
 
 	"github.com/modern-go/reflect2"
 
 	"github.com/doug-martin/goqu/v9"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v4"
 
 	sq "github.com/Masterminds/squirrel"
@@ -27,17 +34,19 @@ const (
 type Database interface {
 	Insert(ctx context.Context, t *Table, instance Resources) error
 	Exec(ctx context.Context, query string, args ...interface{}) error
-	Delete(ctx context.Context, t *Table, args []interface{}) error
+	Delete(ctx context.Context, t *Table, kvFilters []interface{}) error
 	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
+	RemoveStaleData(ctx context.Context, t *Table, executionStart time.Time, kvFilters []interface{}) error
 	CopyFrom(ctx context.Context, resources Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error
 	Close()
 }
 
 type PgDatabase struct {
 	pool *pgxpool.Pool
+	log  hclog.Logger
 }
 
-func NewPgDatabase(ctx context.Context, dsn string) (*PgDatabase, error) {
+func NewPgDatabase(ctx context.Context, logger hclog.Logger, dsn string) (*PgDatabase, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
@@ -46,7 +55,7 @@ func NewPgDatabase(ctx context.Context, dsn string) (*PgDatabase, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PgDatabase{pool: pool}, nil
+	return &PgDatabase{pool: pool, log: logger}, nil
 }
 
 // Insert inserts all resources to given table, table and resources are assumed from same table.
@@ -71,6 +80,13 @@ func (p PgDatabase) Insert(ctx context.Context, t *Table, resources Resources) e
 
 	s, args, err := sqlStmt.ToSql()
 	if err != nil {
+		// This should rarely occur, but if it does we want to print the SQL to debug it further
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
+			p.log.Error("insert syntax error", "sql", s)
+		}
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+			p.log.Error("insert integrity violation error", "constraint", pgErr.ConstraintName, "errMsg", pgErr.Message)
+		}
 		return err
 	}
 	_, err = p.pool.Exec(ctx, s, args...)
@@ -137,21 +153,37 @@ func (p PgDatabase) QueryOne(ctx context.Context, query string, args ...interfac
 	return row
 }
 
-func (p PgDatabase) Delete(ctx context.Context, t *Table, args []interface{}) error {
-	nc := len(args)
+func (p PgDatabase) Delete(ctx context.Context, t *Table, kvFilters []interface{}) error {
+	nc := len(kvFilters)
 	if nc%2 != 0 {
 		return fmt.Errorf("number of args to delete should be even. Got %d", nc)
 	}
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 	ds := psql.Delete(t.Name)
 	for i := 0; i < nc; i += 2 {
-		ds = ds.Where(sq.Eq{args[i].(string): args[i+1]})
+		ds = ds.Where(sq.Eq{kvFilters[i].(string): kvFilters[i+1]})
 	}
 	sql, args, err := ds.ToSql()
 	if err != nil {
 		return err
 	}
 
+	_, err = p.pool.Exec(ctx, sql, args...)
+	return err
+}
+
+func (p PgDatabase) RemoveStaleData(ctx context.Context, t *Table, executionStart time.Time, kvFilters []interface{}) error {
+	q := goqu.Delete(t.Name).WithDialect("postgres").Where(goqu.L(`extract(epoch from (meta->>'last_updated')::timestamp)`).Lt(executionStart.Unix()))
+	if len(kvFilters)%2 != 0 {
+		return fmt.Errorf("expected even number of k,v delete filters received %s", kvFilters)
+	}
+	for i := 0; i < len(kvFilters); i += 2 {
+		q = q.Where(goqu.Ex{cast.ToString(kvFilters[i]): goqu.Op{"eq": kvFilters[i+1]}})
+	}
+	sql, args, err := q.Prepared(true).ToSQL()
+	if err != nil {
+		return fmt.Errorf("failed building query: %w", err)
+	}
 	_, err = p.pool.Exec(ctx, sql, args...)
 	return err
 }
@@ -255,6 +287,17 @@ func getResourceValues(r *Resource) ([]interface{}, error) {
 			case []byte:
 				var newV interface{}
 				err := json.Unmarshal(data, &newV)
+				if err != nil {
+					return nil, err
+				}
+				values = append(values, newV)
+			default:
+				d, err := json.Marshal(data)
+				if err != nil {
+					return nil, err
+				}
+				var newV interface{}
+				err = json.Unmarshal(d, &newV)
 				if err != nil {
 					return nil, err
 				}

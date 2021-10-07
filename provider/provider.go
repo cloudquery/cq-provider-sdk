@@ -72,7 +72,10 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 	data := fmt.Sprintf(`
 		provider "%s" {
 			%s
+			// list of resources to fetch
 			resources = %s
+			// enables partial fetching, allowing for any failures to not stop full resource pull
+			enable_partial_fetch = true
 		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
 
 	return &cqproto.GetProviderConfigResponse{Config: hclwrite.Format([]byte(data))}, nil
@@ -82,8 +85,12 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	if p.meta != nil {
 		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s was already configured", p.Name)}, nil
 	}
+	if p.Logger == nil {
+		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, nil
+	}
 	p.disableDelete = request.DisableDelete
 	p.extraFields = request.ExtraFields
+	p.dbURL = request.Connection.DSN
 	providerConfig := p.Config()
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.ConfigureProviderResponse{}, err
@@ -122,7 +129,13 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		return fmt.Errorf("provider has duplicate resources requested")
 	}
 
-	conn, err := schema.NewPgDatabase(ctx, p.dbURL)
+	// if resources ["*"] is requested we will fetch all resources
+	resources, err := p.interpolateAllResources(request.Resources)
+	if err != nil {
+		return err
+	}
+
+	conn, err := schema.NewPgDatabase(ctx, p.Logger, p.dbURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database. %w", err)
 	}
@@ -130,10 +143,10 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	defer conn.Close()
 
 	g, gctx := errgroup.WithContext(ctx)
-	finishedResources := make(map[string]bool, len(request.Resources))
+	finishedResources := make(map[string]bool, len(resources))
 	l := sync.Mutex{}
 	var totalResourceCount uint64 = 0
-	for _, resource := range request.Resources {
+	for _, resource := range resources {
 		table, ok := p.ResourceMap[resource]
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
@@ -173,6 +186,23 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		})
 	}
 	return g.Wait()
+}
+
+func (p *Provider) interpolateAllResources(requestedResources []string) ([]string, error) {
+	if len(requestedResources) != 1 {
+		if funk.ContainsString(requestedResources, "*") {
+			return nil, fmt.Errorf("invalid \"*\" resource, with explicit resources")
+		}
+		return requestedResources, nil
+	}
+	if requestedResources[0] != "*" {
+		return requestedResources, nil
+	}
+	allResources := make([]string, 0, len(p.ResourceMap))
+	for k := range p.ResourceMap {
+		allResources = append(allResources, k)
+	}
+	return allResources, nil
 }
 
 func getTableDuplicates(resource string, table *schema.Table, tableNames map[string]string) error {

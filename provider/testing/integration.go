@@ -270,19 +270,29 @@ func fetch(providerCreator func() *provider.Provider, resource *ResourceIntegrat
 		CloudQueryVersion: "",
 		Connection: cqproto.ConnectionDetails{DSN: getEnv("DATABASE_URL",
 			"host=localhost user=postgres password=pass DB.name=postgres port=5432")},
-		Config: data,
+		Config:        data,
+		DisableDelete: true,
 	}); err != nil {
 		return err
+	}
+
+	var resourceSender = &fakeResourceSender{
+		Errors: []string{},
 	}
 
 	if err = testProvider.FetchResources(context.Background(),
 		&cqproto.FetchResourcesRequest{
 			Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)},
 		},
-		fakeResourceSender{},
+		resourceSender,
 	); err != nil {
 		return err
 	}
+
+	if len(resourceSender.Errors) > 0 {
+		return fmt.Errorf("error/s occur during test, %s", strings.Join(resourceSender.Errors, ", "))
+	}
+
 	return nil
 }
 
@@ -408,6 +418,11 @@ func compareDataWithExpected(expected []ExpectedValue, received []map[string]int
 			toCompare[i] = nil // row passed verification - it won't be used
 			found++
 		}
+		// verification.Count == 0 means we expect at least 1 result
+		if verification.Count == 0 && found > 0 {
+			continue
+		}
+
 		if verification.Count != found {
 			return fmt.Errorf("expected to have %d but got %d entries with one of the %v\nerrors: %v", verification.Count, found, verification.Data, errors)
 		}
