@@ -3,6 +3,7 @@ package schema
 import (
 	"context"
 	"fmt"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"net"
 	"time"
 
@@ -109,8 +110,8 @@ func parseDate(dateStr string, rfcs ...string) (date *time.Time, err error) {
 //
 // Examples:
 // IPAddressResolver("IP")
-func IPAddressResolver(path string) ColumnResolver {
-	return func(_ context.Context, meta ClientMeta, r *Resource, c Column) error {
+func IPAddressResolver(path string) schema.ColumnResolver {
+	return func(_ context.Context, meta schema.ClientMeta, r *schema.Resource, c schema.Column) error {
 		ipStr, err := cast.ToStringE(funk.Get(r.Item, path, funk.WithAllowZero()))
 		if err != nil {
 			return err
@@ -118,6 +119,9 @@ func IPAddressResolver(path string) ColumnResolver {
 		ip := net.ParseIP(ipStr)
 		if ipStr != "" && ip == nil {
 			return fmt.Errorf("failed to parse IP from %s", ipStr)
+		}
+		if ip.To4() != nil {
+			return r.Set(c.Name, ip.To4())
 		}
 		return r.Set(c.Name, ip)
 	}
