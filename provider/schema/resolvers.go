@@ -174,11 +174,11 @@ func UUIDResolver(path string) ColumnResolver {
 			return err
 		}
 
-		uuid, err := uuid.FromString(uuidString)
+		uuidObject, err := uuid.FromString(uuidString)
 		if err != nil {
 			return err
 		}
-		return r.Set(c.Name, uuid)
+		return r.Set(c.Name, uuidObject)
 	}
 }
 
