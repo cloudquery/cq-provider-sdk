@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 	"reflect"
 	"strconv"
 	"time"
@@ -11,13 +14,10 @@ import (
 	"github.com/spf13/cast"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/jackc/pgconn"
-
 	"github.com/modern-go/reflect2"
 
 	"github.com/doug-martin/goqu/v9"
 
-	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v4"
 
 	sq "github.com/Masterminds/squirrel"
@@ -80,17 +80,23 @@ func (p PgDatabase) Insert(ctx context.Context, t *Table, resources Resources) e
 
 	s, args, err := sqlStmt.ToSql()
 	if err != nil {
-		// This should rarely occur, but if it does we want to print the SQL to debug it further
-		if pgErr, ok := err.(*pgconn.PgError); ok && pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
-			p.log.Error("insert syntax error", "sql", s)
-		}
-		if pgErr, ok := err.(*pgconn.PgError); ok && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
-			p.log.Error("insert integrity violation error", "constraint", pgErr.ConstraintName, "errMsg", pgErr.Message)
-		}
-		return err
+		return diag.FromError(err, diag.ERROR, diag.DATABASE, "bad insert SQL statement created", "")
 	}
 	_, err = p.pool.Exec(ctx, s, args...)
-	return err
+	if err == nil {
+		return nil
+	}
+	if pgErr, ok := err.(*pgconn.PgError); ok {
+		// This should rarely occur, but if it occurs we want to print the SQL to debug it further
+		if pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
+			p.log.Debug("insert syntax error", "sql", s)
+		}
+		if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+			p.log.Debug("insert integrity violation error", "constraint", pgErr.ConstraintName, "errMsg", pgErr.Message)
+		}
+		return diag.FromError(err, diag.ERROR, diag.DATABASE, fmt.Sprintf("insert failed for table %s", t.Name), pgErr.Message)
+	}
+	return diag.FromError(err, diag.ERROR, diag.DATABASE, "", "")
 }
 
 // CopyFrom copies all resources from []*Resource
@@ -129,7 +135,6 @@ func (p PgDatabase) CopyFrom(ctx context.Context, resources Resources, shouldCas
 		if copied != int64(len(resources)) {
 			return fmt.Errorf("not all resources copied %d != %d to %s", copied, len(resources), resources.TableName())
 		}
-
 		return nil
 	})
 	return err

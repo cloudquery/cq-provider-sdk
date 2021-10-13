@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 	"sync"
 	"sync/atomic"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+
 	"github.com/creasty/defaults"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/hcl/v2/hclsimple"
@@ -39,6 +41,11 @@ type Provider struct {
 	Config func() Config
 	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger hclog.Logger
+	// Migrations embedded and passed by the provider to upgrade between versions
+	Migrations embed.FS
+	// ErrorClassifier allows the provider to classify errors it returns table execution, and return diagnostics to the user
+	ErrorClassifier func(table *schema.Table, err error) []diag.Diagnostic
+
 	// Database connection string
 	dbURL string
 	// meta is the provider's client created when configure is called
@@ -47,8 +54,8 @@ type Provider struct {
 	disableDelete bool
 	// Add extra fields to all resources, these fields don't show up in documentation and are used for internal CQ testing.
 	extraFields map[string]interface{}
-	// Migrations embedded and passed by the provider to upgrade between versions
-	Migrations embed.FS
+
+	databaseCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error)
 }
 
 func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
@@ -135,7 +142,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		return err
 	}
 
-	conn, err := schema.NewPgDatabase(ctx, p.Logger, p.dbURL)
+	conn, err := p.databaseCreator(ctx, p.Logger, p.dbURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database. %w", err)
 	}
@@ -166,26 +173,46 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 			defer l.Unlock()
 			if err != nil {
 				return sender.Send(&cqproto.FetchResourcesResponse{
+					ResourceName:                r,
 					FinishedResources:           finishedResources,
 					ResourceCount:               resourceCount,
 					Error:                       err.Error(),
 					PartialFetchFailedResources: cqproto.PartialFetchToCQProto(execData.PartialFetchFailureResult),
+
 				})
 			}
 			err = sender.Send(&cqproto.FetchResourcesResponse{
+				ResourceName:                r,
 				FinishedResources:           finishedResources,
 				ResourceCount:               resourceCount,
 				Error:                       "",
 				PartialFetchFailedResources: cqproto.PartialFetchToCQProto(execData.PartialFetchFailureResult),
+				Diagnostics:                 p.collectExecutionDiagnostics(execData),
 			})
 			if err != nil {
 				return err
 			}
-			p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
+			p.Logger.Debug("finished fetching table...", "provider", p.Name, "table", table.Name)
 			return nil
 		})
 	}
 	return g.Wait()
+}
+
+func (p *Provider) collectExecutionDiagnostics(exec schema.ExecutionData) []diag.Diagnostic {
+	classifier := DefaultErrorClassifier
+	if p.ErrorClassifier != nil {
+		classifier = p.ErrorClassifier
+	}
+	diagnostics := make([]diag.Diagnostic, 0)
+	for _, e := range exec.PartialFetchFailureResult {
+		if d, ok := e.Err.(diag.Diagnostic); ok {
+			diagnostics = append(diagnostics, d)
+			continue
+		}
+		diagnostics = append(diagnostics, classifier(exec.Table, e.Err)...)
+	}
+	return diagnostics
 }
 
 func (p *Provider) interpolateAllResources(requestedResources []string) ([]string, error) {

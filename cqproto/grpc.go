@@ -237,13 +237,13 @@ func tableToProto(in *schema.Table) *internal.Table {
 	}
 }
 
-func partialFetchFailedResourcesFromProto(in []*internal.PartialFetchFailedResource) []*PartialFetchFailedResource {
+func partialFetchFailedResourcesFromProto(in []*internal.PartialFetchFailedResource) []*FailedResourceFetch {
 	if len(in) == 0 {
 		return nil
 	}
-	failedResources := make([]*PartialFetchFailedResource, len(in))
+	failedResources := make([]*FailedResourceFetch, len(in))
 	for i, p := range in {
-		failedResources[i] = &PartialFetchFailedResource{
+		failedResources[i] = &FailedResourceFetch{
 			TableName:            p.TableName,
 			RootTableName:        p.RootTableName,
 			RootPrimaryKeyValues: p.RootPrimaryKeyValues,
@@ -253,7 +253,7 @@ func partialFetchFailedResourcesFromProto(in []*internal.PartialFetchFailedResou
 	return failedResources
 }
 
-func partialFetchFailedResourcesToProto(in []*PartialFetchFailedResource) []*internal.PartialFetchFailedResource {
+func partialFetchFailedResourcesToProto(in []*FailedResourceFetch) []*internal.PartialFetchFailedResource {
 	if len(in) == 0 {
 		return nil
 	}
@@ -270,17 +270,17 @@ func partialFetchFailedResourcesToProto(in []*PartialFetchFailedResource) []*int
 }
 
 // PartialFetchToCQProto converts schema partial fetch failed resources to cq-proto partial fetch resources
-func PartialFetchToCQProto(in []schema.PartialFetchFailedResource) []*PartialFetchFailedResource {
+func PartialFetchToCQProto(in []schema.ResourceFetchError) []*FailedResourceFetch {
 	if len(in) == 0 {
 		return nil
 	}
-	failedResources := make([]*PartialFetchFailedResource, len(in))
+	failedResources := make([]*FailedResourceFetch, len(in))
 	for i, p := range in {
-		failedResources[i] = &PartialFetchFailedResource{
+		failedResources[i] = &FailedResourceFetch{
 			TableName:            p.TableName,
 			RootTableName:        p.RootTableName,
 			RootPrimaryKeyValues: p.RootPrimaryKeyValues,
-			Error:                p.Error,
+			Error:                p.Err.Error(),
 		}
 	}
 	return failedResources

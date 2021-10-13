@@ -3,8 +3,8 @@ package cqproto
 
 import (
 	"context"
-
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 )
 
 type CQProvider interface {
@@ -19,7 +19,7 @@ type CQProvider interface {
 	// configuration to the provider.
 	ConfigureProvider(context.Context, *ConfigureProviderRequest) (*ConfigureProviderResponse, error)
 
-	// FetchResources is called when CloudQuery requests to fetch one or more resources from the provider
+	// FetchResources is called when CloudQuery requests to fetch one or more resources from the provider.
 	// The provider reports back status updates on the resources fetching progress.
 	FetchResources(context.Context, *FetchResourcesRequest) (FetchResourcesStream, error)
 }
@@ -36,7 +36,7 @@ type CQProviderServer interface {
 	// configuration to the provider.
 	ConfigureProvider(context.Context, *ConfigureProviderRequest) (*ConfigureProviderResponse, error)
 
-	// FetchResources is called when CloudQuery requests to fetch one or more resources from the provider
+	// FetchResources is called when CloudQuery requests to fetch one or more resources from the provider.
 	// The provider reports back status updates on the resources fetching progress.
 	FetchResources(context.Context, *FetchResourcesRequest, FetchResourcesSender) error
 }
@@ -101,6 +101,7 @@ type FetchResourcesSender interface {
 
 // FetchResourcesResponse represents a CloudQuery RPC response of the current fetch progress of the provider
 type FetchResourcesResponse struct {
+	ResourceName string
 	// map of resources that have finished fetching
 	FinishedResources map[string]bool
 	// Amount of resources collected so far
@@ -108,10 +109,13 @@ type FetchResourcesResponse struct {
 	// Error value if any, if returned the stream will be canceled
 	Error string
 	// list of resources where the fetching failed
-	PartialFetchFailedResources []*PartialFetchFailedResource
+	PartialFetchFailedResources []*FailedResourceFetch
+	// Diagnostics of failed resource fetch, the diagnostic provides insights such as severity, summary and
+	// details on how to solve this issue
+	Diagnostics []diag.Diagnostic
 }
 
-type PartialFetchFailedResource struct {
+type FailedResourceFetch struct {
 	// table name of the failed resource fetch
 	TableName string
 	// root/parent table name
