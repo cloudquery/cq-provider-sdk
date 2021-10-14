@@ -107,7 +107,6 @@ func (e *ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, paren
 			atomic.AddUint64(&totalResources, count)
 			return err
 		})
-		time.Sleep(100 * time.Millisecond)
 	}
 	err := g.Wait()
 	if e.partialFetch {
