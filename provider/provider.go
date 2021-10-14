@@ -120,7 +120,6 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 }
 
 func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchResourcesRequest, sender cqproto.FetchResourcesSender) error {
-
 	if p.meta == nil {
 		return fmt.Errorf("provider client is not configured, call ConfigureProvider first")
 	}
@@ -142,6 +141,11 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 
 	defer conn.Close()
 
+	//request.ParallelFetchingLimit = 5
+	var ch chan bool
+	if request.ParallelFetchingLimit != 0 {
+		ch = make(chan bool, request.ParallelFetchingLimit)
+	}
 	g, gctx := errgroup.WithContext(ctx)
 	finishedResources := make(map[string]bool, len(resources))
 	l := sync.Mutex{}
@@ -159,7 +163,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		finishedResources[r] = false
 		l.Unlock()
 		g.Go(func() error {
-			resourceCount, err := execData.ResolveTable(gctx, p.meta, nil)
+			resourceCount, err := execData.ResolveTable(gctx, p.meta, nil, ch)
 			l.Lock()
 			finishedResources[r] = true
 			atomic.AddUint64(&totalResourceCount, resourceCount)
