@@ -88,8 +88,8 @@ type FetchResourcesRequest struct {
 	// PartialFetchingEnabled if true enables partial fetching
 	PartialFetchingEnabled bool
 
-	//ParallelFetchingLimit global client parallel limit X resources Y Clients per resource; ParallelFetchingLimit <= X * Y
-	ParallelFetchingLimit uint
+	// ParallelFetchingLimit global client parallel limit X resources Y Clients per resource; ParallelFetchingLimit <= X * Y
+	ParallelFetchingLimit uint64
 }
 
 // FetchResourcesStream represents a CloudQuery RPC stream of fetch updates from the provider

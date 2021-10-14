@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsimple"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 // Config Every provider implements a resources field we only want to extract that in fetch execution
@@ -141,11 +142,12 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 
 	defer conn.Close()
 
-	//request.ParallelFetchingLimit = 5
-	var ch chan bool
-	if request.ParallelFetchingLimit != 0 {
-		ch = make(chan bool, request.ParallelFetchingLimit)
+	// limiter used to limit the amount of resources fetched concurently
+	var limiter *semaphore.Weighted
+	if request.ParallelFetchingLimit > 0 {
+		limiter = semaphore.NewWeighted(int64(request.ParallelFetchingLimit))
 	}
+
 	g, gctx := errgroup.WithContext(ctx)
 	finishedResources := make(map[string]bool, len(resources))
 	l := sync.Mutex{}
@@ -163,7 +165,13 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		finishedResources[r] = false
 		l.Unlock()
 		g.Go(func() error {
-			resourceCount, err := execData.ResolveTable(gctx, p.meta, nil, ch)
+			if limiter != nil {
+				if err := limiter.Acquire(gctx, 1); err != nil {
+					return err
+				}
+				defer limiter.Release(1)
+			}
+			resourceCount, err := execData.ResolveTable(gctx, p.meta, nil)
 			l.Lock()
 			finishedResources[r] = true
 			atomic.AddUint64(&totalResourceCount, resourceCount)

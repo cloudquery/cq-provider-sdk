@@ -75,7 +75,7 @@ func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDel
 	}
 }
 
-func (e *ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, parent *Resource, limiter chan bool) (uint64, error) {
+func (e *ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, parent *Resource) (uint64, error) {
 	var clients []ClientMeta
 	clients = append(clients, meta)
 	if e.Table.Multiplex != nil {
@@ -103,16 +103,6 @@ func (e *ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, paren
 	for _, client := range clients {
 		client := client
 		g.Go(func() error {
-			if limiter != nil {
-				meta.Logger().Debug("waiting for queue to free", "table", e.Table.Name)
-				limiter <- true
-				meta.Logger().Debug("queue is free for", "table", e.Table.Name)
-				defer func() {
-					<-limiter
-					meta.Logger().Debug("free queue for", "table", e.Table.Name)
-				}()
-			}
-
 			count, err := e.callTableResolve(ctx, client, parent)
 
 			atomic.AddUint64(&totalResources, count)
@@ -260,7 +250,7 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 		meta.Logger().Debug("resolving table relation", "table", e.Table.Name, "relation", rel.Name)
 		for _, r := range resources {
 			// ignore relation resource count
-			_, err := e.WithTable(rel).ResolveTable(ctx, meta, r, nil)
+			_, err := e.WithTable(rel).ResolveTable(ctx, meta, r)
 			if err != nil {
 				if partialFetchErr := e.checkPartialFetchError(err, r, "resolve relation error"); partialFetchErr != nil {
 					return partialFetchErr
