@@ -104,7 +104,6 @@ func (e *ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, paren
 		client := client
 		g.Go(func() error {
 			count, err := e.callTableResolve(ctx, client, parent)
-
 			atomic.AddUint64(&totalResources, count)
 			return err
 		})
