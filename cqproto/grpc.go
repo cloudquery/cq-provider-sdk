@@ -2,6 +2,7 @@ package cqproto
 
 import (
 	"context"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 
 	"github.com/vmihailenco/msgpack/v5"
 
@@ -82,10 +83,12 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 		return nil, err
 	}
 	return &FetchResourcesResponse{
+		ResourceName:                resp.GetResource(),
 		FinishedResources:           resp.GetFinishedResources(),
 		ResourceCount:               resp.GetResourceCount(),
 		Error:                       resp.GetError(),
 		PartialFetchFailedResources: partialFetchFailedResourcesFromProto(resp.GetPartialFetchFailedResources()),
+		Diagnostics:                 diagnosticsFromProto(resp.GetResource(), resp.Diagnostics),
 	}, nil
 }
 
@@ -160,6 +163,7 @@ func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 		ResourceCount:               response.ResourceCount,
 		Error:                       response.Error,
 		PartialFetchFailedResources: partialFetchFailedResourcesToProto(response.PartialFetchFailedResources),
+		Diagnostics:                 diagnosticsToProto(response.Diagnostics),
 	})
 }
 
@@ -267,6 +271,39 @@ func partialFetchFailedResourcesToProto(in []*FailedResourceFetch) []*internal.P
 		}
 	}
 	return failedResources
+}
+
+func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
+	if len(in) == 0 {
+		return nil
+	}
+	diagnostics := make([]*internal.Diagnostic, len(in))
+	for i, p := range in {
+		diagnostics[i] = &internal.Diagnostic{
+			Type:     internal.Diagnostic_Type(p.Type()),
+			Severity: internal.Diagnostic_Severity(p.Severity()),
+			Summary:  p.Description().Summary,
+			Detail:   p.Description().Detail,
+		}
+	}
+	return diagnostics
+}
+
+func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.Diagnostics {
+	if len(in) == 0 {
+		return nil
+	}
+	diagnostics := make(diag.Diagnostics, len(in))
+	for i, p := range in {
+		diagnostics[i] = &ProviderDiagnostic{
+			ResourceName:       resourceName,
+			DiagnosticType:     diag.DiagnosticType(p.GetType()),
+			DiagnosticSeverity: diag.Severity(p.GetSeverity()),
+			Summary:            p.GetSummary(),
+			Details:            p.GetDetail(),
+		}
+	}
+	return diagnostics
 }
 
 // PartialFetchToCQProto converts schema partial fetch failed resources to cq-proto partial fetch resources

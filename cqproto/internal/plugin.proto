@@ -69,11 +69,19 @@ message PartialFetchFailedResource {
 
 
 message Diagnostic {
+  enum Type {
+      Unknown = 0;
+      RESOLVING = 1;
+      ACCESS = 2;
+      THROTTLE = 3;
+      DATABASE = 4;
+  }
   enum Severity {
     INVALID = 0;
     ERROR = 1;
     WARNING = 2;
   }
+  Type type = 1;
   Severity severity = 2;
   string summary = 3;
   string detail = 4;

@@ -55,6 +55,7 @@ type Provider struct {
 	// Add extra fields to all resources, these fields don't show up in documentation and are used for internal CQ testing.
 	extraFields map[string]interface{}
 
+	// databaseCreator creates a database based on requested engine
 	databaseCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error)
 }
 
@@ -95,6 +96,13 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	if p.Logger == nil {
 		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, nil
 	}
+	// set database creator
+	if p.databaseCreator == nil {
+		p.databaseCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error) {
+			return schema.NewPgDatabase(ctx, logger, dbURL)
+		}
+	}
+
 	p.disableDelete = request.DisableDelete
 	p.extraFields = request.ExtraFields
 	p.dbURL = request.Connection.DSN
@@ -178,7 +186,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 					ResourceCount:               resourceCount,
 					Error:                       err.Error(),
 					PartialFetchFailedResources: cqproto.PartialFetchToCQProto(execData.PartialFetchFailureResult),
-
 				})
 			}
 			err = sender.Send(&cqproto.FetchResourcesResponse{
@@ -199,12 +206,12 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	return g.Wait()
 }
 
-func (p *Provider) collectExecutionDiagnostics(exec schema.ExecutionData) []diag.Diagnostic {
+func (p *Provider) collectExecutionDiagnostics(exec schema.ExecutionData) diag.Diagnostics {
 	classifier := DefaultErrorClassifier
 	if p.ErrorClassifier != nil {
 		classifier = p.ErrorClassifier
 	}
-	diagnostics := make([]diag.Diagnostic, 0)
+	diagnostics := make(diag.Diagnostics, 0)
 	for _, e := range exec.PartialFetchFailureResult {
 		if d, ok := e.Err.(diag.Diagnostic); ok {
 			diagnostics = append(diagnostics, d)

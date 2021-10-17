@@ -112,7 +112,7 @@ type FetchResourcesResponse struct {
 	PartialFetchFailedResources []*FailedResourceFetch
 	// Diagnostics of failed resource fetch, the diagnostic provides insights such as severity, summary and
 	// details on how to solve this issue
-	Diagnostics []diag.Diagnostic
+	Diagnostics diag.Diagnostics
 }
 
 type FailedResourceFetch struct {
@@ -129,4 +129,27 @@ type FailedResourceFetch struct {
 type ConnectionDetails struct {
 	Type string
 	DSN  string
+}
+
+type ProviderDiagnostic struct {
+	ResourceName       string
+	DiagnosticType     diag.DiagnosticType
+	DiagnosticSeverity diag.Severity
+	Summary            string
+	Details            string
+}
+
+func (p ProviderDiagnostic) Severity() diag.Severity {
+	return p.DiagnosticSeverity
+}
+
+func (p ProviderDiagnostic) Type() diag.DiagnosticType {
+	return p.DiagnosticType
+}
+
+func (p ProviderDiagnostic) Description() diag.Description {
+	return diag.Description{
+		Summary: p.Summary,
+		Detail:  p.Details,
+	}
 }
