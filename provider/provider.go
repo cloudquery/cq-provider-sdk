@@ -44,7 +44,7 @@ type Provider struct {
 	// Migrations embedded and passed by the provider to upgrade between versions
 	Migrations embed.FS
 	// ErrorClassifier allows the provider to classify errors it returns table execution, and return diagnostics to the user
-	ErrorClassifier func(table *schema.Table, err error) []diag.Diagnostic
+	ErrorClassifier func(meta schema.ClientMeta, table *schema.Table, err error) []diag.Diagnostic
 
 	// Database connection string
 	dbURL string
@@ -194,7 +194,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 				ResourceCount:               resourceCount,
 				Error:                       "",
 				PartialFetchFailedResources: cqproto.PartialFetchToCQProto(execData.PartialFetchFailureResult),
-				Diagnostics:                 p.collectExecutionDiagnostics(execData),
+				Diagnostics:                 p.collectExecutionDiagnostics(p.meta, execData),
 			})
 			if err != nil {
 				return err
@@ -206,7 +206,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	return g.Wait()
 }
 
-func (p *Provider) collectExecutionDiagnostics(exec schema.ExecutionData) diag.Diagnostics {
+func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec schema.ExecutionData) diag.Diagnostics {
 	classifier := DefaultErrorClassifier
 	if p.ErrorClassifier != nil {
 		classifier = p.ErrorClassifier
@@ -217,7 +217,13 @@ func (p *Provider) collectExecutionDiagnostics(exec schema.ExecutionData) diag.D
 			diagnostics = append(diagnostics, d)
 			continue
 		}
-		diagnostics = append(diagnostics, classifier(exec.Table, e.Err)...)
+		dd := classifier(client, exec.Table, e.Err)
+		if len(dd) > 0 {
+			diagnostics = append(diagnostics, dd...)
+			continue
+		}
+		// if error wasn't classified by provider mark it as error
+		diagnostics = append(diagnostics, diag.FromError(e.Err, diag.ERROR, diag.RESOLVING, e.Error(), ""))
 	}
 	return diagnostics
 }
