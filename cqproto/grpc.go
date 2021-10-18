@@ -2,6 +2,7 @@ package cqproto
 
 import (
 	"context"
+
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 
 	"github.com/vmihailenco/msgpack/v5"

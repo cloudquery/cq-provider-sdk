@@ -4,9 +4,10 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 	"sync"
 	"sync/atomic"
+
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 
 	"github.com/thoas/go-funk"
 

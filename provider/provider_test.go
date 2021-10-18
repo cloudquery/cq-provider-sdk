@@ -3,9 +3,10 @@ package provider
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/mocks"
 	"github.com/golang/mock/gomock"
-	"testing"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/faker/v3"

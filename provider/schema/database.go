@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgerrcode"
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 
 	"github.com/spf13/cast"
 

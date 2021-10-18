@@ -390,7 +390,7 @@ func (e *ExecutionData) checkPartialFetchError(err error, res *Resource, customM
 
 	partialFetchFailure := ResourceFetchError{
 		TableName: e.Table.Name,
-		Err:     fmt.Errorf("%s: %w", customMsg, err),
+		Err:       fmt.Errorf("%s: %w", customMsg, err),
 	}
 	e.Logger.Debug("fetch error occurred and partial fetch is enabled", "msg", partialFetchFailure.Error, "table", e.Table.Name)
 
