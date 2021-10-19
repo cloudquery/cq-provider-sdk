@@ -45,8 +45,7 @@ type Provider struct {
 	// Migrations embedded and passed by the provider to upgrade between versions
 	Migrations embed.FS
 	// ErrorClassifier allows the provider to classify errors it returns table execution, and return diagnostics to the user
-	ErrorClassifier func(meta schema.ClientMeta, table *schema.Table, err error) []diag.Diagnostic
-
+	ErrorClassifier func(meta schema.ClientMeta, resource string, err error) []diag.Diagnostic
 	// Database connection string
 	dbURL string
 	// meta is the provider's client created when configure is called
@@ -218,13 +217,13 @@ func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec sc
 			diagnostics = append(diagnostics, d)
 			continue
 		}
-		dd := classifier(client, exec.Table, e.Err)
+		dd := classifier(client, exec.ResourceName, e.Err)
 		if len(dd) > 0 {
 			diagnostics = append(diagnostics, dd...)
 			continue
 		}
 		// if error wasn't classified by provider mark it as error
-		diagnostics = append(diagnostics, diag.FromError(e.Err, diag.ERROR, diag.RESOLVING, e.Error(), ""))
+		diagnostics = append(diagnostics, diag.FromError(e.Err, diag.ERROR, diag.RESOLVING, exec.Table.Name, e.Error(), ""))
 	}
 	return diagnostics
 }

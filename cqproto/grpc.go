@@ -160,6 +160,7 @@ type GRPCFetchResourcesServer struct {
 
 func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 	return g.server.Send(&internal.FetchResources_Response{
+		Resource:                    response.ResourceName,
 		FinishedResources:           response.FinishedResources,
 		ResourceCount:               response.ResourceCount,
 		Error:                       response.Error,
@@ -285,6 +286,7 @@ func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
 			Severity: internal.Diagnostic_Severity(p.Severity()),
 			Summary:  p.Description().Summary,
 			Detail:   p.Description().Detail,
+			Resource: p.Description().Resource,
 		}
 	}
 	return diagnostics

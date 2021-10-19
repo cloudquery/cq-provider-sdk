@@ -81,7 +81,7 @@ func (p PgDatabase) Insert(ctx context.Context, t *Table, resources Resources) e
 
 	s, args, err := sqlStmt.ToSql()
 	if err != nil {
-		return diag.FromError(err, diag.ERROR, diag.DATABASE, "bad insert SQL statement created", "")
+		return diag.FromError(err, diag.ERROR, diag.DATABASE, t.Name, "bad insert SQL statement created", "")
 	}
 	_, err = p.pool.Exec(ctx, s, args...)
 	if err == nil {
@@ -95,9 +95,9 @@ func (p PgDatabase) Insert(ctx context.Context, t *Table, resources Resources) e
 		if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
 			p.log.Debug("insert integrity violation error", "constraint", pgErr.ConstraintName, "errMsg", pgErr.Message)
 		}
-		return diag.FromError(err, diag.ERROR, diag.DATABASE, fmt.Sprintf("insert failed for table %s", t.Name), pgErr.Message)
+		return diag.FromError(err, diag.ERROR, diag.DATABASE, t.Name, fmt.Sprintf("insert failed for table %s", t.Name), pgErr.Message)
 	}
-	return diag.FromError(err, diag.ERROR, diag.DATABASE, "", "")
+	return diag.FromError(err, diag.ERROR, diag.DATABASE, t.Name, err.Error(), "")
 }
 
 // CopyFrom copies all resources from []*Resource

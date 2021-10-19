@@ -28,6 +28,8 @@ type ClientMeta interface {
 
 // ExecutionData marks all the related execution info passed to TableResolver and ColumnResolver giving access to the Runner's meta
 type ExecutionData struct {
+	// ResourceName name of top-level resource associated with table
+	ResourceName string
 	// Table this execution is associated with
 	Table *Table
 	// Database connection to insert data into
@@ -125,6 +127,7 @@ func (e *ExecutionData) ResolveTable(ctx context.Context, meta ClientMeta, paren
 func (e *ExecutionData) WithTable(t *Table) *ExecutionData {
 	return &ExecutionData{
 		Table:                     t,
+		ResourceName:              e.ResourceName,
 		Db:                        e.Db,
 		Logger:                    e.Logger,
 		disableDelete:             e.disableDelete,

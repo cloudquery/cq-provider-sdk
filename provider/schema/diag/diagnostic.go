@@ -5,8 +5,9 @@ type Severity int
 const (
 	// IGNORE severity is set for diagnostics that were ignored by the SDK
 	IGNORE Severity = iota
-	// WARNING severity are diagnostics that should be fixed but aren't 
+	// WARNING severity are diagnostics that should be fixed but aren't fatal to the fetch execution
 	WARNING
+	// ERROR severity are diagnostics that were fatal in the fetch execution and should be fixed.
 	ERROR
 )
 
@@ -45,8 +46,9 @@ type Diagnostic interface {
 }
 
 type Description struct {
-	Summary string
-	Detail  string
+	Resource string
+	Summary  string
+	Detail   string
 }
 
 type Diagnostics []Diagnostic

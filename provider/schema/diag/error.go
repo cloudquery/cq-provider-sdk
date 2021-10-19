@@ -5,6 +5,9 @@ type ExecutionError struct {
 	// Err is the underlying go error this diagnostic wraps
 	Err error
 
+	// Resource indicates the resource that failed in the execution
+	resource string
+
 	// Severity indicates the level of the Diagnostic. Currently, can be set to
 	// either Error/Warning/Ignore
 	severity Severity
@@ -25,6 +28,7 @@ func (e ExecutionError) Severity() Severity {
 
 func (e ExecutionError) Description() Description {
 	return Description{
+		e.resource,
 		e.summary,
 		e.detail,
 	}
@@ -36,4 +40,16 @@ func (e ExecutionError) Type() DiagnosticType {
 
 func (e ExecutionError) Error() string {
 	return e.Err.Error()
+}
+
+// FromError creates an ExecutionError from given error
+func FromError(err error, severity Severity, dt DiagnosticType, resource, summary, details string) *ExecutionError {
+	return &ExecutionError{
+		Err:            err,
+		severity:       severity,
+		resource:       resource,
+		summary:        summary,
+		detail:         details,
+		diagnosticType: dt,
+	}
 }

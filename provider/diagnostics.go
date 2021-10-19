@@ -7,8 +7,8 @@ import (
 
 // DefaultErrorClassifier defines default error classifier for providers that don't provide custom error classification
 // for errors returned from fetch execution
-func DefaultErrorClassifier(_ schema.ClientMeta, _ *schema.Table, err error) []diag.Diagnostic {
+func DefaultErrorClassifier(_ schema.ClientMeta, resourceName string, err error) []diag.Diagnostic {
 	return []diag.Diagnostic{
-		diag.FromError(err, diag.ERROR, diag.RESOLVING, err.Error(), ""),
+		diag.FromError(err, diag.ERROR, diag.RESOLVING, resourceName, err.Error(), ""),
 	}
 }
