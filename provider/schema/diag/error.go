@@ -1,6 +1,6 @@
 package diag
 
-// ExecutionError is a contextual message intended at outlining problems in execution.
+// ExecutionError is a generic error returned when execution is run, ExecutionError satisfies
 type ExecutionError struct {
 	// Err is the underlying go error this diagnostic wraps
 	Err error
@@ -15,7 +15,7 @@ type ExecutionError struct {
 	// Detail is an optional second message, typically used to communicate a potential fix to the user.
 	detail string
 
-	// Category indicates the classification family of this diagnostic
+	// DiagnosticType indicates the classification family of this diagnostic
 	diagnosticType DiagnosticType
 }
 
