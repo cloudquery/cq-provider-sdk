@@ -257,7 +257,7 @@ func TestProvider_FetchResources(t *testing.T) {
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
 		Config:        nil,
-		DisableDelete: true,
+		DisableDelete: false,
 		ExtraFields:   nil,
 	})
 	ctrl := gomock.NewController(t)

@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/modern-go/reflect2"
+
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 
 	"github.com/hashicorp/go-hclog"
@@ -335,7 +337,11 @@ func (e *ExecutionData) resolveColumns(ctx context.Context, meta ClientMeta, res
 				return err
 			}
 			// check if column resolver defined an IgnoreError function, if it does check if ignore should be ignored.
-			if c.IgnoreError != nil && !c.IgnoreError(err) {
+			if c.IgnoreError == nil || !c.IgnoreError(err) {
+				return err
+			}
+
+			if reflect2.IsNil(c.Default) {
 				return err
 			}
 			// Set default value if defined, otherwise it will be nil
