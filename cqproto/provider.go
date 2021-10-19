@@ -151,7 +151,7 @@ func (p ProviderDiagnostic) Type() diag.DiagnosticType {
 func (p ProviderDiagnostic) Description() diag.Description {
 	return diag.Description{
 		Resource: p.ResourceName,
-		Summary: p.Summary,
-		Detail:  p.Details,
+		Summary:  p.Summary,
+		Detail:   p.Details,
 	}
 }
