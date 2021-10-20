@@ -111,6 +111,22 @@ type FetchResourcesResponse struct {
 	Error string
 	// list of resources where the fetching failed
 	PartialFetchFailedResources []*FailedResourceFetch
+	//
+	Summary ResourceFetchSummary
+}
+
+type ResourceFetchStatus int
+
+const (
+	ResourceFetchComplete ResourceFetchStatus = iota
+	ResourceFetchFailed
+	ResourceFetchPartial
+	ResourceFetchCanceled
+)
+
+type ResourceFetchSummary struct {
+	Status        ResourceFetchStatus
+	ResourceCount uint64
 	// Diagnostics of failed resource fetch, the diagnostic provides insights such as severity, summary and
 	// details on how to solve this issue
 	Diagnostics diag.Diagnostics

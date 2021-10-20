@@ -180,13 +180,26 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 			atomic.AddUint64(&totalResourceCount, resourceCount)
 			defer l.Unlock()
 			if err != nil {
+				status := cqproto.ResourceFetchFailed
+				if err == context.Canceled {
+					status = cqproto.ResourceFetchCanceled
+				}
 				return sender.Send(&cqproto.FetchResourcesResponse{
 					ResourceName:                r,
 					FinishedResources:           finishedResources,
 					ResourceCount:               resourceCount,
 					Error:                       err.Error(),
 					PartialFetchFailedResources: cqproto.PartialFetchToCQProto(execData.PartialFetchFailureResult),
+					Summary: cqproto.ResourceFetchSummary{
+						Status:        status,
+						ResourceCount: resourceCount,
+						Diagnostics:   p.collectExecutionDiagnostics(p.meta, execData),
+					},
 				})
+			}
+			status := cqproto.ResourceFetchComplete
+			if len(execData.PartialFetchFailureResult) > 0 {
+				status = cqproto.ResourceFetchPartial
 			}
 			err = sender.Send(&cqproto.FetchResourcesResponse{
 				ResourceName:                r,
@@ -194,7 +207,11 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 				ResourceCount:               resourceCount,
 				Error:                       "",
 				PartialFetchFailedResources: cqproto.PartialFetchToCQProto(execData.PartialFetchFailureResult),
-				Diagnostics:                 p.collectExecutionDiagnostics(p.meta, execData),
+				Summary: cqproto.ResourceFetchSummary{
+					Status:        status,
+					ResourceCount: resourceCount,
+					Diagnostics:   p.collectExecutionDiagnostics(p.meta, execData),
+				},
 			})
 			if err != nil {
 				return err

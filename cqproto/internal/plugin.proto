@@ -49,11 +49,26 @@ message FetchResources {
     string error = 3;
     // list of resources where the fetching failed
     repeated PartialFetchFailedResource partial_fetch_failed_resources = 4;
-    // list of diagnostic returned from a resource fetch
-    repeated Diagnostic diagnostics = 5;
+    // fetch summary of resource
+    ResourceFetchSummary summary = 5;
     // name of resource that finished
     string resource = 6;
   }
+}
+
+message ResourceFetchSummary {
+  enum Status {
+    COMPLETE = 0;
+    FAILED = 1;
+    PARTIAL = 2;
+    CANCELED = 3;
+  }
+  // General status of resource
+  Status status = 1;
+  // Total Amount of resources collected by this resource
+  uint64 resource_count = 2;
+  // list of diagnostic returned from a resource fetch
+  repeated Diagnostic diagnostics = 3;
 }
 
 message PartialFetchFailedResource {
@@ -70,11 +85,11 @@ message PartialFetchFailedResource {
 
 message Diagnostic {
   enum Type {
-      Unknown = 0;
-      RESOLVING = 1;
-      ACCESS = 2;
-      THROTTLE = 3;
-      DATABASE = 4;
+    Unknown = 0;
+    RESOLVING = 1;
+    ACCESS = 2;
+    THROTTLE = 3;
+    DATABASE = 4;
   }
   enum Severity {
     INVALID = 0;
@@ -85,6 +100,7 @@ message Diagnostic {
   Severity severity = 2;
   string summary = 3;
   string detail = 4;
+  string resource = 5;
 }
 
 

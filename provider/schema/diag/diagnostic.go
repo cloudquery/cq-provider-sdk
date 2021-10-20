@@ -53,6 +53,26 @@ type Description struct {
 
 type Diagnostics []Diagnostic
 
+func (dd Diagnostics) Warnings() uint64 {
+	var warningsCount uint64 = 0
+	for _, d := range dd {
+		if d.Severity() == WARNING {
+			warningsCount++
+		}
+	}
+	return warningsCount
+}
+
+func (dd Diagnostics) Errors() uint64 {
+	var errorCount uint64 = 0
+	for _, d := range dd {
+		if d.Severity() == ERROR {
+			errorCount++
+		}
+	}
+	return errorCount
+}
+
 func (dd Diagnostics) Len() int      { return len(dd) }
 func (dd Diagnostics) Swap(i, j int) { dd[i], dd[j] = dd[j], dd[i] }
 func (dd Diagnostics) Less(i, j int) bool {

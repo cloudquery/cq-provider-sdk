@@ -89,7 +89,11 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 		ResourceCount:               resp.GetResourceCount(),
 		Error:                       resp.GetError(),
 		PartialFetchFailedResources: partialFetchFailedResourcesFromProto(resp.GetPartialFetchFailedResources()),
-		Diagnostics:                 diagnosticsFromProto(resp.GetResource(), resp.Diagnostics),
+		Summary: ResourceFetchSummary{
+			Status:        ResourceFetchStatus(resp.Summary.Status),
+			ResourceCount: resp.GetSummary().GetResourceCount(),
+			Diagnostics:   diagnosticsFromProto(resp.GetResource(), resp.Summary.Diagnostics),
+		},
 	}, nil
 }
 
@@ -165,7 +169,11 @@ func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 		ResourceCount:               response.ResourceCount,
 		Error:                       response.Error,
 		PartialFetchFailedResources: partialFetchFailedResourcesToProto(response.PartialFetchFailedResources),
-		Diagnostics:                 diagnosticsToProto(response.Diagnostics),
+		Summary: &internal.ResourceFetchSummary{
+			Status:        internal.ResourceFetchSummary_Status(response.Summary.Status),
+			ResourceCount: response.Summary.ResourceCount,
+			Diagnostics:   diagnosticsToProto(response.Summary.Diagnostics),
+		},
 	})
 }
 
