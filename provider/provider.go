@@ -211,6 +211,7 @@ func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec sc
 	if p.ErrorClassifier != nil {
 		classifier = p.ErrorClassifier
 	}
+	p.Logger.Debug("collecting diagnostics for resource execution", "resource", exec.ResourceName)
 	diagnostics := make(diag.Diagnostics, 0)
 	for _, e := range exec.PartialFetchFailureResult {
 		if d, ok := e.Err.(diag.Diagnostic); ok {
@@ -223,7 +224,7 @@ func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec sc
 			continue
 		}
 		// if error wasn't classified by provider mark it as error
-		diagnostics = append(diagnostics, diag.FromError(e.Err, diag.ERROR, diag.RESOLVING, exec.Table.Name, e.Error(), ""))
+		diagnostics = append(diagnostics, diag.FromError(e.Err, diag.ERROR, diag.RESOLVING, exec.ResourceName, e.Error(), ""))
 	}
 	return diagnostics
 }
