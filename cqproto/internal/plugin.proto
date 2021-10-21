@@ -49,21 +49,28 @@ message FetchResources {
     string error = 3;
     // list of resources where the fetching failed
     repeated PartialFetchFailedResource partial_fetch_failed_resources = 4;
-    // fetch summary of resource
+    // fetch summary of resource that finished
     ResourceFetchSummary summary = 5;
     // name of resource that finished
     string resource = 6;
   }
 }
 
+// ResourceFetchSummary includes a summarized report of a fetched resource, such as total amount of resources collected,
+// status of the fetch and any diagnostics found while executing fetch on it.
 message ResourceFetchSummary {
+  // Execution status of the resource fetch execution
   enum Status {
+    // Execution was completed successfully without any errors/diagnostics
     COMPLETE = 0;
+    // Execution failed and wasn't able to fetch any resource
     FAILED = 1;
+    // Execution was partial, one or more resources failed to resolve/fetch
     PARTIAL = 2;
+    // Execution was canceled preemptively
     CANCELED = 3;
   }
-  // General status of resource
+  // Execution status of resource
   Status status = 1;
   // Total Amount of resources collected by this resource
   uint64 resource_count = 2;

@@ -54,7 +54,6 @@ type Provider struct {
 	disableDelete bool
 	// Add extra fields to all resources, these fields don't show up in documentation and are used for internal CQ testing.
 	extraFields map[string]interface{}
-
 	// databaseCreator creates a database based on requested engine
 	databaseCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error)
 }
