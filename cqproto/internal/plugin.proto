@@ -92,7 +92,7 @@ message PartialFetchFailedResource {
 
 message Diagnostic {
   enum Type {
-    Unknown = 0;
+    UNKNOWN = 0;
     RESOLVING = 1;
     ACCESS = 2;
     THROTTLE = 3;

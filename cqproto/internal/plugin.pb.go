@@ -7,11 +7,10 @@
 package internal
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -164,12 +163,17 @@ func (ConnectionType) EnumDescriptor() ([]byte, []int) {
 	return file_internal_plugin_proto_rawDescGZIP(), []int{1}
 }
 
+// Execution status of the resource fetch execution
 type ResourceFetchSummary_Status int32
 
 const (
+	// Execution was completed successfully without any errors/diagnostics
 	ResourceFetchSummary_COMPLETE ResourceFetchSummary_Status = 0
-	ResourceFetchSummary_FAILED   ResourceFetchSummary_Status = 1
-	ResourceFetchSummary_PARTIAL  ResourceFetchSummary_Status = 2
+	// Execution failed and wasn't able to fetch any resource
+	ResourceFetchSummary_FAILED ResourceFetchSummary_Status = 1
+	// Execution was partial, one or more resources failed to resolve/fetch
+	ResourceFetchSummary_PARTIAL ResourceFetchSummary_Status = 2
+	// Execution was canceled preemptively
 	ResourceFetchSummary_CANCELED ResourceFetchSummary_Status = 3
 )
 
@@ -219,7 +223,7 @@ func (ResourceFetchSummary_Status) EnumDescriptor() ([]byte, []int) {
 type Diagnostic_Type int32
 
 const (
-	Diagnostic_Unknown   Diagnostic_Type = 0
+	Diagnostic_UNKNOWN   Diagnostic_Type = 0
 	Diagnostic_RESOLVING Diagnostic_Type = 1
 	Diagnostic_ACCESS    Diagnostic_Type = 2
 	Diagnostic_THROTTLE  Diagnostic_Type = 3
@@ -229,14 +233,14 @@ const (
 // Enum value maps for Diagnostic_Type.
 var (
 	Diagnostic_Type_name = map[int32]string{
-		0: "Unknown",
+		0: "UNKNOWN",
 		1: "RESOLVING",
 		2: "ACCESS",
 		3: "THROTTLE",
 		4: "DATABASE",
 	}
 	Diagnostic_Type_value = map[string]int32{
-		"Unknown":   0,
+		"UNKNOWN":   0,
 		"RESOLVING": 1,
 		"ACCESS":    2,
 		"THROTTLE":  3,
@@ -396,12 +400,14 @@ func (*FetchResources) Descriptor() ([]byte, []int) {
 	return file_internal_plugin_proto_rawDescGZIP(), []int{1}
 }
 
+// ResourceFetchSummary includes a summarized report of a fetched resource, such as total amount of resources collected,
+// status of the fetch and any diagnostics found while executing fetch on it.
 type ResourceFetchSummary struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// General status of resource
+	// Execution status of resource
 	Status ResourceFetchSummary_Status `protobuf:"varint,1,opt,name=status,proto3,enum=proto.ResourceFetchSummary_Status" json:"status,omitempty"`
 	// Total Amount of resources collected by this resource
 	ResourceCount uint64 `protobuf:"varint,2,opt,name=resource_count,json=resourceCount,proto3" json:"resource_count,omitempty"`
@@ -585,7 +591,7 @@ func (x *Diagnostic) GetType() Diagnostic_Type {
 	if x != nil {
 		return x.Type
 	}
-	return Diagnostic_Unknown
+	return Diagnostic_UNKNOWN
 }
 
 func (x *Diagnostic) GetSeverity() Diagnostic_Severity {
@@ -1138,7 +1144,7 @@ type FetchResources_Response struct {
 	Error string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
 	// list of resources where the fetching failed
 	PartialFetchFailedResources []*PartialFetchFailedResource `protobuf:"bytes,4,rep,name=partial_fetch_failed_resources,json=partialFetchFailedResources,proto3" json:"partial_fetch_failed_resources,omitempty"`
-	// fetch summary of resource
+	// fetch summary of resource that finished
 	Summary *ResourceFetchSummary `protobuf:"bytes,5,opt,name=summary,proto3" json:"summary,omitempty"`
 	// name of resource that finished
 	Resource string `protobuf:"bytes,6,opt,name=resource,proto3" json:"resource,omitempty"`
@@ -1523,7 +1529,7 @@ var file_internal_plugin_proto_rawDesc = []byte{
 	0x28, 0x09, 0x52, 0x06, 0x64, 0x65, 0x74, 0x61, 0x69, 0x6c, 0x12, 0x1a, 0x0a, 0x08, 0x72, 0x65,
 	0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x72, 0x65,
 	0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x22, 0x4a, 0x0a, 0x04, 0x54, 0x79, 0x70, 0x65, 0x12, 0x0b,
-	0x0a, 0x07, 0x55, 0x6e, 0x6b, 0x6e, 0x6f, 0x77, 0x6e, 0x10, 0x00, 0x12, 0x0d, 0x0a, 0x09, 0x52,
+	0x0a, 0x07, 0x55, 0x4e, 0x4b, 0x4e, 0x4f, 0x57, 0x4e, 0x10, 0x00, 0x12, 0x0d, 0x0a, 0x09, 0x52,
 	0x45, 0x53, 0x4f, 0x4c, 0x56, 0x49, 0x4e, 0x47, 0x10, 0x01, 0x12, 0x0a, 0x0a, 0x06, 0x41, 0x43,
 	0x43, 0x45, 0x53, 0x53, 0x10, 0x02, 0x12, 0x0c, 0x0a, 0x08, 0x54, 0x48, 0x52, 0x4f, 0x54, 0x54,
 	0x4c, 0x45, 0x10, 0x03, 0x12, 0x0c, 0x0a, 0x08, 0x44, 0x41, 0x54, 0x41, 0x42, 0x41, 0x53, 0x45,

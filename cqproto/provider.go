@@ -111,7 +111,7 @@ type FetchResourcesResponse struct {
 	Error string
 	// list of resources where the fetching failed
 	PartialFetchFailedResources []*FailedResourceFetch
-	//
+	// fetch summary of resource that finished execution
 	Summary ResourceFetchSummary
 }
 
