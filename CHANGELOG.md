@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v0.5.0] - 2021-10-21
 
 ### :rocket: Added
-* Support diagnostics from fetch execution, allow providers to define custom diagnostic classifier for error received from fetch execution [#104](https://github.com/cloudquery/cq-provider-sdk/pull/104)
-* Add more metadata sent on fetched resources completion [#104](https://github.com/cloudquery/cq-provider-sdk/pull/104)
+* Support diagnostics from fetch executions, allow providers to define custom diagnostic classifiers for errosr received from the fetch execution [#104](https://github.com/cloudquery/cq-provider-sdk/pull/104)
+* Add more metadata sent on fetched resources completion, status, resource count and diagnostics [#104](https://github.com/cloudquery/cq-provider-sdk/pull/104)
 
 ## [v0.4.10] - 2021-10-18
 
