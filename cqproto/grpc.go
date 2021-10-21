@@ -83,18 +83,21 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FetchResourcesResponse{
+	fr := &FetchResourcesResponse{
 		ResourceName:                resp.GetResource(),
 		FinishedResources:           resp.GetFinishedResources(),
 		ResourceCount:               resp.GetResourceCount(),
 		Error:                       resp.GetError(),
 		PartialFetchFailedResources: partialFetchFailedResourcesFromProto(resp.GetPartialFetchFailedResources()),
-		Summary: ResourceFetchSummary{
+	}
+	if resp.GetSummary() != nil {
+		fr.Summary = ResourceFetchSummary{
 			Status:        ResourceFetchStatus(resp.Summary.Status),
 			ResourceCount: resp.GetSummary().GetResourceCount(),
-			Diagnostics:   diagnosticsFromProto(resp.GetResource(), resp.Summary.Diagnostics),
-		},
-	}, nil
+			Diagnostics:   diagnosticsFromProto(resp.GetResource(), resp.GetSummary().Diagnostics),
+		}
+	}
+	return fr, nil
 }
 
 type GRPCServer struct {
