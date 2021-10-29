@@ -377,7 +377,7 @@ func (f *testResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 	return nil
 }
 
-func TestProvider_FetchResourcesParalelLimit(t *testing.T) {
+func TestProvider_FetchResourcesParallelLimit(t *testing.T) {
 	parallelCheckProvider.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, error) {
 		return testClient{}, nil
 	}
