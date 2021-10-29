@@ -3,7 +3,9 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/faker/v3"
@@ -49,6 +51,7 @@ var (
 	testResolverFunc = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan interface{}) error {
 		for i := 0; i < 10; i++ {
 			t := testStruct{}
+			time.Sleep(50 * time.Millisecond)
 			res <- faker.FakeData(&t)
 		}
 		return nil
@@ -107,6 +110,85 @@ var (
 			},
 			"test1": {
 				Name: "sdk_test1",
+			},
+		},
+	}
+
+	parallelCheckProvider = Provider{
+		Name: "paralel",
+		Config: func() Config {
+			return &testConfig{}
+		},
+		ResourceMap: map[string]*schema.Table{
+			"test": {
+				Name:     "test_resource",
+				Resolver: testResolverFunc,
+				Columns: []schema.Column{
+					{
+						Name: "id",
+						Type: schema.TypeBigInt,
+					},
+					{
+						Name: "name",
+						Type: schema.TypeString,
+					},
+				},
+			},
+			"test1": {
+				Name:     "test1_resource",
+				Resolver: testResolverFunc,
+				Columns: []schema.Column{
+					{
+						Name: "id",
+						Type: schema.TypeBigInt,
+					},
+					{
+						Name: "name",
+						Type: schema.TypeString,
+					},
+				},
+			},
+			"test2": {
+				Name:     "test2_resource",
+				Resolver: testResolverFunc,
+				Columns: []schema.Column{
+					{
+						Name: "id",
+						Type: schema.TypeBigInt,
+					},
+					{
+						Name: "name",
+						Type: schema.TypeString,
+					},
+				},
+			},
+			"test3": {
+				Name:     "test3_resource",
+				Resolver: testResolverFunc,
+				Columns: []schema.Column{
+					{
+						Name: "id",
+						Type: schema.TypeBigInt,
+					},
+					{
+						Name: "name",
+						Type: schema.TypeString,
+					},
+				},
+			},
+			"test4": {
+				Name:     "test4_resource",
+				Resolver: testResolverFunc,
+				Columns: []schema.Column{
+					{
+						Name: "id",
+						Type: schema.TypeBigInt,
+					},
+					{
+						Name: "name",
+						Type: schema.TypeString,
+					},
+				},
 			},
 		},
 	}
@@ -173,4 +255,54 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 	})
 	assert.Equal(t, "", resp.Error)
 	assert.Error(t, err)
+}
+
+type fakeResourceSender struct {
+	Errors []string
+}
+
+func (f *fakeResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
+	if r.Error != "" {
+		fmt.Printf(r.Error)
+		f.Errors = append(f.Errors, r.Error)
+	}
+	return nil
+}
+
+type fakeClient struct {
+	Log hclog.Logger
+}
+
+func (f fakeClient) Logger() hclog.Logger {
+	return f.Log
+}
+
+func TestProvider_FetchResources(t *testing.T) {
+	parallelCheckProvider.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, error) {
+		return fakeClient{Log: logger}, nil
+	}
+	parallelCheckProvider.Logger = hclog.Default()
+	resp, err := parallelCheckProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
+		CloudQueryVersion: "dev",
+		Connection: cqproto.ConnectionDetails{
+			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
+		},
+		Config:        nil,
+		DisableDelete: true,
+		ExtraFields:   nil,
+	})
+	assert.Equal(t, "", resp.Error)
+	assert.Nil(t, err)
+
+	start := time.Now()
+	err = parallelCheckProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{"*"}}, &fakeResourceSender{})
+	assert.Nil(t, err)
+	length := time.Since(start)
+	assert.Less(t, length, 1000*time.Millisecond)
+
+	start = time.Now()
+	err = parallelCheckProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{"*"}, ParallelFetchingLimit: 1}, &fakeResourceSender{})
+	assert.Nil(t, err)
+	length = time.Since(start)
+	assert.Greater(t, length, 2500*time.Millisecond)
 }
