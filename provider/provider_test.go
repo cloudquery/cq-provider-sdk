@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -25,7 +24,6 @@ type (
 		Name string
 	}
 	testConfig struct{}
-
 	testClient struct{}
 )
 
@@ -139,7 +137,7 @@ var (
 	}
 
 	parallelCheckProvider = Provider{
-		Name: "paralel",
+		Name: "parallel",
 		Config: func() Config {
 			return &testConfig{}
 		},
@@ -379,29 +377,9 @@ func (f *testResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 	return nil
 }
 
-type fakeResourceSender struct {
-	Errors []string
-}
-
-func (f *fakeResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
-	if r.Error != "" {
-		fmt.Printf(r.Error)
-		f.Errors = append(f.Errors, r.Error)
-	}
-	return nil
-}
-
-type fakeClient struct {
-	Log hclog.Logger
-}
-
-func (f fakeClient) Logger() hclog.Logger {
-	return f.Log
-}
-
-func TestProvider_FetchResources1(t *testing.T) {
+func TestProvider_FetchResourcesParalelLimit(t *testing.T) {
 	parallelCheckProvider.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, error) {
-		return fakeClient{Log: logger}, nil
+		return testClient{}, nil
 	}
 	parallelCheckProvider.Logger = hclog.Default()
 	resp, err := parallelCheckProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
@@ -418,14 +396,14 @@ func TestProvider_FetchResources1(t *testing.T) {
 
 	// it runs 5 resources at a time. each resource takes ~500ms
 	start := time.Now()
-	err = parallelCheckProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{"*"}}, &fakeResourceSender{})
+	err = parallelCheckProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{"*"}}, &testResourceSender{})
 	assert.Nil(t, err)
 	length := time.Since(start)
 	assert.Less(t, length, 1000*time.Millisecond)
 
 	// it runs 5 resources one by one. each resource takes ~500ms
 	start = time.Now()
-	err = parallelCheckProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{"*"}, ParallelFetchingLimit: 1}, &fakeResourceSender{})
+	err = parallelCheckProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{"*"}, ParallelFetchingLimit: 1}, &testResourceSender{})
 	assert.Nil(t, err)
 	length = time.Since(start)
 	assert.Greater(t, length, 2500*time.Millisecond)
