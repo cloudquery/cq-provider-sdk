@@ -294,12 +294,14 @@ func TestProvider_FetchResources(t *testing.T) {
 	assert.Equal(t, "", resp.Error)
 	assert.Nil(t, err)
 
+	// it runs 5 resources at a time. each resource takes ~500ms
 	start := time.Now()
 	err = parallelCheckProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{"*"}}, &fakeResourceSender{})
 	assert.Nil(t, err)
 	length := time.Since(start)
 	assert.Less(t, length, 1000*time.Millisecond)
 
+	// it runs 5 resources one by one. each resource takes ~500ms
 	start = time.Now()
 	err = parallelCheckProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{"*"}, ParallelFetchingLimit: 1}, &fakeResourceSender{})
 	assert.Nil(t, err)
