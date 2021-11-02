@@ -3,6 +3,8 @@ package cqproto
 import (
 	"context"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
+
 	"github.com/vmihailenco/msgpack/v5"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto/internal"
@@ -65,6 +67,7 @@ func (g GRPCClient) FetchResources(ctx context.Context, request *FetchResourcesR
 	res, err := g.client.FetchResources(ctx, &internal.FetchResources_Request{
 		Resources:              request.Resources,
 		PartialFetchingEnabled: request.PartialFetchingEnabled,
+		ParallelFetchingLimit:  request.ParallelFetchingLimit,
 	})
 	if err != nil {
 		return nil, err
@@ -81,12 +84,21 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FetchResourcesResponse{
+	fr := &FetchResourcesResponse{
+		ResourceName:                resp.GetResource(),
 		FinishedResources:           resp.GetFinishedResources(),
 		ResourceCount:               resp.GetResourceCount(),
 		Error:                       resp.GetError(),
 		PartialFetchFailedResources: partialFetchFailedResourcesFromProto(resp.GetPartialFetchFailedResources()),
-	}, nil
+	}
+	if resp.GetSummary() != nil {
+		fr.Summary = ResourceFetchSummary{
+			Status:        ResourceFetchStatus(resp.Summary.Status),
+			ResourceCount: resp.GetSummary().GetResourceCount(),
+			Diagnostics:   diagnosticsFromProto(resp.GetResource(), resp.GetSummary().Diagnostics),
+		}
+	}
+	return fr, nil
 }
 
 type GRPCServer struct {
@@ -145,7 +157,7 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, server internal.Provider_FetchResourcesServer) error {
 	return g.Impl.FetchResources(
 		server.Context(),
-		&FetchResourcesRequest{Resources: request.GetResources(), PartialFetchingEnabled: request.PartialFetchingEnabled},
+		&FetchResourcesRequest{Resources: request.GetResources(), PartialFetchingEnabled: request.PartialFetchingEnabled, ParallelFetchingLimit: request.ParallelFetchingLimit},
 		&GRPCFetchResourcesServer{server: server},
 	)
 }
@@ -156,10 +168,16 @@ type GRPCFetchResourcesServer struct {
 
 func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 	return g.server.Send(&internal.FetchResources_Response{
+		Resource:                    response.ResourceName,
 		FinishedResources:           response.FinishedResources,
 		ResourceCount:               response.ResourceCount,
 		Error:                       response.Error,
 		PartialFetchFailedResources: partialFetchFailedResourcesToProto(response.PartialFetchFailedResources),
+		Summary: &internal.ResourceFetchSummary{
+			Status:        internal.ResourceFetchSummary_Status(response.Summary.Status),
+			ResourceCount: response.Summary.ResourceCount,
+			Diagnostics:   diagnosticsToProto(response.Summary.Diagnostics),
+		},
 	})
 }
 
@@ -237,13 +255,13 @@ func tableToProto(in *schema.Table) *internal.Table {
 	}
 }
 
-func partialFetchFailedResourcesFromProto(in []*internal.PartialFetchFailedResource) []*PartialFetchFailedResource {
+func partialFetchFailedResourcesFromProto(in []*internal.PartialFetchFailedResource) []*FailedResourceFetch {
 	if len(in) == 0 {
 		return nil
 	}
-	failedResources := make([]*PartialFetchFailedResource, len(in))
+	failedResources := make([]*FailedResourceFetch, len(in))
 	for i, p := range in {
-		failedResources[i] = &PartialFetchFailedResource{
+		failedResources[i] = &FailedResourceFetch{
 			TableName:            p.TableName,
 			RootTableName:        p.RootTableName,
 			RootPrimaryKeyValues: p.RootPrimaryKeyValues,
@@ -253,7 +271,7 @@ func partialFetchFailedResourcesFromProto(in []*internal.PartialFetchFailedResou
 	return failedResources
 }
 
-func partialFetchFailedResourcesToProto(in []*PartialFetchFailedResource) []*internal.PartialFetchFailedResource {
+func partialFetchFailedResourcesToProto(in []*FailedResourceFetch) []*internal.PartialFetchFailedResource {
 	if len(in) == 0 {
 		return nil
 	}
@@ -269,18 +287,52 @@ func partialFetchFailedResourcesToProto(in []*PartialFetchFailedResource) []*int
 	return failedResources
 }
 
-// PartialFetchToCQProto converts schema partial fetch failed resources to cq-proto partial fetch resources
-func PartialFetchToCQProto(in []schema.PartialFetchFailedResource) []*PartialFetchFailedResource {
+func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
 	if len(in) == 0 {
 		return nil
 	}
-	failedResources := make([]*PartialFetchFailedResource, len(in))
+	diagnostics := make([]*internal.Diagnostic, len(in))
 	for i, p := range in {
-		failedResources[i] = &PartialFetchFailedResource{
+		diagnostics[i] = &internal.Diagnostic{
+			Type:     internal.Diagnostic_Type(p.Type()),
+			Severity: internal.Diagnostic_Severity(p.Severity()),
+			Summary:  p.Description().Summary,
+			Detail:   p.Description().Detail,
+			Resource: p.Description().Resource,
+		}
+	}
+	return diagnostics
+}
+
+func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.Diagnostics {
+	if len(in) == 0 {
+		return nil
+	}
+	diagnostics := make(diag.Diagnostics, len(in))
+	for i, p := range in {
+		diagnostics[i] = &ProviderDiagnostic{
+			ResourceName:       resourceName,
+			DiagnosticType:     diag.DiagnosticType(p.GetType()),
+			DiagnosticSeverity: diag.Severity(p.GetSeverity()),
+			Summary:            p.GetSummary(),
+			Details:            p.GetDetail(),
+		}
+	}
+	return diagnostics
+}
+
+// PartialFetchToCQProto converts schema partial fetch failed resources to cq-proto partial fetch resources
+func PartialFetchToCQProto(in []schema.ResourceFetchError) []*FailedResourceFetch {
+	if len(in) == 0 {
+		return nil
+	}
+	failedResources := make([]*FailedResourceFetch, len(in))
+	for i, p := range in {
+		failedResources[i] = &FailedResourceFetch{
 			TableName:            p.TableName,
 			RootTableName:        p.RootTableName,
 			RootPrimaryKeyValues: p.RootPrimaryKeyValues,
-			Error:                p.Error,
+			Error:                p.Err.Error(),
 		}
 	}
 	return failedResources

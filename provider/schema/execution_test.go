@@ -123,8 +123,9 @@ var testIgnoreErrorColumnResolverTable = &Table{
 	Name: "test_table",
 	Columns: []Column{
 		{
-			Name: "name",
-			Type: TypeString,
+			Name:    "name",
+			Type:    TypeString,
+			Default: "defaultName",
 			IgnoreError: func(err error) bool {
 				return true
 			},
@@ -187,14 +188,18 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 	})
 	mockedClient.On("Logger", mock.Anything).Return(logger)
 
-	t.Run("failing table column resolver", func(t *testing.T) {
+	t.Run("failed table resolver", func(t *testing.T) {
 		testTable.Resolver = failingTableResolver
 		mockDb := new(DatabaseMock)
 		exec := NewExecutionData(mockDb, logger, testTable, false, nil, false)
 		_, err := exec.ResolveTable(context.Background(), mockedClient, nil)
 		assert.Error(t, err)
+	})
+
+	t.Run("failing table column resolver", func(t *testing.T) {
+		mockDb := new(DatabaseMock)
 		execFailing := NewExecutionData(mockDb, logger, testBadColumnResolverTable, false, nil, false)
-		_, err = execFailing.ResolveTable(context.Background(), mockedClient, nil)
+		_, err := execFailing.ResolveTable(context.Background(), mockedClient, nil)
 		assert.Error(t, err)
 	})
 
@@ -211,7 +216,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Len(t, exec.PartialFetchFailureResult, 0)
 		assert.Equal(t, "TestValue", expectedResource.Get("default_value"))
-		assert.Nil(t, expectedResource.Get("name"))
+		assert.Equal(t, "defaultName", expectedResource.Get("name"))
 	})
 
 	t.Run("error table column resolver w/partialFetch", func(t *testing.T) {
@@ -344,6 +349,38 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		mockDb.AssertNumberOfCalls(t, "CopyFrom", 2)
 		assert.Nil(t, err)
 	})
+	t.Run("disable delete w/deleteFilter", func(t *testing.T) {
+		mockDb := new(DatabaseMock)
+		exec := NewExecutionData(mockDb, logger, testTable, true, map[string]interface{}{"test": 1}, false)
+		//mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
+		testTable.Resolver = dataReturningSingleResolver
+		testTable.DeleteFilter = func(meta ClientMeta, r *Resource) []interface{} {
+			return []interface{}{"a", 2}
+		}
+		var expectedResource *Resource
+		testTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
+			err := parent.Set("name", "other")
+			assert.Nil(t, err)
+			expectedResource = parent
+			return nil
+		}
+		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
+		mockDb.On("Delete", mock.Anything, testTable, mock.Anything).Return(nil)
+		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, []interface{}{"test", 1, "a", 2}).Return(nil)
+		mockDb.AssertNumberOfCalls(t, "Delete", 0)
+		_, err := exec.ResolveTable(context.Background(), mockedClient, nil)
+		mockDb.AssertNumberOfCalls(t, "Delete", 0)
+		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
+		assert.Equal(t, expectedResource.data["name"], "other")
+		assert.Nil(t, err)
+		exec = NewExecutionData(mockDb, logger, testTable, false, nil, false)
+		mockDb.On("CopyFrom", mock.Anything, mock.Anything, false, mock.Anything).Return(nil)
+		_, err = exec.ResolveTable(context.Background(), mockedClient, nil)
+		mockDb.AssertNumberOfCalls(t, "Delete", 1)
+		mockDb.AssertNumberOfCalls(t, "CopyFrom", 2)
+		assert.Nil(t, err)
+	})
+
 	t.Run("disable delete failed copy from", func(t *testing.T) {
 		mockDb := new(DatabaseMock)
 		exec := NewExecutionData(mockDb, logger, testTable, true, nil, false)
@@ -436,7 +473,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedResource.data["name"], "defaultValue")
 		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
-		assert.Equal(t, "failed to resolve resource: post resource resolver failed: random failure", execDefault.PartialFetchFailureResult[0].Error)
+		assert.Equal(t, "failed to resolve resource: post resource resolver failed: random failure", execDefault.PartialFetchFailureResult[0].Error())
 	})
 
 	t.Run("test partial fetch resolver", func(t *testing.T) {
@@ -456,7 +493,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedResource.data["name"], "defaultValue")
 		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
-		assert.Equal(t, "table resolve error: random failure", execDefault.PartialFetchFailureResult[0].Error)
+		assert.Equal(t, "table resolve error: random failure", execDefault.PartialFetchFailureResult[0].Error())
 	})
 
 	t.Run("test partial fetch resolver panic", func(t *testing.T) {
@@ -476,7 +513,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedResource.data["name"], "defaultValue")
 		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
-		assert.Equal(t, "table resolve error: failed table test_table fetch. Error: test panic", execDefault.PartialFetchFailureResult[0].Error)
+		assert.Equal(t, "table resolve error: failed table test_table fetch. Error: test panic", execDefault.PartialFetchFailureResult[0].Error())
 	})
 
 	t.Run("test partial fetch post resource resolver panic", func(t *testing.T) {
@@ -496,7 +533,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedResource.data["name"], "defaultValue")
 		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
-		assert.Equal(t, "failed to resolve resource: recovered from panic: test panic", execDefault.PartialFetchFailureResult[0].Error)
+		assert.Equal(t, "failed to resolve resource: recovered from panic: test panic", execDefault.PartialFetchFailureResult[0].Error())
 	})
 
 	t.Run("test table with multiplex", func(t *testing.T) {
