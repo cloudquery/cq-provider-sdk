@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
@@ -289,11 +290,11 @@ func (c Column) Meta() *ColumnMeta {
 			IgnoreExists: c.IgnoreError != nil,
 		}
 	}
-	typ := reflect.TypeOf(c.Resolver)
+	fnName := runtime.FuncForPC(reflect.ValueOf(c.Resolver).Pointer()).Name()
 	return &ColumnMeta{
 		Resolver: &ResolverMeta{
-			Name:    typ.Name(),
-			Builtin: strings.HasPrefix(typ.PkgPath(), "github.com/cloudquery/cq-provider-sdk"),
+			Name:    strings.TrimPrefix(fnName, "github.com/cloudquery/cq-provider-sdk/provider/"),
+			Builtin: strings.HasPrefix(fnName, "github.com/cloudquery/cq-provider-sdk/"),
 		},
 		IgnoreExists: c.IgnoreError != nil,
 	}
