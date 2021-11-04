@@ -2,6 +2,7 @@ package cqproto
 
 import (
 	"context"
+
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 
 	"github.com/vmihailenco/msgpack/v5"
@@ -22,10 +23,10 @@ func (g GRPCClient) GetProviderSchema(ctx context.Context, _ *GetProviderSchemaR
 		return nil, err
 	}
 	resp := &GetProviderSchemaResponse{
-		Name:               res.GetName(),
-		Version:            res.GetVersion(),
-		ResourceTables:     tablesFromProto(res.GetResourceTables()),
-		Migrations:         res.Migrations,
+		Name:           res.GetName(),
+		Version:        res.GetVersion(),
+		ResourceTables: tablesFromProto(res.GetResourceTables()),
+		Migrations:     res.Migrations,
 	}
 
 	return resp, nil
@@ -112,10 +113,10 @@ func (g *GRPCServer) GetProviderSchema(ctx context.Context, _ *internal.GetProvi
 		return nil, err
 	}
 	return &internal.GetProviderSchema_Response{
-		Name:                  resp.Name,
-		Version:               resp.Version,
-		ResourceTables:        tablesToProto(resp.ResourceTables),
-		Migrations:            resp.Migrations,
+		Name:           resp.Name,
+		Version:        resp.Version,
+		ResourceTables: tablesToProto(resp.ResourceTables),
+		Migrations:     resp.Migrations,
 	}, nil
 
 }
@@ -254,7 +255,7 @@ func tableToProto(in *schema.Table) *internal.Table {
 			Name:        c.Name,
 			Type:        internal.ColumnType(c.Type),
 			Description: c.Description,
-			Meta: columnMetaToProto(c.GetMeta()),
+			Meta:        columnMetaToProto(c.GetMeta()),
 		}
 	}
 	rels := make([]*internal.Table, len(in.Relations))
@@ -281,7 +282,7 @@ func columnMetaToProto(m *schema.ColumnMeta) *internal.ColumnMeta {
 		r = &internal.ResolverMeta{Name: m.Resolver.Name, Builtin: m.Resolver.Builtin}
 	}
 	return &internal.ColumnMeta{
-		Resolver:    r,
+		Resolver:     r,
 		IgnoreExists: m.IgnoreExists,
 	}
 }
