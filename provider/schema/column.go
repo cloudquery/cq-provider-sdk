@@ -279,7 +279,7 @@ func (c Column) checkType(v interface{}) bool {
 	return false
 }
 
-func (c Column) GetMeta() *ColumnMeta {
+func (c Column) Meta() *ColumnMeta {
 	if c.meta != nil {
 		return c.meta
 	}

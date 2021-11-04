@@ -255,7 +255,7 @@ func tableToProto(in *schema.Table) *internal.Table {
 			Name:        c.Name,
 			Type:        internal.ColumnType(c.Type),
 			Description: c.Description,
-			Meta:        columnMetaToProto(c.GetMeta()),
+			Meta:        columnMetaToProto(c.Meta()),
 		}
 	}
 	rels := make([]*internal.Table, len(in.Relations))

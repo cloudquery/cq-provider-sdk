@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 )
 
