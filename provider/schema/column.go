@@ -160,6 +160,9 @@ type Column struct {
 	IgnoreError IgnoreErrorFunc
 	// Creation options allow modifying how column is defined when table is created
 	CreationOptions ColumnCreationOptions
+
+	// meta holds serializable information about the column's resolvers and functions
+	meta *ColumnMeta
 }
 
 func (c Column) ValidateType(v interface{}) error {
@@ -274,4 +277,39 @@ func (c Column) checkType(v interface{}) bool {
 	}
 
 	return false
+}
+
+func (c Column) GetMeta() *ColumnMeta {
+	if c.meta != nil {
+		return c.meta
+	}
+	if c.Resolver == nil {
+		return &ColumnMeta{
+			Resolver:     nil,
+			IgnoreExists: c.IgnoreError != nil,
+		}
+	}
+	typ := reflect.TypeOf(c.Resolver)
+	return &ColumnMeta{
+		Resolver: &ResolverMeta{
+			Name:    typ.Name(),
+			Builtin: strings.HasPrefix(typ.PkgPath(), "github.com/cloudquery/cq-provider-sdk"),
+		},
+		IgnoreExists: c.IgnoreError != nil,
+	}
+}
+
+type ResolverMeta struct {
+	Name    string
+	Builtin bool
+}
+
+type ColumnMeta struct {
+	Resolver     *ResolverMeta
+	IgnoreExists bool
+}
+
+func SetColumnMeta(c Column, m *ColumnMeta) Column {
+	c.meta = m
+	return c
 }

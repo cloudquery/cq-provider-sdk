@@ -2,9 +2,6 @@ package cqproto
 
 import (
 	"context"
-	"reflect"
-	"strings"
-
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 
 	"github.com/vmihailenco/msgpack/v5"
@@ -29,7 +26,6 @@ func (g GRPCClient) GetProviderSchema(ctx context.Context, _ *GetProviderSchemaR
 		Version:            res.GetVersion(),
 		ResourceTables:     tablesFromProto(res.GetResourceTables()),
 		Migrations:         res.Migrations,
-		ResourceTablesMeta: metaTablesFromProto(res.GetResourceTableMetadata()),
 	}
 
 	return resp, nil
@@ -120,7 +116,6 @@ func (g *GRPCServer) GetProviderSchema(ctx context.Context, _ *internal.GetProvi
 		Version:               resp.Version,
 		ResourceTables:        tablesToProto(resp.ResourceTables),
 		Migrations:            resp.Migrations,
-		ResourceTableMetadata: tablesToTableMetaProto(resp.ResourceTables),
 	}, nil
 
 }
@@ -185,56 +180,6 @@ func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 	})
 }
 
-func metaTablesFromProto(in map[string]*internal.TableMeta) map[string]*TableMeta {
-	if in == nil {
-		return nil
-	}
-	out := make(map[string]*TableMeta, len(in))
-	for k, v := range in {
-		out[k] = metaTableFromProto(v)
-	}
-	return out
-}
-
-func metaTableFromProto(in *internal.TableMeta) *TableMeta {
-
-	cols := make([]ColumnMeta, len(in.Columns))
-	for i, c := range in.Columns {
-
-		var resolver *ResolverMeta
-		if c.GetResolver() != nil {
-			resolver = &ResolverMeta{
-				Name:    c.Resolver.Name,
-				Builtin: c.Resolver.Builtin,
-			}
-		}
-		cols[i] = ColumnMeta{
-			Resolver:     resolver,
-			IgnoreExists: c.IgnoreExists,
-		}
-	}
-
-	rels := make([]*TableMeta, len(in.Relations))
-	for i, r := range in.Relations {
-		rels[i] = metaTableFromProto(r)
-	}
-	var resolver *ResolverMeta
-	if in.GetResolver() != nil {
-		resolver = &ResolverMeta{
-			Name:    in.Resolver.Name,
-			Builtin: in.Resolver.Builtin,
-		}
-	}
-	return &TableMeta{
-		Resolver:           resolver,
-		IgnoreExists:       in.IgnoreExists,
-		MultiplexExists:    in.MultiplexExists,
-		PostResolverExists: in.PostResolverExists,
-		Relations:          rels,
-		Columns:            cols,
-	}
-}
-
 func tablesFromProto(in map[string]*internal.Table) map[string]*schema.Table {
 	if in == nil {
 		return nil
@@ -249,11 +194,11 @@ func tablesFromProto(in map[string]*internal.Table) map[string]*schema.Table {
 func tableFromProto(v *internal.Table) *schema.Table {
 	cols := make([]schema.Column, len(v.GetColumns()))
 	for i, c := range v.GetColumns() {
-		cols[i] = schema.Column{
+		cols[i] = schema.SetColumnMeta(schema.Column{
 			Name:        c.GetName(),
 			Type:        schema.ValueType(c.GetType()),
 			Description: c.GetDescription(),
-		}
+		}, metaFromProto(c.GetMeta()))
 	}
 	rels := make([]*schema.Table, len(v.GetRelations()))
 	for i, r := range v.GetRelations() {
@@ -271,6 +216,23 @@ func tableFromProto(v *internal.Table) *schema.Table {
 		Columns:     cols,
 		Relations:   rels,
 		Options:     opts,
+	}
+}
+
+func metaFromProto(m *internal.ColumnMeta) *schema.ColumnMeta {
+	if m == nil {
+		return nil
+	}
+	var r *schema.ResolverMeta
+	if m.GetResolver() != nil {
+		r = &schema.ResolverMeta{
+			Name:    m.Resolver.Name,
+			Builtin: m.Resolver.Builtin,
+		}
+	}
+	return &schema.ColumnMeta{
+		Resolver:     r,
+		IgnoreExists: m.GetIgnoreExists(),
 	}
 }
 
@@ -292,6 +254,7 @@ func tableToProto(in *schema.Table) *internal.Table {
 			Name:        c.Name,
 			Type:        internal.ColumnType(c.Type),
 			Description: c.Description,
+			Meta: columnMetaToProto(c.GetMeta()),
 		}
 	}
 	rels := make([]*internal.Table, len(in.Relations))
@@ -306,6 +269,20 @@ func tableToProto(in *schema.Table) *internal.Table {
 		Options: &internal.TableCreationOptions{
 			PrimaryKeys: in.Options.PrimaryKeys,
 		},
+	}
+}
+
+func columnMetaToProto(m *schema.ColumnMeta) *internal.ColumnMeta {
+	if m == nil {
+		return nil
+	}
+	var r *internal.ResolverMeta
+	if m.Resolver != nil {
+		r = &internal.ResolverMeta{Name: m.Resolver.Name, Builtin: m.Resolver.Builtin}
+	}
+	return &internal.ColumnMeta{
+		Resolver:    r,
+		IgnoreExists: m.IgnoreExists,
 	}
 }
 
@@ -390,45 +367,4 @@ func PartialFetchToCQProto(in []schema.ResourceFetchError) []*FailedResourceFetc
 		}
 	}
 	return failedResources
-}
-
-func tablesToTableMetaProto(tables map[string]*schema.Table) map[string]*internal.TableMeta {
-	protoTables := make(map[string]*internal.TableMeta, len(tables))
-	for n, t := range tables {
-		protoTables[n] = extractTableMeta(t)
-	}
-	return protoTables
-}
-
-func extractTableMeta(t *schema.Table) *internal.TableMeta {
-	cols := make([]*internal.ColumnMeta, len(t.Columns))
-	for i, c := range t.Columns {
-		cols[i] = &internal.ColumnMeta{
-			Resolver:     getResolverMeta(c.Resolver),
-			IgnoreExists: c.IgnoreError != nil,
-		}
-	}
-	relMetas := make([]*internal.TableMeta, len(t.Relations))
-	for i, rel := range t.Relations {
-		relMetas[i] = extractTableMeta(rel)
-	}
-
-	return &internal.TableMeta{
-		Resolver:           getResolverMeta(t.Resolver),
-		IgnoreExists:       t.IgnoreError != nil,
-		MultiplexExists:    t.Multiplex != nil,
-		PostResolverExists: t.PostResourceResolver != nil,
-		Columns:            cols,
-	}
-}
-
-func getResolverMeta(f interface{}) *internal.ResolverMeta {
-	if f == nil {
-		return nil
-	}
-	typ := reflect.TypeOf(f)
-	return &internal.ResolverMeta{
-		Name:    typ.Name(),
-		Builtin: strings.HasPrefix(typ.PkgPath(), "github.com/cloudquery/cq-provider-sdk"),
-	}
 }

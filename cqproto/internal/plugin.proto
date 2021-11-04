@@ -120,7 +120,6 @@ message GetProviderSchema {
     string version = 2;
     map<string, Table> resource_tables = 3;
     map<string, bytes> migrations = 4;
-    map<string, TableMeta> resource_table_metadata = 5;
   }
 }
 
@@ -146,15 +145,7 @@ message Column {
   string name = 1;
   string description = 2;
   ColumnType type = 3;
-}
-
-message TableMeta {
-  ResolverMeta resolver = 1;
-  bool IgnoreExists = 2;
-  bool MultiplexExists = 3;
-  bool PostResolverExists = 4;
-  repeated ColumnMeta columns = 5;
-  repeated TableMeta relations = 6;
+  ColumnMeta meta = 4;
 }
 
 message ColumnMeta {
@@ -170,9 +161,6 @@ message ResolverMeta {
 message TableCreationOptions {
   repeated string PrimaryKeys = 1;
 }
-
-
-
 
 
 enum ColumnType {

@@ -55,8 +55,6 @@ type GetProviderSchemaResponse struct {
 	ResourceTables map[string]*schema.Table
 	// Migrations scripts available for the provider
 	Migrations map[string][]byte
-	// Holds resource tables meta, such as resolver names column resolvers, defined functions etc'
-	ResourceTablesMeta map[string]*TableMeta
 }
 
 // GetProviderConfigRequest represents a CloudQuery RPC request for provider's config
@@ -184,24 +182,4 @@ func (p ProviderDiagnostic) Description() diag.Description {
 		Summary:  p.Summary,
 		Detail:   p.Details,
 	}
-}
-
-// TableMeta MetaInfo is information collected on the table and it's columns such as resolvers etc'
-type TableMeta struct {
-	Resolver           *ResolverMeta
-	IgnoreExists       bool
-	MultiplexExists    bool
-	PostResolverExists bool
-	Relations          []*TableMeta
-	Columns            []ColumnMeta
-}
-
-type ResolverMeta struct {
-	Name    string
-	Builtin bool
-}
-
-type ColumnMeta struct {
-	Resolver     *ResolverMeta
-	IgnoreExists bool
 }
