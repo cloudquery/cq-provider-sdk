@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsimple"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 // Config Every provider implements a resources field we only want to extract that in fetch execution
@@ -44,7 +45,9 @@ type Provider struct {
 	Logger hclog.Logger
 	// Migrations embedded and passed by the provider to upgrade between versions
 	Migrations embed.FS
-	// ErrorClassifier allows the provider to classify errors it returns table execution, and return diagnostics to the user
+	// ErrorClassifier allows the provider to classify errors it produces during table execution, and return them as diagnostics to the user.
+	// Classifier function may return empty slice if it cannot meaningfully convert the error into diagnostics. In this case
+	// the error will be converted by the SDK into diagnostic at ERROR level and RESOLVING type.
 	ErrorClassifier func(meta schema.ClientMeta, resource string, err error) []diag.Diagnostic
 	// Database connection string
 	dbURL string
@@ -134,7 +137,6 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 }
 
 func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchResourcesRequest, sender cqproto.FetchResourcesSender) error {
-
 	if p.meta == nil {
 		return fmt.Errorf("provider client is not configured, call ConfigureProvider first")
 	}
@@ -156,6 +158,12 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 
 	defer conn.Close()
 
+	// limiter used to limit the amount of resources fetched concurently
+	var limiter *semaphore.Weighted
+	if request.ParallelFetchingLimit > 0 {
+		limiter = semaphore.NewWeighted(int64(request.ParallelFetchingLimit))
+	}
+
 	g, gctx := errgroup.WithContext(ctx)
 	finishedResources := make(map[string]bool, len(resources))
 	l := sync.Mutex{}
@@ -173,6 +181,12 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		finishedResources[r] = false
 		l.Unlock()
 		g.Go(func() error {
+			if limiter != nil {
+				if err := limiter.Acquire(gctx, 1); err != nil {
+					return err
+				}
+				defer limiter.Release(1)
+			}
 			resourceCount, err := execData.ResolveTable(gctx, p.meta, nil)
 			l.Lock()
 			finishedResources[r] = true
