@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v0.5.1] - 2021-11-01
 
 ### :rocket: Added
- * feat/implementation of parallel clients limit by @fdistorted in [#103](https://github.com/cloudquery/cq-provider-sdk/pull/103))
- * Support passing table meta information over cqproto [#107](https://github.com/cloudquery/cq-provider-sdk/pull/
+ * feat/implementation of parallel clients limit by @fdistorted in [#103](https://github.com/cloudquery/cq-provider-sdk/pull/103)
+ * Support passing table meta information over cqproto [#107](https://github.com/cloudquery/cq-provider-sdk/pull/107)
 
 ## [v0.5.0] - 2021-10-21
 
