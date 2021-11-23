@@ -126,7 +126,6 @@ func IPAddressResolver(path string) ColumnResolver {
 	}
 }
 
-
 // IPAddressesResolver resolves the ip string value and returns net.IP
 //
 // Examples:
