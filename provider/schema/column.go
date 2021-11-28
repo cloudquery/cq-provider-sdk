@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
@@ -160,6 +161,9 @@ type Column struct {
 	IgnoreError IgnoreErrorFunc
 	// Creation options allow modifying how column is defined when table is created
 	CreationOptions ColumnCreationOptions
+
+	// meta holds serializable information about the column's resolvers and functions
+	meta *ColumnMeta
 }
 
 func (c Column) ValidateType(v interface{}) error {
@@ -248,10 +252,14 @@ func (c Column) checkType(v interface{}) bool {
 			return true
 		}
 		if kindName == reflect.Slice {
-			if c.Type == TypeStringArray && reflect.String == reflect2.TypeOf(v).Type1().Elem().Kind() {
+			itemKind := reflect2.TypeOf(v).Type1().Elem().Kind()
+			if c.Type == TypeStringArray && reflect.String == itemKind {
 				return true
 			}
-			if c.Type == TypeIntArray && reflect.Int == reflect2.TypeOf(v).Type1().Elem().Kind() {
+			if c.Type == TypeIntArray && reflect.Int == itemKind {
+				return true
+			}
+			if c.Type == TypeJSON && reflect.Struct == itemKind {
 				return true
 			}
 			if c.Type == TypeUUIDArray && reflect2.TypeOf(v).String() == "uuid.UUID" || reflect2.TypeOf(v).String() == "*uuid.UUID" {
@@ -274,4 +282,39 @@ func (c Column) checkType(v interface{}) bool {
 	}
 
 	return false
+}
+
+func (c Column) Meta() *ColumnMeta {
+	if c.meta != nil {
+		return c.meta
+	}
+	if c.Resolver == nil {
+		return &ColumnMeta{
+			Resolver:     nil,
+			IgnoreExists: c.IgnoreError != nil,
+		}
+	}
+	fnName := runtime.FuncForPC(reflect.ValueOf(c.Resolver).Pointer()).Name()
+	return &ColumnMeta{
+		Resolver: &ResolverMeta{
+			Name:    strings.TrimPrefix(fnName, "github.com/cloudquery/cq-provider-sdk/provider/"),
+			Builtin: strings.HasPrefix(fnName, "github.com/cloudquery/cq-provider-sdk/"),
+		},
+		IgnoreExists: c.IgnoreError != nil,
+	}
+}
+
+type ResolverMeta struct {
+	Name    string
+	Builtin bool
+}
+
+type ColumnMeta struct {
+	Resolver     *ResolverMeta
+	IgnoreExists bool
+}
+
+func SetColumnMeta(c Column, m *ColumnMeta) Column {
+	c.meta = m
+	return c
 }
