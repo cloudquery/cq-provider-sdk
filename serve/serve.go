@@ -111,7 +111,7 @@ func serve(opts *Options) {
 	}
 
 	if opts.TestConfig == nil && os.Getenv(Handshake.MagicCookieKey) != Handshake.MagicCookieValue {
-		fmt.Printf(pluginExecutionMsg)
+		fmt.Print(pluginExecutionMsg)
 		os.Exit(1)
 	}
 	plugin.Serve(&plugin.ServeConfig{
