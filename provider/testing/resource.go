@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
-	"github.com/jackc/pgx/v4/pgxpool"
-
+	"github.com/Masterminds/squirrel"
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/logging"
 	"github.com/cloudquery/cq-provider-sdk/provider"
@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tmccombs/hcl2json/convert"
@@ -78,7 +79,9 @@ func TestResource(t *testing.T, providerCreator func() *provider.Provider, resou
 
 	err = testProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)}}, &fakeResourceSender{Errors: []string{}})
 	assert.Nil(t, err)
-	verifyNoEmptyColumns(t, resource, conn)
+	sequence := getVerificationSequence(resource.Table)
+	verifyColumnsBySequence(t, conn, sequence, nil)
+	//verifyNoEmptyColumns(t, resource, conn)
 }
 
 func findResourceFromTableName(table *schema.Table, tables map[string]*schema.Table) string {
@@ -126,44 +129,71 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func verifyNoEmptyColumns(t *testing.T, tc ResourceTestData, conn pgxscan.Querier) {
-	// Test that we don't have missing columns and have exactly one entry for each table
-	for _, table := range getTablesFromMainTable(tc.Table) {
-		query := fmt.Sprintf("select * FROM %s ", table)
-		rows, err := conn.Query(context.Background(), query)
-		if err != nil {
-			t.Fatal(err)
-		}
-		count := 0
-		for rows.Next() {
-			count += 1
-		}
-		if count < 1 {
-			t.Fatalf("expected to have at least 1 entry at table %s got %d", table, count)
-		}
-		if tc.SkipEmptyJsonB {
-			continue
-		}
-		query = fmt.Sprintf("select t.* FROM %s as t WHERE to_jsonb(t) = jsonb_strip_nulls(to_jsonb(t))", table)
-		rows, err = conn.Query(context.Background(), query)
-		if err != nil {
-			t.Fatal(err)
-		}
-		count = 0
-		for rows.Next() {
-			count += 1
-		}
-		if count < 1 {
-			t.Fatalf("row at table %s has an empty column", table)
-		}
-	}
+type VerificationSequence struct {
+	TableName      string
+	ForeignKeyName string
+	Relations      []VerificationSequence
 }
 
-func getTablesFromMainTable(table *schema.Table) []string {
-	var res []string
-	res = append(res, table.Name)
+func getVerificationSequence(table *schema.Table) VerificationSequence {
+	res := VerificationSequence{
+		TableName: table.Name,
+	}
+	for _, c := range table.Columns {
+		if strings.Contains(c.Name, "_cq_id") {
+			res.ForeignKeyName = c.Name
+		}
+	}
 	for _, t := range table.Relations {
-		res = append(res, getTablesFromMainTable(t)...)
+		res.Relations = append(res.Relations, getVerificationSequence(t))
 	}
 	return res
+}
+func verifyColumnsBySequence(t *testing.T, conn pgxscan.Querier, sequence VerificationSequence, parentID *string) {
+	sq := squirrel.StatementBuilder.
+		PlaceholderFormat(squirrel.Dollar).
+		Select(fmt.Sprintf("json_agg(%s)", sequence.TableName)).
+		From(sequence.TableName)
+	if parentID == nil {
+		// it is a root object
+		sq = sq.Where(squirrel.Eq{"account_id": "testAccount"})
+	} else {
+		// it is a relation
+		sq = sq.Where(squirrel.Eq{sequence.ForeignKeyName: parentID})
+	}
+	query, args, err := sq.ToSql()
+	if err != nil {
+		t.Fatalf("Failed to build query for %s:%v", sequence.TableName, err)
+	}
+	var data []map[string]interface{}
+	if err = pgxscan.Get(context.Background(), conn, &data, query, args...); err != nil {
+		t.Fatalf("Failed to execute query to %s:%v", sequence.TableName, err)
+	}
+	if len(data) == 0 {
+		t.Fatalf("expected to have at least 1 entry at table %s got %d", sequence.TableName, len(data))
+	}
+
+	var pID *string
+	for _, d := range data {
+		var nullColumns []string
+		for k, v := range d {
+			if v == nil {
+				nullColumns = append(nullColumns, k)
+				continue
+			}
+			if k == "cq_id" {
+				id, ok := v.(string)
+				if !ok {
+					t.Fatalf("table %s column %s cq_id column has wrong type", sequence.TableName, k)
+				}
+				pID = &id
+			}
+		}
+		if len(nullColumns) > 0 {
+			t.Fatalf("table '%s' has NULL coumns: '%s'", sequence.TableName, strings.Join(nullColumns, "', '"))
+		}
+	}
+	for _, r := range sequence.Relations {
+		verifyColumnsBySequence(t, conn, r, pID)
+	}
 }
