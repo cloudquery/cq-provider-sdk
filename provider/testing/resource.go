@@ -81,7 +81,6 @@ func TestResource(t *testing.T, providerCreator func() *provider.Provider, resou
 	assert.Nil(t, err)
 	sequence := getVerificationSequence(resource.Table)
 	verifyColumnsBySequence(t, conn, sequence, nil)
-	//verifyNoEmptyColumns(t, resource, conn)
 }
 
 func findResourceFromTableName(table *schema.Table, tables map[string]*schema.Table) string {
