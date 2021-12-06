@@ -30,6 +30,8 @@ type ResourceTestData struct {
 	Resources      []string
 	Configure      func(logger hclog.Logger, data interface{}) (schema.ClientMeta, error)
 	SkipEmptyJsonB bool
+	// Filter - function that add required select arguments to query tested resource. Usually it is a column that used in delete filter function
+	Filter func(sq squirrel.SelectBuilder) squirrel.SelectBuilder
 }
 
 func TestResource(t *testing.T, providerCreator func() *provider.Provider, resource ResourceTestData) {
@@ -80,7 +82,7 @@ func TestResource(t *testing.T, providerCreator func() *provider.Provider, resou
 	err = testProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)}}, &fakeResourceSender{Errors: []string{}})
 	assert.Nil(t, err)
 	sequence := getVerificationSequence(resource.Table)
-	verifyColumnsBySequence(t, conn, sequence, nil)
+	verifyColumnsBySequence(t, conn, sequence, nil, resource.Filter)
 }
 
 func findResourceFromTableName(table *schema.Table, tables map[string]*schema.Table) string {
@@ -148,14 +150,17 @@ func getVerificationSequence(table *schema.Table) VerificationSequence {
 	}
 	return res
 }
-func verifyColumnsBySequence(t *testing.T, conn pgxscan.Querier, sequence VerificationSequence, parentID *string) {
+func verifyColumnsBySequence(t *testing.T, conn pgxscan.Querier, sequence VerificationSequence, parentID *string, filter func(sq squirrel.SelectBuilder) squirrel.SelectBuilder) {
 	sq := squirrel.StatementBuilder.
 		PlaceholderFormat(squirrel.Dollar).
 		Select(fmt.Sprintf("json_agg(%s)", sequence.TableName)).
 		From(sequence.TableName)
 	if parentID == nil {
 		// it is a root object
-		sq = sq.Where(squirrel.Eq{"account_id": "testAccount"})
+		if filter == nil {
+			t.Fatal("No filter was provided to query test data")
+		}
+		sq = filter(sq)
 	} else {
 		// it is a relation
 		sq = sq.Where(squirrel.Eq{sequence.ForeignKeyName: parentID})
@@ -189,10 +194,10 @@ func verifyColumnsBySequence(t *testing.T, conn pgxscan.Querier, sequence Verifi
 			}
 		}
 		if len(nullColumns) > 0 {
-			t.Fatalf("table '%s' has NULL coumns: '%s'", sequence.TableName, strings.Join(nullColumns, "', '"))
+			t.Fatalf("table '%s' has NULL columns: '%s'", sequence.TableName, strings.Join(nullColumns, "', '"))
 		}
 	}
 	for _, r := range sequence.Relations {
-		verifyColumnsBySequence(t, conn, r, pID)
+		verifyColumnsBySequence(t, conn, r, pID, nil)
 	}
 }
