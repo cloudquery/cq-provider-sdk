@@ -334,10 +334,6 @@ func verifyFields(resource ResourceIntegrationTestData, conn pgxscan.Querier) er
 		return fmt.Errorf("%s -> %w", resource.Table.Name, err)
 	}
 
-	//if err = compareDataWithExpected(verification.ExpectedValues, data); err != nil {
-	//	return fmt.Errorf("verification failed for table %s; %w", resource.Table.Name, err)
-	//}
-
 	// verify root entry relations
 	for i, e := range retrievedData {
 		id, ok := e["cq_id"]
@@ -348,10 +344,6 @@ func verifyFields(resource ResourceIntegrationTestData, conn pgxscan.Querier) er
 		if err := retrieveRelations(context.Background(), id, resource.Table.Name, resource.Table.Relations, retrievedData[i], conn); err != nil {
 			return fmt.Errorf("%s -> %w", resource.Table.Name, err)
 		}
-
-		//if err = verifyRelations(verification.Relations, id, resource.Table.Name, conn); err != nil {
-		//	return fmt.Errorf("verification failed for relations of table entry %s; cq_id: %v -> %w", resource.Table.Name, id, err)
-		//}
 	}
 
 	expectedData := make([]map[string]interface{}, len(verification.Data))
