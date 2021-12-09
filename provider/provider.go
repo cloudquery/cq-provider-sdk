@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -244,8 +245,9 @@ func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec sc
 	p.Logger.Debug("collecting diagnostics for resource execution", "resource", exec.ResourceName)
 	diagnostics := make(diag.Diagnostics, 0)
 	for _, e := range exec.PartialFetchFailureResult {
-		if d, ok := e.Err.(diag.Diagnostic); ok {
-			diagnostics = append(diagnostics, d)
+		var execErr *diag.ExecutionError
+		if errors.As(e.Err, &execErr) {
+			diagnostics = append(diagnostics, execErr)
 			continue
 		}
 		dd := classifier(client, exec.ResourceName, e.Err)
