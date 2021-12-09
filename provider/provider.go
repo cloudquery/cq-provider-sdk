@@ -250,6 +250,10 @@ func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec sc
 			diagnostics = append(diagnostics, execErr)
 			continue
 		}
+		if d, ok := e.Err.(diag.Diagnostic); ok {
+			diagnostics = append(diagnostics, d)
+			continue
+		}
 		dd := classifier(client, exec.ResourceName, e.Err)
 		if len(dd) > 0 {
 			diagnostics = append(diagnostics, dd...)
