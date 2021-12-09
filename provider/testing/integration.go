@@ -47,20 +47,18 @@ type ResourceIntegrationTestData struct {
 	Configure           func(logger hclog.Logger, data interface{}) (schema.ClientMeta, error)
 	Suffix              string
 	Prefix              string
-	VerificationBuilder func(res *ResourceIntegrationTestData) ResourceIntegrationVerification
+	VerificationBuilder VerificationBuilder
 	workdir             string
 }
 
-// ResourceIntegrationVerification - a set of verification rules to query and check test related data
-type ResourceIntegrationVerification struct {
-	Filter func(sq squirrel.SelectBuilder, res *ResourceIntegrationTestData) squirrel.SelectBuilder
-	Data   []Data
-}
+type VerificationBuilder func(res *ResourceIntegrationTestData) []Verification
 
-type Data struct {
+// Verification - a set of verification rules to compare with fetched data
+type Verification struct {
+	Filter         squirrel.And
 	Name           string
 	ExpectedValues map[string]interface{}
-	Relations      []Data
+	Relations      []Verification
 }
 
 // IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
@@ -312,120 +310,139 @@ func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
 // verifyFields - gets the root db entry and check all its expected relations
 func verifyFields(resource ResourceIntegrationTestData, conn pgxscan.Querier) error {
 	verification := resource.VerificationBuilder(&resource)
+	foreignKeys := getForeignKeys(resource.Table)
 
-	// build query to get the root object
-	sq := squirrel.StatementBuilder.
-		PlaceholderFormat(squirrel.Dollar).
-		Select(fmt.Sprintf("json_agg(%s)", resource.Table.Name)).
-		From(resource.Table.Name)
-	// use special filter if it is set.
-	if verification.Filter != nil {
-		sq = verification.Filter(sq, &resource)
-	} else {
-		sq = sq.Where(squirrel.Eq{"tags->>'TestId'": resource.Suffix})
-	}
-	query, args, err := sq.ToSql()
+	violations, err := verifyRelations(context.Background(), nil, foreignKeys, verification, conn)
 	if err != nil {
 		return fmt.Errorf("%s -> %w", resource.Table.Name, err)
 	}
 
-	var retrievedData []map[string]interface{}
-	if err := pgxscan.Get(context.Background(), conn, &retrievedData, query, args...); err != nil {
-		return fmt.Errorf("%s -> %w", resource.Table.Name, err)
-	}
-
-	// verify root entry relations
-	for i, e := range retrievedData {
-		id, ok := e["cq_id"]
-		if !ok {
-			return fmt.Errorf("failed to get parent id for %s", resource.Table.Name)
-		}
-
-		if err := retrieveRelations(context.Background(), id, resource.Table.Name, resource.Table.Relations, retrievedData[i], conn); err != nil {
-			return fmt.Errorf("%s -> %w", resource.Table.Name, err)
-		}
-	}
-
-	expectedData := make([]map[string]interface{}, len(verification.Data))
-	for i, d := range verification.Data {
-		expectedData[i] = d.ExpectedValues
-		buildVerificationRelations(d.Relations, expectedData[i])
-	}
-
-	changelog, err := diff.Diff(expectedData, retrievedData, diff.StructMapKeySupport(), diff.SliceOrdering(false))
-	if err != nil {
-		return fmt.Errorf("failed to compare expected and retrieved data: %w", err)
-	}
-	var verificationResult []string
-	for _, c := range changelog {
-		if c.Type == diff.UPDATE || c.Type == diff.DELETE {
-			verificationResult = append(verificationResult, fmt.Sprintf("%s | %v != %v", strings.Join(c.Path, "."), c.From, c.To))
-		}
-	}
-	if len(verificationResult) > 0 {
-		return fmt.Errorf("failed to validate data.\npath | expected != retrieved\n_____________________\n%s", strings.Join(verificationResult, "\n"))
+	if len(violations) > 0 {
+		return fmt.Errorf("failed to validate data.\n%s", strings.Join(violations, "\n"))
 	}
 	return nil
 }
 
-func buildVerificationRelations(v []Data, parent map[string]interface{}) {
-	for _, d := range v {
-		if _, ok := parent[d.Name]; !ok {
-			parent[d.Name] = []map[string]interface{}{
-				d.ExpectedValues,
-			}
-		} else {
-			parent[d.Name] = append(parent[d.Name].([]map[string]interface{}), d.ExpectedValues)
-		}
-		r := parent[d.Name].([]map[string]interface{})
-		if len(d.Relations) > 0 {
-			buildVerificationRelations(d.Relations, r[len(r)-1])
+func getForeignKeys(table *schema.Table) map[string]string {
+	result := make(map[string]string, len(table.Relations))
+	for _, c := range table.Columns {
+		if strings.Contains(c.Name, "_cq_id") {
+			result[table.Name] = c.Name
 		}
 	}
+
+	for _, relation := range table.Relations {
+		data := getForeignKeys(relation)
+		for k, v := range data {
+			result[k] = v
+		}
+	}
+
+	return result
 }
 
-// verifyRelations - recursively runs through all the relations and compares their values with expected data
-func retrieveRelations(ctx context.Context, parentId interface{}, parentName string, relations []*schema.Table, parent map[string]interface{}, conn pgxscan.Querier) error {
+// verifyRelations - recursively runs through all the relations
+func verifyRelations(ctx context.Context, parentId interface{}, foreignKeys map[string]string, relations []Verification, conn pgxscan.Querier) ([]string, error) {
+	var violations []string
 	for _, relation := range relations {
-		// build query to get relation
-		var foreignKey string
-		for _, c := range relation.Columns {
-			if strings.Contains(c.Name, "_cq_id") {
-				foreignKey = c.Name
-			}
-		}
-		if foreignKey == "" {
-			return fmt.Errorf("failed to find foreignKey for %s", relation.Name)
-		}
 		sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar).
 			Select(fmt.Sprintf("json_agg(%s)", relation.Name)).
-			From(relation.Name).
-			LeftJoin(fmt.Sprintf("%[1]s on %[1]s.cq_id = %[3]s.%[2]s", parentName, foreignKey, relation.Name)).
-			Where(squirrel.Eq{fmt.Sprintf("%s.cq_id", parentName): parentId})
-		query, args, err := sq.ToSql()
+			From(relation.Name)
 
-		if err != nil {
-			return fmt.Errorf("%s -> %w", relation.Name, err)
-		}
-
-		var data []map[string]interface{}
-		if err := pgxscan.Get(context.Background(), conn, &data, query, args...); err != nil {
-			return fmt.Errorf("%s -> %w", relation.Name, err)
-		}
-
-		// verify relation entry relations
-		for i, e := range data {
-			id, ok := e["cq_id"]
+		filters := squirrel.And{}
+		if parentId != nil {
+			foreignKey, ok := foreignKeys[relation.Name]
 			if !ok {
-				return fmt.Errorf("failed to get parent id for %s", relation.Name)
+				return nil, fmt.Errorf("failed to find foreignKey for %s", relation.Name)
 			}
-			if err := retrieveRelations(context.Background(), id, relation.Name, relation.Relations, data[i], conn); err != nil {
-				return fmt.Errorf("%s cq_id: %v -> %w", relation.Name, id, err)
+			filters = append(filters, squirrel.Eq{foreignKey: parentId})
+		}
+		if relation.Filter != nil {
+			filters = append(filters, relation.Filter)
+		}
+		// add verification fields as query parameters but ignore complex types like arrays and maps
+		for k, v := range relation.ExpectedValues {
+			_, ismap := v.(map[string]interface{})
+			_, isslice := v.([]interface{})
+			// ignore complex types in query
+			if ismap || isslice {
+				continue
+			}
+
+			filters = append(filters, squirrel.Eq{k: v})
+		}
+		sq = sq.Where(filters)
+		query, args, err := sq.ToSql()
+		if err != nil {
+			return nil, fmt.Errorf("%s -> %w", relation.Name, err)
+		}
+
+		queryToExecute := fmt.Sprintf("query: %s, args: %v", query, args)
+		var data []map[string]interface{}
+		if err := pgxscan.Get(ctx, conn, &data, query, args...); err != nil {
+			return nil, fmt.Errorf("%s -> %s:%w", relation.Name, queryToExecute, err)
+		}
+
+		if len(data) > 0 {
+			// verify relation entry relations
+			diffs, smallestDiffId, smallestDiffLenght, err := resolveDiffs(relation, data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to diff values of %s -> %w", relation.Name, err)
+			}
+
+			if smallestDiffLenght == 0 {
+				v, err := verifyRelations(ctx, smallestDiffId, foreignKeys, relation.Relations, conn)
+				if err != nil {
+					return nil, fmt.Errorf("%s cq_id: %v -> %w", relation.Name, smallestDiffId, err)
+				}
+				violations = append(violations, v...)
+			} else {
+				violations = append(violations, fmt.Sprintf("fields does not match: path | expected != retrieved: %s", strings.Join(diffs[smallestDiffId], ",")))
+			}
+
+		} else {
+			violationString := fmt.Sprintf("Query: `%s` returned no results", queryToExecute)
+			violations = append(violations, violationString)
+		}
+	}
+	return violations, nil
+}
+
+// resolveDiffs - finds which object from retrieved matches expected object the most
+func resolveDiffs(relation Verification, retrieved []map[string]interface{}) (map[interface{}][]string, interface{}, int, error) {
+	smallestDiffCount := -1
+	var smallestDiffId interface{}
+	diffs := make(map[interface{}][]string, len(retrieved))
+	for _, r := range retrieved {
+		id, ok := r["cq_id"]
+		if !ok {
+			return diffs, smallestDiffId, smallestDiffCount, fmt.Errorf("object does not have cq_id field")
+		}
+		// check if current retrieved object matches expected values including complex fields
+		d, e := diff.Diff(relation.ExpectedValues, r, diff.AllowTypeMismatch(true))
+		if e != nil {
+			return diffs, smallestDiffId, smallestDiffCount, e
+		}
+		var diffResult []string
+		// skipping all differences that exist in retrieved object and does not exist in expected object
+		for _, c := range d {
+			if c.Type == diff.UPDATE || c.Type == diff.DELETE {
+				diffResult = append(diffResult, fmt.Sprintf("%s | %v(%T) != %v(%T)", strings.Join(c.Path, "."), c.From, c.From, c.To, c.To))
 			}
 		}
-		parent[relation.Name] = data
+		diffs[id] = diffResult
 	}
-	return nil
+	for k, v := range diffs {
+		diffCount := len(v)
+		if smallestDiffCount == -1 {
+			smallestDiffCount = diffCount
+			smallestDiffId = k
+		} else if diffCount < smallestDiffCount {
+			smallestDiffCount = diffCount
+			smallestDiffId = k
+		}
+	}
+	return diffs, smallestDiffId, smallestDiffCount, nil
 }
 
 // simplifyString - prepares the string to be used in resources names
