@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -362,13 +363,13 @@ func verifyRelations(ctx context.Context, parentId interface{}, foreignKeys map[
 		}
 		// add verification fields as query parameters but ignore complex types like arrays and maps
 		for k, v := range relation.ExpectedValues {
-			_, ismap := v.(map[string]interface{})
-			_, isslice := v.([]interface{})
-			// ignore complex types in query
-			if ismap || isslice {
-				continue
+			rt := reflect.TypeOf(v)
+			if rt != nil {
+				switch rt.Kind() {
+				case reflect.Slice, reflect.Array, reflect.Map:
+					continue
+				}
 			}
-
 			filters = append(filters, squirrel.Eq{k: v})
 		}
 		sq = sq.Where(filters)
@@ -377,15 +378,16 @@ func verifyRelations(ctx context.Context, parentId interface{}, foreignKeys map[
 			return nil, fmt.Errorf("%s -> %w", relation.Name, err)
 		}
 
-		queryToExecute := fmt.Sprintf("query: %s, args: %v", query, args)
-		var data []map[string]interface{}
-		if err := pgxscan.Get(ctx, conn, &data, query, args...); err != nil {
+		queryToExecute := squirrel.DebugSqlizer(sq.PlaceholderFormat(squirrel.Question))
+		tableData := make([]map[string]interface{}, 0)
+
+		if err := pgxscan.Get(ctx, conn, &tableData, query, args...); err != nil {
 			return nil, fmt.Errorf("%s -> %s:%w", relation.Name, queryToExecute, err)
 		}
 
-		if len(data) > 0 {
+		if len(tableData) > 0 {
 			// verify relation entry relations
-			diffs, smallestDiffId, smallestDiffLenght, err := resolveDiffs(relation, data)
+			diffs, smallestDiffId, smallestDiffLenght, err := resolveDiffs(relation, tableData)
 			if err != nil {
 				return nil, fmt.Errorf("failed to diff values of %s -> %w", relation.Name, err)
 			}
