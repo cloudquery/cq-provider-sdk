@@ -197,11 +197,16 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 			close(res)
 		}()
 		err := e.Table.Resolver(ctx, client, parent, res)
-		if err != nil && e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
-			client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-			// add partial fetch error, this will be passed in diagnostics, although it was ignored
-			_ = e.checkPartialFetchError(err, parent, "table resolver ignored error")
-			return
+		if err != nil {
+			if strings.Contains(err.Error(), ": socket: too many open files") {
+				client.Logger().Warn("OS error during %s fetch. try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters", e.Table.Name)
+			}
+			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
+				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
+				// add partial fetch error, this will be passed in diagnostics, although it was ignored
+				_ = e.checkPartialFetchError(err, parent, "table resolver ignored error")
+				return
+			}
 		}
 		resolverErr = err
 	}()
