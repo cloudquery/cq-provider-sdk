@@ -68,10 +68,13 @@ func (p ResourceFetchError) Error() string {
 	return p.Err.Error()
 }
 
-// partialFetchFailureBufferLength defines the buffer length for the partialFetchChan.
-const partialFetchFailureBufferLength = 10
+const (
+	// partialFetchFailureBufferLength defines the buffer length for the partialFetchChan.
+	partialFetchFailureBufferLength = 10
 
-const fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
+	// fdLimitMessage defines the message for when a client isn't able to fetch because the open fd limit is hit
+	fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
+)
 
 // NewExecutionData Create a new execution data
 func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDelete bool, extraFields map[string]interface{}, partialFetch bool) ExecutionData {
@@ -199,16 +202,11 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 			close(res)
 		}()
 		err := e.Table.Resolver(ctx, client, parent, res)
-		if err != nil {
-			if strings.Contains(err.Error(), ": socket: too many open files") {
-				client.Logger().Warn("OS error during %s fetch. %s ", e.Table.Name, fdLimitMessage)
-			}
-			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
-				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-				// add partial fetch error, this will be passed in diagnostics, although it was ignored
-				_ = e.checkPartialFetchError(err, parent, "table resolver ignored error")
-				return
-			}
+		if err != nil && e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
+			client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
+			// add partial fetch error, this will be passed in diagnostics, although it was ignored
+			_ = e.checkPartialFetchError(err, parent, "table resolver ignored error")
+			return
 		}
 		resolverErr = err
 	}()
