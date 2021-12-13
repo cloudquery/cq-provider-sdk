@@ -44,7 +44,7 @@ type ExecutionData struct {
 	extraFields map[string]interface{}
 	// partialFetch if true allows partial fetching of resources
 	partialFetch bool
-	// PartialFetchFailureResult is a map of resources where the fetch process failed
+	// PartialFetchFailureResult is a an array of resources where the fetch process failed
 	PartialFetchFailureResult []ResourceFetchError
 	// partialFetchChan is the channel that is used to send failed resource fetches
 	partialFetchChan chan ResourceFetchError
@@ -220,9 +220,6 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	// check if channel iteration stopped because of resolver failure
 	if resolverErr != nil {
 		client.Logger().Error("received resolve resources error", "table", e.Table.Name, "error", resolverErr)
-		if strings.Contains(resolverErr.Error(), ": socket: too many open files") {
-			return 0, diag.FromError(resolverErr, diag.WARNING, diag.THROTTLE, e.ResourceName, resolverErr.Error(), "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters")
-		}
 		return 0, e.checkPartialFetchError(resolverErr, nil, "table resolve error")
 	}
 	// Print only parent resources
@@ -427,6 +424,9 @@ func (e *ExecutionData) checkPartialFetchError(err error, res *Resource, customM
 			partialFetchFailure.RootTableName = root.table.Name
 			partialFetchFailure.RootPrimaryKeyValues = root.Keys()
 		}
+	}
+	if strings.Contains(err.Error(), ": socket: too many open files") {
+		partialFetchFailure.Err = diag.FromError(err, diag.WARNING, diag.THROTTLE, e.ResourceName, err.Error(), "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters")
 	}
 	// Send information via our channel
 	e.partialFetchChan <- partialFetchFailure
