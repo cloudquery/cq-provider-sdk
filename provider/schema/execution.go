@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 	"github.com/modern-go/reflect2"
 
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
@@ -196,21 +197,11 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 			close(res)
 		}()
 		err := e.Table.Resolver(ctx, client, parent, res)
-		if err != nil {
-			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
-				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-				// add partial fetch error, this will be passed in diagnostics, although it was ignored
-				_ = e.checkPartialFetchError(err, parent, "table resolver ignored error")
-				return
-			}
-
-			// Not sure if this should be before we check for an IgnoredError as it is a unique error that we know about locally
-			if strings.Contains(err.Error(), ": socket: too many open files") {
-				client.Logger().Warn("try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters")
-				_ = e.checkPartialFetchError(err, parent, "table resolver ignored error")
-				return
-
-			}
+		if err != nil && e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
+			client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
+			// add partial fetch error, this will be passed in diagnostics, although it was ignored
+			_ = e.checkPartialFetchError(err, parent, "table resolver ignored error")
+			return
 		}
 		resolverErr = err
 	}()
@@ -229,6 +220,9 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	// check if channel iteration stopped because of resolver failure
 	if resolverErr != nil {
 		client.Logger().Error("received resolve resources error", "table", e.Table.Name, "error", resolverErr)
+		if strings.Contains(resolverErr.Error(), ": socket: too many open files") {
+			return 0, diag.FromError(resolverErr, diag.WARNING, diag.THROTTLE, e.ResourceName, resolverErr.Error(), "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters")
+		}
 		return 0, e.checkPartialFetchError(resolverErr, nil, "table resolve error")
 	}
 	// Print only parent resources

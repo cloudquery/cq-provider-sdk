@@ -5,7 +5,6 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -261,10 +260,6 @@ func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec sc
 			continue
 		}
 
-		if strings.Contains(e.Error(), ": socket: too many open files") {
-			diagnostics = append(diagnostics, diag.FromError(e.Err, diag.WARNING, diag.THROTTLE, exec.ResourceName, e.Error(), "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"))
-			continue
-		}
 		// if error wasn't classified by provider mark it as error
 		diagnostics = append(diagnostics, diag.FromError(e.Err, diag.ERROR, diag.RESOLVING, exec.ResourceName, e.Error(), ""))
 	}
