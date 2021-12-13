@@ -71,6 +71,8 @@ func (p ResourceFetchError) Error() string {
 // partialFetchFailureBufferLength defines the buffer length for the partialFetchChan.
 const partialFetchFailureBufferLength = 10
 
+const fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
+
 // NewExecutionData Create a new execution data
 func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDelete bool, extraFields map[string]interface{}, partialFetch bool) ExecutionData {
 	return ExecutionData{
@@ -199,7 +201,7 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 		err := e.Table.Resolver(ctx, client, parent, res)
 		if err != nil {
 			if strings.Contains(err.Error(), ": socket: too many open files") {
-				client.Logger().Warn("OS error during %s fetch. try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters", e.Table.Name)
+				client.Logger().Warn("OS error during %s fetch. %s ", e.Table.Name, fdLimitMessage)
 			}
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
 				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
@@ -431,7 +433,8 @@ func (e *ExecutionData) checkPartialFetchError(err error, res *Resource, customM
 		}
 	}
 	if strings.Contains(err.Error(), ": socket: too many open files") {
-		partialFetchFailure.Err = diag.FromError(err, diag.WARNING, diag.THROTTLE, e.ResourceName, err.Error(), "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters")
+		// Return a Diagnostic error so that it can be properly propegated back to the user via the CLI
+		partialFetchFailure.Err = diag.FromError(err, diag.WARNING, diag.THROTTLE, e.ResourceName, err.Error(), fdLimitMessage)
 	}
 	// Send information via our channel
 	e.partialFetchChan <- partialFetchFailure
