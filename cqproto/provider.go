@@ -3,6 +3,7 @@ package cqproto
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
@@ -182,3 +183,9 @@ func (p ProviderDiagnostic) Description() diag.Description {
 		Detail:   p.Details,
 	}
 }
+
+func (p ProviderDiagnostic) Error() string {
+	return fmt.Sprintf("%s: %s: %s", p.ResourceName, p.Summary, p.Details)
+}
+
+var _ diag.Diagnostic = (*ProviderDiagnostic)(nil)
