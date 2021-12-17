@@ -560,6 +560,11 @@ type mockedClientMeta struct {
 	mock.Mock
 }
 
+// GetMetadata returns client metadata:
+func (_m *mockedClientMeta) GetMetadata() interface{} {
+	return "test"
+}
+
 // Logger provides a mock function with given fields:
 func (_m *mockedClientMeta) Logger() hclog.Logger {
 	ret := _m.Called()

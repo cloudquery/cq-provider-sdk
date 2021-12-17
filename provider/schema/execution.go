@@ -26,6 +26,8 @@ const executionJitter = -1 * time.Minute
 
 type ClientMeta interface {
 	Logger() hclog.Logger
+	// GetMetadata returns a useful non sensetiver invorimation about client. is used in fetch summary
+	GetMetadata() interface{}
 }
 
 // ExecutionData marks all the related execution info passed to TableResolver and ColumnResolver giving access to the Runner's meta

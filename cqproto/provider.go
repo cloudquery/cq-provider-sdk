@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 )
@@ -91,6 +93,8 @@ type FetchResourcesRequest struct {
 	PartialFetchingEnabled bool
 	// ParallelFetchingLimit limits parallel resources fetch at a time is more than 0
 	ParallelFetchingLimit uint64
+	// FetchId unique id of fetch. It is used to aggregate all fetches from different providers
+	FetchId uuid.UUID
 }
 
 // FetchResourcesStream represents a CloudQuery RPC stream of fetch updates from the provider
@@ -121,6 +125,21 @@ type FetchResourcesResponse struct {
 // ResourceFetchStatus defines execution status of the resource fetch execution
 type ResourceFetchStatus int
 
+func (e ResourceFetchStatus) String() string {
+	switch e {
+	case ResourceFetchComplete:
+		return "complete"
+	case ResourceFetchFailed:
+		return "failed"
+	case ResourceFetchPartial:
+		return "partial"
+	case ResourceFetchCanceled:
+		return "canceled"
+	default:
+		return fmt.Sprintf("%d", int(e))
+	}
+}
+
 const (
 	// ResourceFetchComplete execution was completed successfully without any errors/diagnostics
 	ResourceFetchComplete ResourceFetchStatus = iota
@@ -146,13 +165,13 @@ type ResourceFetchSummary struct {
 
 type FailedResourceFetch struct {
 	// table name of the failed resource fetch
-	TableName string
+	TableName string `json:"table_name"`
 	// root/parent table name
-	RootTableName string
+	RootTableName string `json:"root_table_name"`
 	// root/parent primary key values
-	RootPrimaryKeyValues []string
+	RootPrimaryKeyValues []string `json:"root_primary_key_values"`
 	// error message for this resource fetch failure
-	Error string
+	Error string `json:"error"`
 }
 
 type ConnectionDetails struct {

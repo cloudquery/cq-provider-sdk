@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 
@@ -138,6 +141,13 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 }
 
 func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchResourcesRequest, sender cqproto.FetchResourcesSender) error {
+	fs := FetchSummary{
+		FetchId:         request.FetchId,
+		ProviderName:    p.Name,
+		ProviderVersion: p.Version,
+		ProviderMeta:    p.meta.GetMetadata(),
+		Start:           time.Now().UTC(),
+	}
 	if p.meta == nil {
 		return fmt.Errorf("provider client is not configured, call ConfigureProvider first")
 	}
@@ -159,7 +169,20 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 
 	defer conn.Close()
 
-	// limiter used to limit the amount of resources fetched concurently
+	var totalResourceCount uint64 = 0
+	// init fetch summary function that stores fetch results to database
+	if request.FetchId != uuid.Nil {
+		f := NewFetchSummarizer(p.Logger, conn, p.meta)
+		defer func() {
+			fs.Finish = time.Now().UTC()
+			fs.TotalResourceCount = totalResourceCount
+			if err := f.Save(ctx, fs); err != nil {
+				p.Logger.Error("failed to store fetch summary")
+			}
+		}()
+	}
+
+	// limiter used to limit the amount of resources fetched concurrently
 	var limiter *semaphore.Weighted
 	if request.ParallelFetchingLimit > 0 {
 		limiter = semaphore.NewWeighted(int64(request.ParallelFetchingLimit))
@@ -168,7 +191,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	g, gctx := errgroup.WithContext(ctx)
 	finishedResources := make(map[string]bool, len(resources))
 	l := sync.Mutex{}
-	var totalResourceCount uint64 = 0
 	for _, resource := range resources {
 		table, ok := p.ResourceMap[resource]
 		if !ok {
@@ -193,29 +215,12 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 			finishedResources[r] = true
 			atomic.AddUint64(&totalResourceCount, resourceCount)
 			defer l.Unlock()
-			if err != nil {
-				status := cqproto.ResourceFetchFailed
-				if err == context.Canceled {
-					status = cqproto.ResourceFetchCanceled
-				}
-				return sender.Send(&cqproto.FetchResourcesResponse{
-					ResourceName:                r,
-					FinishedResources:           finishedResources,
-					ResourceCount:               resourceCount,
-					Error:                       err.Error(),
-					PartialFetchFailedResources: cqproto.PartialFetchToCQProto(execData.PartialFetchFailureResult),
-					Summary: cqproto.ResourceFetchSummary{
-						Status:        status,
-						ResourceCount: resourceCount,
-						Diagnostics:   p.collectExecutionDiagnostics(p.meta, execData),
-					},
-				})
-			}
+
 			status := cqproto.ResourceFetchComplete
 			if len(execData.PartialFetchFailureResult) > 0 {
 				status = cqproto.ResourceFetchPartial
 			}
-			err = sender.Send(&cqproto.FetchResourcesResponse{
+			fetchResponse := cqproto.FetchResourcesResponse{
 				ResourceName:                r,
 				FinishedResources:           finishedResources,
 				ResourceCount:               resourceCount,
@@ -226,7 +231,31 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 					ResourceCount: resourceCount,
 					Diagnostics:   p.collectExecutionDiagnostics(p.meta, execData),
 				},
+			}
+			if err != nil {
+				status = cqproto.ResourceFetchFailed
+				if err == context.Canceled {
+					status = cqproto.ResourceFetchCanceled
+				}
+				fetchResponse.Error = err.Error()
+				fetchResponse.Summary.Status = status
+			}
+
+			fs.FetchedResources = append(fs.FetchedResources, ResourceSummary{
+				ResourceName:                fetchResponse.ResourceName,
+				FinishedResources:           fetchResponse.FinishedResources,
+				Status:                      fetchResponse.Summary.Status.String(),
+				Error:                       fetchResponse.Error,
+				PartialFetchFailedResources: fetchResponse.PartialFetchFailedResources,
+				ResourceCount:               fetchResponse.ResourceCount,
+				Diagnostics:                 fetchResponse.Summary.Diagnostics,
 			})
+
+			if err != nil {
+				return sender.Send(&fetchResponse)
+			}
+
+			err = sender.Send(&fetchResponse)
 			if err != nil {
 				return err
 			}

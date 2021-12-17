@@ -31,6 +31,11 @@ func (t testConfig) Example() string {
 	return ""
 }
 
+// GetMetadata returns client metadata:
+func (t testClient) GetMetadata() interface{} {
+	return "test"
+}
+
 func (t testClient) Logger() hclog.Logger {
 	return hclog.Default()
 }
