@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-* Added new test for table and column name limits
+* Added new test for table and column name limits [#133](https://github.com/cloudquery/cq-provider-sdk/pull/133)
 
 ## [v0.5.5] - 2021-12-15
 
