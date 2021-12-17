@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/huandu/go-sqlbuilder"
+
+	"github.com/google/uuid"
+
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/mocks"
 	"github.com/golang/mock/gomock"
 
@@ -412,4 +416,44 @@ func TestProvider_FetchResourcesParallelLimit(t *testing.T) {
 	assert.Nil(t, err)
 	length = time.Since(start)
 	assert.Greater(t, length, 2500*time.Millisecond)
+}
+
+func TestProvider_FetchResourcesSaveFetchSummary(t *testing.T) {
+	parallelCheckProvider.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, error) {
+		return testClient{}, nil
+	}
+	parallelCheckProvider.Logger = hclog.Default()
+	resp, err := parallelCheckProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
+		CloudQueryVersion: "dev",
+		Connection: cqproto.ConnectionDetails{
+			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
+		},
+		Config:        nil,
+		DisableDelete: true,
+		ExtraFields:   nil,
+	})
+	assert.Equal(t, "", resp.Error)
+	assert.Nil(t, err)
+
+	id, err := uuid.NewUUID()
+	assert.Nil(t, err)
+	err = parallelCheckProvider.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{Resources: []string{"*"}, FetchId: id}, &testResourceSender{})
+	assert.Nil(t, err)
+	conn, err := parallelCheckProvider.databaseCreator(context.Background(), parallelCheckProvider.Logger, parallelCheckProvider.dbURL)
+	assert.Nil(t, err)
+	defer conn.Close()
+
+	sb := sqlbuilder.NewSelectBuilder()
+	sb.Select("*").From(cqFetches().Name).Where(sb.Equal("fetch_id", id))
+
+	sql, args := sb.BuildWithFlavor(sqlbuilder.PostgreSQL)
+	rows, err := conn.Query(context.Background(), sql, args...)
+	assert.Nil(t, err)
+	count := 0
+	for rows.Next() {
+		count += 1
+	}
+	if count < 1 {
+		t.Fatalf("expected to have at least 1 entry at table %s got %d", "cq_fetches", count)
+	}
 }

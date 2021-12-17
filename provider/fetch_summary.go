@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 	"github.com/google/uuid"
-	"github.com/hashicorp/go-hclog"
 	"github.com/huandu/go-sqlbuilder"
 )
 
@@ -28,6 +28,7 @@ type FetchSummary struct {
 	FetchedResources   []ResourceSummary
 }
 
+// ResourceSummary includes a data about fetching specific resource
 type ResourceSummary struct {
 	ResourceName string `json:"resource_name"`
 	// map of resources that have finished fetching
@@ -46,21 +47,14 @@ type ResourceSummary struct {
 	Diagnostics diag.Diagnostics `json:"diagnostics"`
 }
 
-type FetchSummarizer struct {
-	log  hclog.Logger
-	conn schema.Database
-	meta schema.ClientMeta
-}
-
-func NewFetchSummarizer(log hclog.Logger, conn schema.Database, meta schema.ClientMeta) FetchSummarizer {
-	return FetchSummarizer{
-		log:  log,
-		conn: conn,
-		meta: meta,
+func (p *Provider) SaveFetchSummary(ctx context.Context, fs FetchSummary) error {
+	conn, err := p.databaseCreator(ctx, p.Logger, p.dbURL)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database. %w", err)
 	}
-}
 
-func (f *FetchSummarizer) Save(ctx context.Context, fs FetchSummary) error {
+	defer conn.Close()
+
 	table := cqFetches()
 	// todo replace code below with upgraded table creator that uses schema.Database
 	ctb := sqlbuilder.CreateTable(table.Name).IfNotExists()
@@ -80,14 +74,14 @@ func (f *FetchSummarizer) Save(ctx context.Context, fs FetchSummary) error {
 	}
 	sql, _ := ctb.BuildWithFlavor(sqlbuilder.PostgreSQL)
 
-	f.log.Debug("creating table if not exists", "table", table.Name)
+	p.Logger.Debug("creating table if not exists", "table", table.Name)
 
-	if err := f.conn.Exec(ctx, sql); err != nil {
+	if err := conn.Exec(ctx, sql); err != nil {
 		return err
 	}
 
-	execData := schema.NewExecutionData(f.conn, f.log, table, false, nil, false)
-	if _, err := execData.ResolveTable(ctx, f.meta, &schema.Resource{Item: fs}); err != nil {
+	execData := schema.NewExecutionData(conn, p.Logger, table, false, nil, false)
+	if _, err := execData.ResolveTable(ctx, p.meta, &schema.Resource{Item: fs}); err != nil {
 		return err
 	}
 	return nil

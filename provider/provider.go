@@ -172,11 +172,10 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	var totalResourceCount uint64 = 0
 	// init fetch summary function that stores fetch results to database
 	if request.FetchId != uuid.Nil {
-		f := NewFetchSummarizer(p.Logger, conn, p.meta)
 		defer func() {
 			fs.Finish = time.Now().UTC()
 			fs.TotalResourceCount = totalResourceCount
-			if err := f.Save(ctx, fs); err != nil {
+			if err := p.SaveFetchSummary(ctx, fs); err != nil {
 				p.Logger.Error("failed to store fetch summary")
 			}
 		}()
@@ -198,7 +197,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		}
 		execData := schema.NewExecutionData(conn, p.Logger, table, p.disableDelete, p.extraFields, request.PartialFetchingEnabled)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
-		// Save resource aside
+		// SaveFetchSummary resource aside
 		r := resource
 		l.Lock()
 		finishedResources[r] = false
