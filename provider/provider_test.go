@@ -223,6 +223,57 @@ var (
 			},
 		},
 	}
+
+	fetchSummaryCheck = Provider{
+		Name: "fetch_summary",
+		Config: func() Config {
+			return &testConfig{}
+		},
+		ResourceMap: map[string]*schema.Table{
+			"test": {
+				Name:     "test_resource",
+				Resolver: testResolverFunc,
+				Columns: []schema.Column{
+					{
+						Name: "id",
+						Type: schema.TypeBigInt,
+					},
+					{
+						Name: "name",
+						Type: schema.TypeString,
+					},
+				},
+			},
+			"test1": {
+				Name:     "test1_resource",
+				Resolver: testResolverFunc,
+				Columns: []schema.Column{
+					{
+						Name: "id",
+						Type: schema.TypeBigInt,
+					},
+					{
+						Name: "name",
+						Type: schema.TypeString,
+					},
+				},
+			},
+			"test2": {
+				Name:     "test2_resource",
+				Resolver: testResolverFunc,
+				Columns: []schema.Column{
+					{
+						Name: "id",
+						Type: schema.TypeBigInt,
+					},
+					{
+						Name: "name",
+						Type: schema.TypeString,
+					},
+				},
+			},
+		},
+	}
 )
 
 func TestProviderInterpolate(t *testing.T) {
@@ -419,11 +470,11 @@ func TestProvider_FetchResourcesParallelLimit(t *testing.T) {
 }
 
 func TestProvider_FetchResourcesSaveFetchSummary(t *testing.T) {
-	parallelCheckProvider.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, error) {
+	fetchSummaryCheck.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, error) {
 		return testClient{}, nil
 	}
-	parallelCheckProvider.Logger = hclog.Default()
-	resp, err := parallelCheckProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
+	fetchSummaryCheck.Logger = hclog.Default()
+	resp, err := fetchSummaryCheck.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
 		CloudQueryVersion: "dev",
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
