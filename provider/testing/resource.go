@@ -66,6 +66,10 @@ func TestResource(t *testing.T, providerCreator func() *provider.Provider, resou
 	require.Nil(t, err)
 
 	testProvider := providerCreator()
+
+	// No need for configuration or db connection, get it out of the way first
+	testTableIdentifiersForProvider(t, testProvider)
+
 	testProvider.Logger = l
 	testProvider.Configure = resource.Configure
 	_, err = testProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
@@ -166,4 +170,33 @@ func getTablesFromMainTable(table *schema.Table) []string {
 		res = append(res, getTablesFromMainTable(t)...)
 	}
 	return res
+}
+
+func testTableIdentifiersForProvider(t *testing.T, prov *provider.Provider) {
+	t.Parallel()
+	for _, res := range prov.ResourceMap {
+		res := res
+		t.Run(res.Name, func(t *testing.T) {
+			testTableIdentifiers(t, res)
+		})
+	}
+}
+
+func testTableIdentifiers(t *testing.T, table *schema.Table) {
+	const maxIdentifierLength = 63 // maximum allowed identifier length is 63 bytes https://www.postgresql.org/docs/13/limits.html
+
+	assert.NotEmpty(t, table.Name)
+	assert.LessOrEqual(t, len(table.Name), maxIdentifierLength, "Table name too long")
+
+	for _, c := range table.Columns {
+		assert.NotEmpty(t, c.Name)
+		assert.LessOrEqual(t, len(c.Name), maxIdentifierLength, "Column name too long:", c.Name)
+	}
+
+	for _, res := range table.Relations {
+		res := res
+		t.Run(res.Name, func(t *testing.T) {
+			testTableIdentifiers(t, res)
+		})
+	}
 }
