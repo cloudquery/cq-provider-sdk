@@ -183,20 +183,12 @@ func testTableIdentifiersForProvider(t *testing.T, prov *provider.Provider) {
 }
 
 func testTableIdentifiers(t *testing.T, table *schema.Table) {
-	const maxIdentifierLength = 63 // maximum allowed identifier length is 63 bytes https://www.postgresql.org/docs/13/limits.html
-
-	assert.NotEmpty(t, table.Name)
-	assert.LessOrEqual(t, len(table.Name), maxIdentifierLength, "Table name too long")
-
-	for _, c := range table.Columns {
-		assert.NotEmpty(t, c.Name)
-		assert.LessOrEqual(t, len(c.Name), maxIdentifierLength, "Column name too long:", c.Name)
-	}
+	assert.NoError(t, schema.ValidateTable(table))
 
 	for _, res := range table.Relations {
 		res := res
 		t.Run(res.Name, func(t *testing.T) {
-			testTableIdentifiers(t, res)
+			assert.NoError(t, schema.ValidateTable(res))
 		})
 	}
 }
