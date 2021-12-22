@@ -40,6 +40,8 @@ func TestResource(t *testing.T, providerCreator func() *provider.Provider, resou
 	}
 	ctx := context.Background()
 
+	verifyColumnNameLength(t, resource.Table)
+
 	pool, err := setupDatabase()
 	if err != nil {
 		t.Fatal(err)
@@ -124,6 +126,18 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func verifyColumnNameLength(t *testing.T, table *schema.Table) {
+	for _, c := range table.Columns {
+		if len(c.Name) > 63 {
+			t.Fatalf("column %s of table %s is longer than 63", c.Name, table.Name)
+		}
+	}
+
+	for _, r := range table.Relations {
+		verifyColumnNameLength(t, r)
+	}
 }
 
 func verifyNoEmptyColumns(t *testing.T, tc ResourceTestData, conn pgxscan.Querier) {
