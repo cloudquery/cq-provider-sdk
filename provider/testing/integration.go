@@ -30,11 +30,6 @@ import (
 	"github.com/tmccombs/hcl2json/convert"
 )
 
-const (
-	tfDir         = "./.test/"
-	infraFilesDir = "./infra/"
-)
-
 var (
 	// Make a Regex to say we only want letters and numbers
 	tfVarRegex = regexp.MustCompile("[^a-zA-Z0-9]+")
@@ -48,7 +43,7 @@ type ResourceIntegrationTestData struct {
 	Suffix              string
 	Prefix              string
 	VerificationBuilder func(res *ResourceIntegrationTestData) ResourceIntegrationVerification
-	workdir             string
+	Workdir             string
 }
 
 // ResourceIntegrationVerification - a set of verification rules to query and check test related data
@@ -156,20 +151,6 @@ func IntegrationTest(t *testing.T, providerCreator func() *provider.Provider, re
 // setup - puts *.tf files into isolated test dir and creates the instance of terraform
 func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
 	var err error
-	if resource.Resources != nil {
-		resource.workdir, err = copyTfFiles(resource.Table.Name, resource.Resources...)
-	} else {
-		resource.workdir, err = copyTfFiles(resource.Table.Name, fmt.Sprintf("%s.tf", resource.Table.Name))
-	}
-
-	if err != nil {
-		// remove workdir
-		if e := os.RemoveAll(resource.workdir); e != nil {
-			return nil, fmt.Errorf("failed to RemoveAll after: %w\n reason:%s", err, e)
-		}
-		return nil, err
-	}
-
 	lookPath := getEnv("TF_EXEC_PATH", "")
 	if lookPath == "" {
 		lookPath = "terraform"
@@ -178,11 +159,11 @@ func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
 	if err != nil {
 		return nil, err
 	}
-	tf, err := tfexec.NewTerraform(resource.workdir, execPath)
+	tf, err := tfexec.NewTerraform(resource.Workdir, execPath)
 	if err != nil {
 		return nil, err
 	}
-	if err = enableTerraformLog(tf, resource.workdir); err != nil {
+	if err = enableTerraformLog(tf, resource.Workdir); err != nil {
 		return nil, err
 	}
 	return tf, nil
@@ -190,22 +171,36 @@ func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
 
 // deploy - uses terraform to deploy resources and builds teardown function. deployment timeout can be set via TF_EXEC_TIMEOUT env variable
 func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func() error, error) {
-	testSuffix := fmt.Sprintf("test_suffix=%s", resource.Suffix)
-	testPrefix := fmt.Sprintf("test_prefix=%s", resource.Prefix)
+
+	var tfDestoryOptions []tfexec.DestroyOption
+	var tfApplyOptions []tfexec.ApplyOption
+	tfDestoryOptions = append(tfDestoryOptions, tfexec.Var("test_suffix="+resource.Suffix))
+	tfDestoryOptions = append(tfDestoryOptions, tfexec.Var("test_prefix="+resource.Prefix))
+	tfApplyOptions = append(tfApplyOptions, tfexec.Var("test_suffix="+resource.Suffix))
+	tfApplyOptions = append(tfApplyOptions, tfexec.Var("test_prefix="+resource.Prefix))
+
+	for _, f := range resource.Resources {
+		tfDestoryOptions = append(tfDestoryOptions, tfexec.Target("target="+f))
+		tfApplyOptions = append(tfApplyOptions, tfexec.Target("target="+f))
+	}
 
 	teardown := func() error {
-		log.Printf("%s destroy\n", resource.Table.Name)
-		err := tf.Destroy(context.Background(), tfexec.Var(testPrefix),
-			tfexec.Var(testSuffix))
-		if err != nil {
-			return err
+		if len(resource.Resources) == 0 {
+			// we have nothing to destroy so we can just skip
+			return nil
 		}
-		log.Printf("%s cleanup\n", resource.Table.Name)
-		if err := os.RemoveAll(resource.workdir); err != nil {
+		log.Printf("%s destroy\n", resource.Table.Name)
+		err := tf.Destroy(context.Background(), tfDestoryOptions...)
+		if err != nil {
 			return err
 		}
 		log.Printf("%s done\n", resource.Table.Name)
 		return nil
+	}
+
+	if len(resource.Resources) == 0 {
+		// we have nothing to deploy so we can just skip
+		return teardown, nil
 	}
 
 	ctx := context.Background()
@@ -214,8 +209,9 @@ func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func()
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(i)*time.Minute)
 		defer cancel()
 	}
-
+	log.Println("hello")
 	log.Printf("%s tf init\n", resource.Table.Name)
+	log.Printf("%v\n", tfApplyOptions)
 	if err := tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
 		return teardown, err
 	}
@@ -236,7 +232,7 @@ func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func()
 	}()
 
 	log.Printf("%s tf apply -var test_prefix=%s -var test_suffix=%s\n", resource.Table.Name, resource.Prefix, resource.Suffix)
-	err := tf.Apply(ctx, tfexec.Var(testPrefix), tfexec.Var(testSuffix))
+	err := tf.Apply(ctx, tfApplyOptions...)
 	applyDone <- true
 	if err != nil {
 		return teardown, err
@@ -445,39 +441,4 @@ func compareData(verification, row map[string]interface{}) error {
 // simplifyString - prepares the string to be used in resources names
 func simplifyString(in string) string {
 	return strings.ToLower(tfVarRegex.ReplaceAllString(in, ""))
-}
-
-// copyTfFiles - copies tf files that are related to current test
-func copyTfFiles(testName string, tfTestFiles ...string) (string, error) {
-	workdir := filepath.Join(tfDir, testName)
-	if _, err := os.Stat(workdir); os.IsNotExist(err) {
-		if err := os.MkdirAll(workdir, os.ModePerm); err != nil {
-			return workdir, err
-		}
-	} else if err != nil {
-		return "", err
-	}
-
-	files := make(map[string]string)
-	for _, tftf := range tfTestFiles {
-		files[filepath.Join(infraFilesDir, tftf)] = filepath.Join(workdir, tftf)
-	}
-	files[filepath.Join(infraFilesDir, "terraform.tf")] = filepath.Join(workdir, "terraform.tf")
-	files[filepath.Join(infraFilesDir, "provider.tf")] = filepath.Join(workdir, "provider.tf")
-	files[filepath.Join(infraFilesDir, "variables.tf")] = filepath.Join(workdir, "variables.tf")
-
-	for src, dst := range files {
-		if _, err := os.Stat(src); err != nil {
-			return "", err
-		}
-
-		in, err := os.ReadFile(src)
-		if err != nil {
-			return "", err
-		}
-		if err := os.WriteFile(dst, in, 0644); err != nil {
-			return "", err
-		}
-	}
-	return workdir, nil
 }
