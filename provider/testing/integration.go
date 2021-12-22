@@ -208,9 +208,8 @@ func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func()
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(i)*time.Minute)
 		defer cancel()
 	}
-	log.Println("hello")
+
 	log.Printf("%s tf init\n", resource.Table.Name)
-	log.Printf("%v\n", tfApplyOptions)
 	if err := tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
 		return teardown, err
 	}
