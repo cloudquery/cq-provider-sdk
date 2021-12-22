@@ -171,12 +171,14 @@ func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
 
 // deploy - uses terraform to deploy resources and builds teardown function. deployment timeout can be set via TF_EXEC_TIMEOUT env variable
 func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func() error, error) {
+	tfVars := []*tfexec.VarOption{
+		tfexec.Var("test_suffix=" + resource.Suffix),
+		tfexec.Var("test_prefix=" + resource.Prefix),
+	}
 	tfDestoryOptions := make([]tfexec.DestroyOption, 0, len(resource.Resources)+2)
 	tfApplyOptions := make([]tfexec.ApplyOption, 0, len(resource.Resources)+2)
-	tfDestoryOptions = append(tfDestoryOptions, tfexec.Var("test_suffix="+resource.Suffix))
-	tfDestoryOptions = append(tfDestoryOptions, tfexec.Var("test_prefix="+resource.Prefix))
-	tfApplyOptions = append(tfApplyOptions, tfexec.Var("test_suffix="+resource.Suffix))
-	tfApplyOptions = append(tfApplyOptions, tfexec.Var("test_prefix="+resource.Prefix))
+	tfDestoryOptions = append(tfDestoryOptions, tfVars[0], tfVars[1])
+	tfApplyOptions = append(tfApplyOptions, tfVars[0], tfVars[1])
 
 	for _, f := range resource.Resources {
 		tfDestoryOptions = append(tfDestoryOptions, tfexec.Target("target="+f))
@@ -303,6 +305,7 @@ func enableTerraformLog(tf *tfexec.Terraform, workdir string) error {
 	if err = tf.SetLogPath(dst); err != nil {
 		return err
 	}
+
 	tf.SetLogger(log.Default())
 	return nil
 }
