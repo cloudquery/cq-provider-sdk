@@ -171,9 +171,8 @@ func setup(resource *ResourceIntegrationTestData) (*tfexec.Terraform, error) {
 
 // deploy - uses terraform to deploy resources and builds teardown function. deployment timeout can be set via TF_EXEC_TIMEOUT env variable
 func deploy(tf *tfexec.Terraform, resource *ResourceIntegrationTestData) (func() error, error) {
-
-	var tfDestoryOptions []tfexec.DestroyOption
-	var tfApplyOptions []tfexec.ApplyOption
+	tfDestoryOptions := make([]tfexec.DestroyOption, 0, len(resource.Resources)+2)
+	tfApplyOptions := make([]tfexec.ApplyOption, 0, len(resource.Resources)+2)
 	tfDestoryOptions = append(tfDestoryOptions, tfexec.Var("test_suffix="+resource.Suffix))
 	tfDestoryOptions = append(tfDestoryOptions, tfexec.Var("test_prefix="+resource.Prefix))
 	tfApplyOptions = append(tfApplyOptions, tfexec.Var("test_suffix="+resource.Suffix))
