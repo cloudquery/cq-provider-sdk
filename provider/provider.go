@@ -116,7 +116,7 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	// if we received an empty config we notify in log and only use defaults.
 	if len(request.Config) == 0 {
 		p.Logger.Info("Received empty configuration, using only defaults")
-	} else if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
+	} else if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
 		p.Logger.Error("Failed to load configuration.", "error", err)
 		return &cqproto.ConfigureProviderResponse{}, err
 	}

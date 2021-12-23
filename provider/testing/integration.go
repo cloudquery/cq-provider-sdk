@@ -2,7 +2,6 @@ package testing
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -24,10 +23,7 @@ import (
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/go-test/deep"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/hcl/v2/gohcl"
-	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/hashicorp/terraform-exec/tfexec"
-	"github.com/tmccombs/hcl2json/convert"
 )
 
 var (
@@ -37,7 +33,7 @@ var (
 
 type ResourceIntegrationTestData struct {
 	Table               *schema.Table
-	Config              interface{}
+	Config              string
 	Resources           []string
 	Configure           func(logger hclog.Logger, data interface{}) (schema.ClientMeta, error)
 	Suffix              string
@@ -247,26 +243,17 @@ func fetch(providerCreator func() *provider.Provider, resource *ResourceIntegrat
 	testProvider := providerCreator()
 	testProvider.Logger = logging.New(hclog.DefaultOptions)
 
+	// remove this encode/decode/encode/decode code which is very hard to understand
+	// and as far as I understand is unnecessary. Also, this will be better integration
+	// tests as we will test configuration as the user is passing it
 	// generate a config for provider
-	f := hclwrite.NewFile()
-	f.Body().AppendBlock(gohcl.EncodeAsBlock(resource.Config, "configuration"))
-	data, err := convert.Bytes(f.Bytes(), "config.json", convert.Options{})
-	if err != nil {
-		return err
-	}
-	c := map[string]interface{}{}
-	_ = json.Unmarshal(data, &c)
-	data, err = json.Marshal(c["configuration"].([]interface{})[0])
-	if err != nil {
-		return err
-	}
 
 	testProvider.Configure = resource.Configure
-	if _, err = testProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
+	if _, err := testProvider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
 		CloudQueryVersion: "",
 		Connection: cqproto.ConnectionDetails{DSN: getEnv("DATABASE_URL",
 			"host=localhost user=postgres password=pass DB.name=postgres port=5432")},
-		Config:        data,
+		Config:        []byte(resource.Config),
 		DisableDelete: true,
 	}); err != nil {
 		return err
@@ -276,7 +263,7 @@ func fetch(providerCreator func() *provider.Provider, resource *ResourceIntegrat
 		Errors: []string{},
 	}
 
-	if err = testProvider.FetchResources(context.Background(),
+	if err := testProvider.FetchResources(context.Background(),
 		&cqproto.FetchResourcesRequest{
 			Resources: []string{findResourceFromTableName(resource.Table, testProvider.ResourceMap)},
 		},
