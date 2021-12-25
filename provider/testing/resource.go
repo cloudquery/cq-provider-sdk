@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -106,19 +107,28 @@ func (f *fakeResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 	return nil
 }
 
+var (
+	dbConnOnce sync.Once
+	pool       *pgxpool.Pool
+	dbErr      error
+)
+
 func setupDatabase() (*pgxpool.Pool, error) {
-	dbCfg, err := pgxpool.ParseConfig(getEnv("DATABASE_URL",
-		"host=localhost user=postgres password=pass DB.name=postgres port=5432"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config. %w", err)
-	}
-	ctx := context.Background()
-	dbCfg.MaxConns = 1
-	dbCfg.LazyConnect = true
-	pool, err := pgxpool.ConnectConfig(ctx, dbCfg)
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to database. %w", err)
-	}
+	dbConnOnce.Do(func() {
+		var dbCfg *pgxpool.Config
+		dbCfg, dbErr = pgxpool.ParseConfig(getEnv("DATABASE_URL", "host=localhost user=postgres password=pass DB.name=postgres port=5432"))
+		if dbErr != nil {
+			return
+		}
+		ctx := context.Background()
+		dbCfg.MaxConns = 15
+		dbCfg.LazyConnect = true
+		pool, dbErr = pgxpool.ConnectConfig(ctx, dbCfg)
+		if dbErr != nil {
+			return
+		}
+		return
+	})
 	return pool, nil
 
 }
