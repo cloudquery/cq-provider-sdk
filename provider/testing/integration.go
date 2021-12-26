@@ -158,8 +158,11 @@ func verifyTable(t *testing.T, conn *pgxpool.Conn, table *schema.Table, resource
 	}
 
 	snapshotPath := path.Join(resource.SnapshotsDir, table.Name+".snapshot")
-	os.MkdirAll(resource.SnapshotsDir, os.ModePerm)
+	if err := os.MkdirAll(resource.SnapshotsDir, os.ModePerm); err != nil {
+		return false, err
+	}
 
+	// nolint
 	if _, err := os.Stat(snapshotPath); err == nil {
 		// snapshot already exist check if content is equal, if not fail
 		snapshotContent, err := os.ReadFile(snapshotPath)
@@ -167,7 +170,9 @@ func verifyTable(t *testing.T, conn *pgxpool.Conn, table *schema.Table, resource
 			return false, err
 		}
 		var savedData []map[string]interface{}
-		json.Unmarshal(snapshotContent, &savedData)
+		if err := json.Unmarshal(snapshotContent, &savedData); err != nil {
+			return false, err
+		}
 
 		diff := cmp.Diff(data, savedData)
 		if diff != "" {
@@ -209,7 +214,7 @@ func removeColumns(res []map[string]interface{}, ignoreColumns []string) {
 		ignoreColumnsMap[c] = true
 	}
 
-	for i, _ := range res {
+	for i := range res {
 		for c := range res[i] {
 			if ignoreColumnsMap[c] {
 				res[i][c] = "[unstable_column]"

@@ -124,12 +124,8 @@ func setupDatabase() (*pgxpool.Pool, error) {
 		dbCfg.MaxConns = 15
 		dbCfg.LazyConnect = true
 		pool, dbErr = pgxpool.ConnectConfig(ctx, dbCfg)
-		if dbErr != nil {
-			return
-		}
-		return
 	})
-	return pool, nil
+	return pool, dbErr
 
 }
 
