@@ -348,26 +348,28 @@ func getTablesFromMainTable(table *schema.Table) []string {
 	return res
 }
 
-func testTableIdentifiersForProvider(t *testing.T, prov *provider.Provider) {
-	t.Run("testTableIdentifiersForProvider", func(t *testing.T) {
-		t.Parallel()
-		for _, res := range prov.ResourceMap {
-			res := res
-			t.Run(res.Name, func(t *testing.T) {
-				testTableIdentifiers(t, res)
-			})
-		}
-	})
-}
+// This should move to linter
+// func testTableIdentifiersForProvider(t *testing.T, prov *provider.Provider) {
+// 	t.Run("testTableIdentifiersForProvider", func(t *testing.T) {
+// 		t.Parallel()
+// 		for _, res := range prov.ResourceMap {
+// 			res := res
+// 			t.Run(res.Name, func(t *testing.T) {
+// 				testTableIdentifiers(t, res)
+// 			})
+// 		}
+// 	})
+// }
 
-func testTableIdentifiers(t *testing.T, table *schema.Table) {
-	t.Parallel()
-	assert.NoError(t, schema.ValidateTable(table))
+// this should move to linter
+// func testTableIdentifiers(t *testing.T, table *schema.Table) {
+// 	t.Parallel()
+// 	assert.NoError(t, schema.ValidateTable(table))
 
-	for _, res := range table.Relations {
-		res := res
-		t.Run(res.Name, func(t *testing.T) {
-			testTableIdentifiers(t, res)
-		})
-	}
-}
+// 	for _, res := range table.Relations {
+// 		res := res
+// 		t.Run(res.Name, func(t *testing.T) {
+// 			testTableIdentifiers(t, res)
+// 		})
+// 	}
+// }
