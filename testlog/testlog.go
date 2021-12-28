@@ -24,6 +24,7 @@ func New(t testing.TB) hclog.Logger {
 }
 
 func (l *testLogger) Log(level hclog.Level, msg string, args ...interface{}) {
+	l.t.Helper()
 	switch level {
 	case hclog.NoLevel:
 		return
@@ -49,28 +50,28 @@ func (l *testLogger) Trace(msg string, args ...interface{}) {
 
 func (l *testLogger) Debug(msg string, args ...interface{}) {
 	l.t.Helper()
-	if l.level <= hclog.Debug {
+	if l.IsDebug() {
 		l.t.Log(convertMsgArgToInterface("[DEBUG] "+msg, args)...)
 	}
 }
 
 func (l *testLogger) Info(msg string, args ...interface{}) {
 	l.t.Helper()
-	if l.level <= hclog.Info {
+	if l.IsInfo() {
 		l.t.Log(convertMsgArgToInterface("[INFO] "+msg, args)...)
 	}
 }
 
 func (l *testLogger) Warn(msg string, args ...interface{}) {
 	l.t.Helper()
-	if l.level <= hclog.Warn {
+	if l.IsWarn() {
 		l.t.Log(convertMsgArgToInterface("[WARN] "+msg, args)...)
 	}
 }
 
 func (l *testLogger) Error(msg string, args ...interface{}) {
 	l.t.Helper()
-	if l.level <= hclog.Error {
+	if l.IsError() {
 		l.t.Log(convertMsgArgToInterface("[ERROR] "+msg, args)...)
 	}
 }
