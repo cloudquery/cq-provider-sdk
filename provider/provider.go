@@ -94,10 +94,10 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
 	if p.meta != nil {
-		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s was already configured", p.Name)}, nil
+		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s was already configured", p.Name)}, fmt.Errorf("provider %s was already configured", p.Name)
 	}
 	if p.Logger == nil {
-		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, nil
+		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
 	}
 	// set database creator
 	if p.databaseCreator == nil {
