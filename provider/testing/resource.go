@@ -75,10 +75,11 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 		t.Fatal(err)
 	}
 
+	if err = fetch(t, &resource); err != nil {
+		t.Fatal(err)
+	}
+
 	if resource.SnapshotsDir != "" {
-		if err = fetch(t, &resource); err != nil {
-			t.Fatal(err)
-		}
 
 		// run this if snapshot testing is enabled
 		equal, err := verifyTable(t, conn, resource.Table, resource)
