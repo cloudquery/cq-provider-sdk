@@ -43,8 +43,8 @@ type Table struct {
 	// use this only in specific cases, if you are unsure contact the CloudQuery Team.
 	AlwaysDelete bool
 	// IgnoreInTests if true this skips this column in tests as sometimes it might be hard
-	// to create a reproducible test environment with this column being non nill. For example various error tables such as
-	// security violoations and so.
+	// to create a reproducible test environment with this column being non nil. For example various error tables such as
+	// security violations and so.
 	IgnoreInTests bool
 }
 
