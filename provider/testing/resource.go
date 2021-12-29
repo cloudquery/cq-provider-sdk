@@ -25,8 +25,11 @@ type ResourceTestCase struct {
 	Provider       *provider.Provider
 	Table          *schema.Table
 	Config         string
-	SnapshotsDir   string
 	SkipEmptyJsonB bool
+	// SkipEmptyColumn will skip checking results for empty columns
+	SkipEmptyColumn bool
+	// SkipEmptyRows will skip checking that results were returned and will just check that fetch worked
+	SkipEmptyRows bool
 }
 
 // IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
@@ -129,6 +132,10 @@ func deleteTables(conn *pgxpool.Conn, table *schema.Table) error {
 
 func verifyNoEmptyColumns(t *testing.T, tc ResourceTestCase, conn pgxscan.Querier) {
 	t.Helper()
+	if tc.SkipEmptyRows {
+		t.Logf("table %s marked with SkipEmptyRows. Skipping...", tc.Table.Name)
+		return
+	}
 	// Test that we don't have missing columns and have exactly one entry for each table
 	for _, table := range getTablesFromMainTable(tc.Table) {
 		if table.IgnoreInTests {
