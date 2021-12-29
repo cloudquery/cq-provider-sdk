@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.6.0-rc1] - 2021-12-29
+### :gear: Changed
+* **Breaking Change**: changed column attribute `IgnoreInTests` to `IgnoreInTests` API [#138](https://github.com/cloudquery/cq-provider-sdk/pull/137)
+
+### :rocket: Added
+* Added `SkipEmptyColumn` and `SkipEmptyRows` to `ResourceTestCase`
+* If test fail it will print what are the missing columns as well.
+
+## [v0.6.0-beta] - 2021-12-29
+### :gear: Changed
+* **Breaking Change**: changed `TestResource` API [#137](https://github.com/cloudquery/cq-provider-sdk/pull/137)
+
+## [v0.5.7]- 2021-12-20
+
+### :gear: Changed
+* Fix table and column name limit tests [#134](https://github.com/cloudquery/cq-provider-sdk/pull/134).
+
+## [v0.5.6] - 2021-12-18
+
+### :gear: Changed
+* SDK e2e testing terraform apply now also logs [#130](https://github.com/cloudquery/cq-provider-sdk/pull/130).
+
+### :rocket: Added
+* Added new test for table and column name limits [#133](https://github.com/cloudquery/cq-provider-sdk/pull/133).
+
+## [v0.5.5] - 2021-12-15
+
+### :gear: Changed
+* Added support for error interface for diagnostics [#128](https://github.com/cloudquery/cq-provider-sdk/pull/128).
+* Improved doc generation to remove unused files [#127](https://github.com/cloudquery/cq-provider-sdk/pull/127) fixes [#116](https://github.com/cloudquery/cq-provider-sdk/issues/116).
+* Added warning about file descriptor usage [#126](https://github.com/cloudquery/cq-provider-sdk/pull/126) fixes [cloudquery/cloudquery#285](https://github.com/cloudquery/cloudquery/issues/285).
+
 ## [v0.5.4] - 2021-12-09
 
 ### :spider: Fixed
