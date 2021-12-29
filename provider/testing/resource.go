@@ -28,12 +28,6 @@ type ResourceTestCase struct {
 	SkipEmptyJsonB bool
 }
 
-var ignoreColumns = map[string]bool{
-	"last_updated": true,
-	"cq_id":        true,
-	"meta":         true,
-}
-
 // IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
 func TestResource(t *testing.T, resource ResourceTestCase) {
 	t.Parallel()
