@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added `SkipEmptyColumn` and `SkipEmptyRows` to `ResourceTestCase`
 * If test fail it will print what are the missing columns as well.
 * Added attribute `IgnoreInTests` to column API [#138](https://github.com/cloudquery/cq-provider-sdk/pull/137)
-* `ConfigureProvider` now supports standard `hcl` byte stream
+* `ConfigureProvider` now supports standard `hcl` byte streamq
 
 ## [v0.5.7]- 2021-12-20
 
