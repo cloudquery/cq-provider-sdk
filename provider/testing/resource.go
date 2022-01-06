@@ -12,6 +12,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/provider"
+	"github.com/cloudquery/cq-provider-sdk/provider/migrations"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/testlog"
 	"github.com/cloudquery/faker/v3"
@@ -60,9 +61,15 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 	l := testlog.New(t)
 	l.SetLevel(hclog.Debug)
 	resource.Provider.Logger = l
-	tableCreator := provider.NewTableCreator(l)
-	if err := tableCreator.CreateTable(context.Background(), conn, resource.Table, nil); err != nil {
+	tableCreator := migrations.NewTableCreator(l)
+	if createTables, _, err := tableCreator.CreateTable(context.Background(), resource.Table, nil); err != nil {
 		assert.FailNow(t, fmt.Sprintf("failed to create tables %s", resource.Table.Name), err)
+	} else {
+		for _, sql := range createTables {
+			if _, err := conn.Exec(ctx, sql); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 
 	if err := deleteTables(conn, resource.Table); err != nil {

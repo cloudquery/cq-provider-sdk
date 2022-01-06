@@ -2,16 +2,27 @@ package schema
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
+type Meta struct {
+	LastUpdate time.Time `json:"last_updated"`
+	FetchId    string    `json:"fetch_id,omitempty"`
+}
+
 var (
-	meta = Column{
-		Name:        "meta",
+	cqMeta = Column{
+		Name:        "meta", // TODO rename to cq_meta
 		Type:        TypeJSON,
 		Description: "Meta column holds fetch information",
 		Resolver: func(ctx context.Context, meta ClientMeta, resource *Resource, c Column) error {
-			return resource.Set(c.Name, map[string]interface{}{"last_updated": time.Now().UTC().Format(time.RFC3339)})
+			mi := Meta{
+				LastUpdate: time.Now().UTC(),
+				FetchId:    "", // TODO
+			}
+			b, _ := json.Marshal(mi)
+			return resource.Set(c.Name, b)
 		},
 	}
 	cqIdColumn = Column{
@@ -36,5 +47,5 @@ var (
 
 // GetDefaultSDKColumns Default columns of the SDK, these columns are added to each table by default
 func GetDefaultSDKColumns() []Column {
-	return []Column{cqIdColumn, meta}
+	return []Column{cqIdColumn, cqMeta}
 }
