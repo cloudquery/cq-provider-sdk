@@ -19,7 +19,7 @@ const (
 	queryTableColumns = `SELECT array_agg(column_name::text) as columns FROM information_schema.columns WHERE table_name = $1`
 	addColumnToTable  = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %v %v;`
 
-	dropTable = `DROP TABLE IF EXISTS %s;`
+	dropTable = `DROP TABLE IF EXISTS %s`
 )
 
 // TableCreator handles creation of schema.Table in database as SQL strings
@@ -35,22 +35,26 @@ func NewTableCreator(log hclog.Logger) *TableCreator {
 
 // CreateTable reads schema.Table and builds the CREATE TABLE and DROP TABLE statements for it, also processing and returning subrelation tables
 func (m TableCreator) CreateTable(ctx context.Context, t *schema.Table, parent *schema.Table) (create, drop []string, err error) {
-	// Build a SQL to create a table.
-	ctb := sqlbuilder.CreateTable(t.Name).IfNotExists()
+	b := &strings.Builder{}
+
+	// Build a SQL to create a table
+	b.WriteString("CREATE TABLE IF NOT EXISTS " + strconv.Quote(t.Name) + " (\n")
+
 	for _, c := range schema.GetDefaultSDKColumns() {
+		b.WriteByte('\t')
+		b.WriteString(strconv.Quote(c.Name) + ` ` + schema.GetPgTypeFromType(c.Type))
 		if c.CreationOptions.Unique {
-			ctb.Define(c.Name, schema.GetPgTypeFromType(c.Type), "unique")
-		} else {
-			ctb.Define(c.Name, schema.GetPgTypeFromType(c.Type))
+			b.WriteString(" UNIQUE")
 		}
+		b.WriteString(",\n")
 	}
 
-	m.buildColumns(ctb, t.Columns, parent)
-	ctb.Define(fmt.Sprintf("constraint %s_pk primary key(%s)", schema.TruncateTableConstraint(t.Name), strings.Join(t.PrimaryKeys(), ",")))
-	sql, _ := ctb.BuildWithFlavor(sqlbuilder.PostgreSQL)
+	m.buildColumns(b, t.Columns, parent)
+	b.WriteString(fmt.Sprintf("\tCONSTRAINT %s_pk PRIMARY KEY(%s)\n", schema.TruncateTableConstraint(t.Name), strings.Join(t.PrimaryKeys(), ",")))
+	b.WriteString(")")
 
 	create, drop = make([]string, 0, 1+len(t.Relations)), make([]string, 0, 1+len(t.Relations))
-	create = append(create, sql+";")
+	create = append(create, b.String())
 
 	// Create relation tables
 	for _, r := range t.Relations {
@@ -98,15 +102,16 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 	return ret, nil
 }
 
-func (m TableCreator) buildColumns(ctb *sqlbuilder.CreateTableBuilder, cc []schema.Column, parent *schema.Table) {
+func (m TableCreator) buildColumns(b *strings.Builder, cc []schema.Column, parent *schema.Table) {
 	for _, c := range cc {
-		defs := []string{strconv.Quote(c.Name), schema.GetPgTypeFromType(c.Type)}
+		b.WriteByte('\t')
+		b.WriteString(strconv.Quote(c.Name) + " " + schema.GetPgTypeFromType(c.Type))
 		if c.CreationOptions.Unique {
-			defs = []string{strconv.Quote(c.Name), schema.GetPgTypeFromType(c.Type), "unique"}
+			b.WriteString(" UNIQUE")
 		}
 		if strings.HasSuffix(c.Name, "cq_id") && c.Name != "cq_id" {
-			defs = append(defs, "REFERENCES", fmt.Sprintf("%s(cq_id)", parent.Name), "ON DELETE CASCADE")
+			b.WriteString(" REFERENCES " + fmt.Sprintf("%s(cq_id)", parent.Name) + " ON DELETE CASCADE")
 		}
-		ctb.Define(defs...)
+		b.WriteString(",\n")
 	}
 }

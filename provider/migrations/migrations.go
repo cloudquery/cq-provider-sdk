@@ -66,14 +66,14 @@ func Generate(ctx context.Context, logger hclog.Logger, p *provider.Provider, ou
 			if _, err := cf.WriteString(s); err != nil {
 				return err
 			}
-			_, _ = cf.Write([]byte{'\n'})
+			_, _ = cf.Write([]byte{';', '\n'})
 		}
 
 		for _, s := range drop {
 			if _, err := df.WriteString(s); err != nil {
 				return err
 			}
-			_, _ = df.Write([]byte{'\n'})
+			_, _ = df.Write([]byte{';', '\n'})
 		}
 	}
 
