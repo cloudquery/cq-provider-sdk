@@ -14,7 +14,7 @@ import (
 const defaultPath = "./resources/provider/migrations"
 
 // Run is the main entry point for CLI usage.
-func Run(p *provider.Provider, outputPath string) error {
+func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 	const defaultPrefix = "unreleased_"
 
 	if outputPath == "" {
@@ -36,7 +36,7 @@ func Run(p *provider.Provider, outputPath string) error {
 			*prefixParam = "init_"
 		}
 
-		if err := GenerateFull(context.Background(), hclog.L(), p, *outputPathParam, *prefixParam); err != nil {
+		if err := GenerateFull(ctx, hclog.L(), p, *outputPathParam, *prefixParam); err != nil {
 			return fmt.Errorf("failed to generate migrations: %w", err)
 		}
 		return nil
@@ -46,28 +46,28 @@ func Run(p *provider.Provider, outputPath string) error {
 		return fmt.Errorf("DSN not specified: Use -dsn or set CQ_DSN")
 	}
 
-	pool, err := connect(*dsnParam)
+	pool, err := connect(ctx, *dsnParam)
 	if err != nil {
 		return err
 	}
-	conn, err := pool.Acquire(context.Background())
+	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		return err
 	}
 	defer conn.Release()
 
-	if err := GenerateDiff(context.Background(), hclog.L(), conn, p, *outputPathParam, *prefixParam); err != nil {
+	if err := GenerateDiff(ctx, hclog.L(), conn, p, *outputPathParam, *prefixParam); err != nil {
 		return fmt.Errorf("failed to generate migrations: %w", err)
 	}
 
 	return nil
 }
 
-func connect(dsn string) (*pgxpool.Pool, error) {
+func connect(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 	poolCfg.LazyConnect = true
-	return pgxpool.ConnectConfig(context.Background(), poolCfg)
+	return pgxpool.ConnectConfig(ctx, poolCfg)
 }
