@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/migrations/longestcommon"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/hashicorp/go-hclog"
@@ -17,6 +18,7 @@ const (
 	queryTableColumns   = `SELECT array_agg(column_name::text) AS columns, array_agg(data_type::text) AS types FROM information_schema.columns WHERE table_name = $1`
 	addColumnToTable    = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %v %v`
 	dropColumnFromTable = `ALTER TABLE %s DROP COLUMN IF EXISTS %v`
+	renameColumnInTable = `-- ALTER TABLE %s RENAME COLUMN %v TO %v; -- uncomment to activate, remove ADD/DROP COLUMN above and below` // Can't have IF EXISTS here
 
 	dropTable = `DROP TABLE IF EXISTS %s`
 )
@@ -93,6 +95,27 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 
 	columnsToAdd, columnsToRemove := funk.DifferenceString(t.ColumnNames(), existingColumns.Columns)
 
+	var similars map[string]string
+	{
+		upColsByType, downColsByType := make(map[string][]string), make(map[string][]string)
+
+		for _, d := range columnsToAdd {
+			col := t.Column(d)
+			if col == nil {
+				continue
+			}
+			upColsByType[schema.GetPgTypeFromType(col.Type)] = append(upColsByType[schema.GetPgTypeFromType(col.Type)], d)
+		}
+		for _, d := range columnsToRemove {
+			if col := t.Column(d); col != nil {
+				continue
+			}
+			downColsByType[dbColTypes[d]] = append(downColsByType[dbColTypes[d]], d)
+		}
+
+		similars = findSimilarColumnsWithSameType(upColsByType, downColsByType)
+	}
+
 	capSize := len(columnsToAdd) + len(columnsToRemove) // relations not included...
 	up, down = make([]string, 0, capSize), make([]string, 0, capSize)
 	downLast := make([]string, 0, capSize)
@@ -105,8 +128,18 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 			continue
 		}
 
-		up = append(up, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), schema.GetPgTypeFromType(col.Type)))
-		downLast = append(downLast, fmt.Sprintf(dropColumnFromTable, strconv.Quote(t.Name), strconv.Quote(d)))
+		var notice string
+		if v, ok := similars[d]; ok {
+			notice = "; -- could this be " + strconv.Quote(v) + " ?"
+		}
+
+		up = append(up, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), schema.GetPgTypeFromType(col.Type))+notice)
+		downLast = append(downLast, fmt.Sprintf(dropColumnFromTable, strconv.Quote(t.Name), strconv.Quote(d))+notice)
+
+		if v, ok := similars[d]; ok {
+			up = append(up, fmt.Sprintf(renameColumnInTable, strconv.Quote(t.Name), strconv.Quote(v), strconv.Quote(d)))
+			downLast = append(downLast, fmt.Sprintf(renameColumnInTable, strconv.Quote(t.Name), strconv.Quote(d), strconv.Quote(v)))
+		}
 	}
 
 	for _, d := range columnsToRemove {
@@ -116,8 +149,13 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 			continue
 		}
 
-		up = append(up, fmt.Sprintf(dropColumnFromTable, strconv.Quote(t.Name), strconv.Quote(d)))
-		downLast = append(downLast, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), dbColTypes[d]))
+		var notice string
+		if v, ok := similars[d]; ok {
+			notice = "; -- could this be " + strconv.Quote(v) + " ? Check the RENAME COLUMN statement above"
+		}
+
+		up = append(up, fmt.Sprintf(dropColumnFromTable, strconv.Quote(t.Name), strconv.Quote(d))+notice)
+		downLast = append(downLast, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), dbColTypes[d])+notice)
 	}
 
 	// Do relation tables
@@ -147,4 +185,39 @@ func (m TableCreator) buildColumns(b *strings.Builder, cc []schema.Column, paren
 		}
 		b.WriteString(",\n")
 	}
+}
+
+func findSimilarColumnsWithSameType(setA, setB map[string][]string) map[string]string {
+	const threshold = 4 // minimum common prefix/suffix length
+
+	ret := make(map[string]string)
+
+	for typeKey, alist := range setA {
+		blist, ok := setB[typeKey]
+		if !ok {
+			continue
+		}
+
+		for _, A := range alist {
+			for _, B := range blist {
+				if A == B {
+					panic("passed equal sets") // should not happen
+				}
+
+				pref := longestcommon.Prefix([]string{A, B})
+				suf := longestcommon.Suffix([]string{A, B})
+				if len(suf) > len(pref) {
+					pref = suf
+				}
+				if len(pref) < threshold {
+					continue
+				}
+
+				ret[A] = B
+				ret[B] = A
+			}
+		}
+	}
+
+	return ret
 }

@@ -198,6 +198,7 @@ func (p PgDatabase) Close() {
 	p.pool.Close()
 }
 
+// GetPgTypeFromType returns PG type from the given ValueType. Always lowercase.
 func GetPgTypeFromType(v ValueType) string {
 	switch v {
 	case TypeBool:

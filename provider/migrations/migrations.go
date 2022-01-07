@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/provider"
@@ -151,14 +152,20 @@ func GenerateDiff(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, 
 			if _, err := cf.WriteString(s); err != nil {
 				return err
 			}
-			_, _ = cf.Write([]byte{';', '\n'})
+			if !strings.Contains(s, ";") {
+				_, _ = cf.Write([]byte{';'})
+			}
+			_, _ = cf.Write([]byte{'\n'})
 		}
 
 		for _, s := range downs {
 			if _, err := df.WriteString(s); err != nil {
 				return err
 			}
-			_, _ = df.Write([]byte{';', '\n'})
+			if !strings.Contains(s, ";") {
+				_, _ = df.Write([]byte{';'})
+			}
+			_, _ = df.Write([]byte{'\n'})
 		}
 	}
 
