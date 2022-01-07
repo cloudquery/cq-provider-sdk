@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/huandu/go-sqlbuilder"
-
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/hashicorp/go-hclog"
@@ -16,8 +14,9 @@ import (
 )
 
 const (
-	queryTableColumns = `SELECT array_agg(column_name::text) as columns FROM information_schema.columns WHERE table_name = $1`
-	addColumnToTable  = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %v %v;`
+	queryTableColumns   = `SELECT array_agg(column_name::text) AS columns FROM information_schema.columns WHERE table_name = $1`
+	addColumnToTable    = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %v %v`
+	dropColumnFromTable = `ALTER TABLE %s DROP COLUMN IF EXISTS %v`
 
 	dropTable = `DROP TABLE IF EXISTS %s`
 )
@@ -34,10 +33,10 @@ func NewTableCreator(log hclog.Logger) *TableCreator {
 }
 
 // CreateTable reads schema.Table and builds the CREATE TABLE and DROP TABLE statements for it, also processing and returning subrelation tables
-func (m TableCreator) CreateTable(ctx context.Context, t *schema.Table, parent *schema.Table) (create, drop []string, err error) {
+func (m TableCreator) CreateTable(ctx context.Context, t *schema.Table, parent *schema.Table) (up, down []string, err error) {
 	b := &strings.Builder{}
 
-	// Build a SQL to create a table
+	// Build a SQL tocreate a table
 	b.WriteString("CREATE TABLE IF NOT EXISTS " + strconv.Quote(t.Name) + " (\n")
 
 	for _, c := range schema.GetDefaultSDKColumns() {
@@ -53,29 +52,29 @@ func (m TableCreator) CreateTable(ctx context.Context, t *schema.Table, parent *
 	b.WriteString(fmt.Sprintf("\tCONSTRAINT %s_pk PRIMARY KEY(%s)\n", schema.TruncateTableConstraint(t.Name), strings.Join(t.PrimaryKeys(), ",")))
 	b.WriteString(")")
 
-	create, drop = make([]string, 0, 1+len(t.Relations)), make([]string, 0, 1+len(t.Relations))
-	create = append(create, b.String())
+	up, down = make([]string, 0, 1+len(t.Relations)), make([]string, 0, 1+len(t.Relations))
+	up = append(up, b.String())
 
 	// Create relation tables
 	for _, r := range t.Relations {
 		if cr, dr, err := m.CreateTable(ctx, r, t); err != nil {
 			return nil, nil, err
 		} else {
-			create = append(create, cr...)
-			drop = append(drop, dr...)
+			up = append(up, cr...)
+			down = append(down, dr...)
 		}
 	}
 
-	drop = append(drop, fmt.Sprintf(dropTable, t.Name))
+	down = append(down, fmt.Sprintf(dropTable, t.Name))
 
-	return create, drop, nil
+	return up, down, nil
 }
 
 // UpgradeTable reads current table info from the given conn for the given table, and returns ALTER TABLE ADD COLUMN statements for the missing columns
-func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *schema.Table) ([]string, error) {
+func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *schema.Table) (up, down []string, err error) {
 	rows, err := conn.Query(ctx, queryTableColumns, t.Name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var existingColumns struct {
@@ -83,11 +82,15 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 	}
 
 	if err := pgxscan.ScanOne(&existingColumns, rows); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	columnsToAdd, _ := funk.DifferenceString(t.ColumnNames(), existingColumns.Columns)
-	ret := make([]string, 0, len(columnsToAdd))
+	columnsToAdd, columnsToRemove := funk.DifferenceString(t.ColumnNames(), existingColumns.Columns)
+
+	capSize := len(columnsToAdd) + len(columnsToRemove) // relations not included...
+	up, down = make([]string, 0, capSize), make([]string, 0, capSize)
+	downLast := make([]string, 0, capSize)
+
 	for _, d := range columnsToAdd {
 		m.log.Debug("adding column", "column", d)
 		col := t.Column(d)
@@ -95,11 +98,35 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 			m.log.Warn("column missing from table, not adding it", "table", t.Name, "column", d)
 			continue
 		}
-		sql, _ := sqlbuilder.Buildf(addColumnToTable, sqlbuilder.Raw(t.Name), sqlbuilder.Raw(d), sqlbuilder.Raw(schema.GetPgTypeFromType(col.Type))).BuildWithFlavor(sqlbuilder.PostgreSQL)
-		ret = append(ret, sql)
+
+		up = append(up, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), schema.GetPgTypeFromType(col.Type)))
+		downLast = append(downLast, fmt.Sprintf(dropColumnFromTable, strconv.Quote(t.Name), strconv.Quote(d)))
 	}
 
-	return ret, nil
+	for _, d := range columnsToRemove {
+		m.log.Debug("removing column", "column", d)
+		if col := t.Column(d); col != nil {
+			m.log.Warn("column still in table, not removing it", "table", t.Name, "column", d)
+			continue
+		}
+
+		up = append(up, fmt.Sprintf(dropColumnFromTable, strconv.Quote(t.Name), strconv.Quote(d)))
+		downLast = append(downLast, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), "WHATS THE TYPE"))
+	}
+
+	// Do relation tables
+	for _, r := range t.Relations {
+		if cr, dr, err := m.UpgradeTable(ctx, conn, r); err != nil {
+			return nil, nil, err
+		} else {
+			up = append(up, cr...)
+			down = append(down, dr...)
+		}
+	}
+
+	down = append(down, downLast...)
+
+	return up, down, nil
 }
 
 func (m TableCreator) buildColumns(b *strings.Builder, cc []schema.Column, parent *schema.Table) {
