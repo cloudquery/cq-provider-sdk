@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	queryTableColumns   = `SELECT array_agg(column_name::text) AS columns FROM information_schema.columns WHERE table_name = $1`
+	queryTableColumns   = `SELECT array_agg(column_name::text) AS columns, array_agg(data_type::text) AS types FROM information_schema.columns WHERE table_name = $1`
 	addColumnToTable    = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %v %v`
 	dropColumnFromTable = `ALTER TABLE %s DROP COLUMN IF EXISTS %v`
 
@@ -79,10 +79,16 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 
 	var existingColumns struct {
 		Columns []string
+		Types   []string
 	}
 
 	if err := pgxscan.ScanOne(&existingColumns, rows); err != nil {
 		return nil, nil, err
+	}
+
+	dbColTypes := make(map[string]string, len(existingColumns.Columns))
+	for i := range existingColumns.Columns {
+		dbColTypes[existingColumns.Columns[i]] = strings.ToLower(existingColumns.Types[i])
 	}
 
 	columnsToAdd, columnsToRemove := funk.DifferenceString(t.ColumnNames(), existingColumns.Columns)
@@ -111,7 +117,7 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 		}
 
 		up = append(up, fmt.Sprintf(dropColumnFromTable, strconv.Quote(t.Name), strconv.Quote(d)))
-		downLast = append(downLast, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), "WHATS THE TYPE"))
+		downLast = append(downLast, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), dbColTypes[d]))
 	}
 
 	// Do relation tables
