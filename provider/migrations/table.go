@@ -34,8 +34,22 @@ func NewTableCreator(log hclog.Logger) *TableCreator {
 	}
 }
 
-// CreateTable reads schema.Table and builds the CREATE TABLE and DROP TABLE statements for it, also processing and returning subrelation tables
-func (m TableCreator) CreateTable(ctx context.Context, t *schema.Table, parent *schema.Table) (up, down []string, err error) {
+// CreateTable generates CREATE TABLE definitions for the given table and runs them on the given conn
+func (m TableCreator) CreateTable(ctx context.Context, conn *pgxpool.Conn, t, p *schema.Table) error {
+	ups, _, err := m.CreateTableDefinitions(ctx, t, p)
+	if err != nil {
+		return err
+	}
+	for _, sql := range ups {
+		if _, err := conn.Exec(ctx, sql); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CreateTableDefinitions reads schema.Table and builds the CREATE TABLE and DROP TABLE statements for it, also processing and returning subrelation tables
+func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Table, parent *schema.Table) (up, down []string, err error) {
 	b := &strings.Builder{}
 
 	// Build a SQL tocreate a table
@@ -59,7 +73,7 @@ func (m TableCreator) CreateTable(ctx context.Context, t *schema.Table, parent *
 
 	// Create relation tables
 	for _, r := range t.Relations {
-		if cr, dr, err := m.CreateTable(ctx, r, t); err != nil {
+		if cr, dr, err := m.CreateTableDefinitions(ctx, r, t); err != nil {
 			return nil, nil, err
 		} else {
 			up = append(up, cr...)
@@ -93,7 +107,7 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, p
 
 	if len(existingColumns.Columns) == 0 {
 		// Table does not exist, CREATE TABLE instead
-		u, d, err := m.CreateTable(ctx, t, parent)
+		u, d, err := m.CreateTableDefinitions(ctx, t, parent)
 		if err != nil {
 			return nil, nil, fmt.Errorf("CreateTable: %w", err)
 		}

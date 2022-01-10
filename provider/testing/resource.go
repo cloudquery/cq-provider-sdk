@@ -62,14 +62,8 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 	l.SetLevel(hclog.Debug)
 	resource.Provider.Logger = l
 	tableCreator := migrations.NewTableCreator(l)
-	if createTables, _, err := tableCreator.CreateTable(context.Background(), resource.Table, nil); err != nil {
+	if err := tableCreator.CreateTable(context.Background(), conn, resource.Table, nil); err != nil {
 		assert.FailNow(t, fmt.Sprintf("failed to create tables %s", resource.Table.Name), err)
-	} else {
-		for _, sql := range createTables {
-			if _, err := conn.Exec(ctx, sql); err != nil {
-				t.Fatal(err)
-			}
-		}
 	}
 
 	if err := deleteTables(conn, resource.Table); err != nil {

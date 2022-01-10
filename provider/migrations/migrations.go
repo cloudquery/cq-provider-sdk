@@ -59,7 +59,7 @@ func GenerateFull(ctx context.Context, logger hclog.Logger, p *provider.Provider
 	for resName, table := range p.ResourceMap {
 		writeBoth("\n-- Resource: " + resName + "\n")
 
-		ups, downs, err := tc.CreateTable(ctx, table, nil)
+		ups, downs, err := tc.CreateTableDefinitions(ctx, table, nil)
 		if err != nil {
 			return fmt.Errorf("CreateTable failed for %s: %w", table.Name, err)
 		}
