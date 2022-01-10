@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/cloudquery/cq-provider-sdk/helpers"
-
 	"github.com/hashicorp/go-version"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
@@ -69,6 +68,12 @@ type Migrator struct {
 	// maps between semantic version to the timestamp it was created at
 	versionMapper map[string]uint
 	versions      version.Collection
+	migrationHook MigrationHook
+}
+
+type MigrationHook interface {
+	AfterMigrationUp(ctx context.Context, conn *pgx.Conn) error
+	BeforeMigrationDown(ctx context.Context, conn *pgx.Conn) error
 }
 
 func NewMigrator(log hclog.Logger, migrationFiles map[string][]byte, dsn string, providerName string) (*Migrator, error) {
@@ -123,6 +128,10 @@ func NewMigrator(log hclog.Logger, migrationFiles map[string][]byte, dsn string,
 	}, nil
 }
 
+func (m *Migrator) SetHook(hook MigrationHook) {
+	m.migrationHook = hook
+}
+
 func (m *Migrator) Close() error {
 	_, dbErr := m.m.Close()
 	return dbErr
@@ -130,14 +139,23 @@ func (m *Migrator) Close() error {
 
 func (m *Migrator) UpgradeProvider(version string) error {
 	if version == "latest" {
-		return m.m.Up()
+		if err := m.m.Up(); err != nil {
+			return err
+		}
+		return m.applyHook(context.TODO(), false)
 	}
+
 	mv, err := m.FindLatestMigration(version)
 	if err != nil {
 		return fmt.Errorf("version %s upgrade doesn't exist", version)
 	}
 	m.log.Debug("upgrading provider version", "version", version, "migrator_version", mv)
-	return m.m.Migrate(mv)
+
+	if err := m.m.Migrate(mv); err != nil {
+		return err
+	}
+
+	return m.applyHook(context.TODO(), false)
 }
 
 func (m *Migrator) DowngradeProvider(version string) error {
@@ -146,6 +164,11 @@ func (m *Migrator) DowngradeProvider(version string) error {
 		return fmt.Errorf("version %s upgrade doesn't exist", version)
 	}
 	m.log.Debug("downgrading provider version", "version", version, "migrator_version", mv)
+
+	if err := m.applyHook(context.TODO(), true); err != nil {
+		return err
+	}
+
 	return m.m.Migrate(mv)
 }
 
@@ -153,10 +176,16 @@ func (m *Migrator) DropProvider(ctx context.Context, schema map[string]*schema.T
 	// we don't use go-migrate's drop since its too violent and it will remove all tables of other providers,
 	// instead we will only drop the migration table and all schema's tables
 	// we additionally don't use a transaction since this results quite often in out of shared memory errors
+	if err := m.applyHook(ctx, true); err != nil {
+		return err
+	}
+
 	conn, err := pgx.Connect(ctx, m.dsn)
 	if err != nil {
 		return err
 	}
+	defer conn.Close(ctx)
+
 	q := fmt.Sprintf(dropTableSQL, strconv.Quote(fmt.Sprintf("%s_schema_migrations", m.provider)))
 	if _, err := conn.Exec(ctx, q); err != nil {
 		return err
@@ -227,6 +256,24 @@ func (m *Migrator) FindLatestMigration(requestedVersion string) (uint, error) {
 	}
 	mv = m.versionMapper[m.versions[len(m.versions)-1].Original()]
 	return mv, nil
+}
+
+func (m *Migrator) applyHook(ctx context.Context, pre bool) error {
+	if m.migrationHook == nil {
+		return nil
+	}
+
+	conn, err := pgx.Connect(ctx, m.dsn)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	if pre {
+		return m.migrationHook.BeforeMigrationDown(ctx, conn)
+	}
+
+	return m.migrationHook.AfterMigrationUp(ctx, conn)
 }
 
 func dropTables(ctx context.Context, conn *pgx.Conn, table *schema.Table) error {
