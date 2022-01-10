@@ -117,13 +117,13 @@ func serve(opts *Options) {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
 		VersionedPlugins: map[int]plugin.PluginSet{
-			4: {
+			cqproto.V4: {
 				"provider": &cqproto.CQPlugin{Impl: opts.Provider},
 			},
-			3: {
+			cqproto.V3: {
 				"provider": &cqproto.CQPlugin{Impl: opts.Provider},
 			},
-			2: {
+			cqproto.V2: {
 				"provider": &cqproto.CQPlugin{Impl: opts.Provider},
 			}},
 		GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {
