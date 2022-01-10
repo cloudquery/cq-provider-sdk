@@ -136,7 +136,7 @@ func GenerateDiff(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, 
 
 	changed := false
 	for resName, table := range p.ResourceMap {
-		ups, downs, err := tc.UpgradeTable(ctx, conn, table)
+		ups, downs, err := tc.UpgradeTable(ctx, conn, table, nil)
 		if err != nil {
 			return fmt.Errorf("UpgradeTable failed for %s: %w", table.Name, err)
 		}

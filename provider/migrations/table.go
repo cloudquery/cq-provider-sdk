@@ -72,8 +72,11 @@ func (m TableCreator) CreateTable(ctx context.Context, t *schema.Table, parent *
 	return up, down, nil
 }
 
-// UpgradeTable reads current table info from the given conn for the given table, and returns ALTER TABLE ADD COLUMN statements for the missing columns
-func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *schema.Table) (up, down []string, err error) {
+// UpgradeTable reads current table info from the given conn for the given table, and returns ALTER TABLE ADD COLUMN statements for the missing columns.
+// Newly appearing tables will return a CREATE TABLE statement
+// Column renamings are detected (best effort) and ALTER TABLE RENAME COLUMN statements are generated as comments.
+// Table renamings or removals are not detected.
+func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, parent *schema.Table) (up, down []string, err error) {
 	rows, err := conn.Query(ctx, queryTableColumns, t.Name)
 	if err != nil {
 		return nil, nil, err
@@ -86,6 +89,15 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 
 	if err := pgxscan.ScanOne(&existingColumns, rows); err != nil {
 		return nil, nil, err
+	}
+
+	if len(existingColumns.Columns) == 0 {
+		// Table does not exist, CREATE TABLE instead
+		u, d, err := m.CreateTable(ctx, t, parent)
+		if err != nil {
+			return nil, nil, fmt.Errorf("CreateTable: %w", err)
+		}
+		return u, d, nil
 	}
 
 	dbColTypes := make(map[string]string, len(existingColumns.Columns))
@@ -160,7 +172,7 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t *s
 
 	// Do relation tables
 	for _, r := range t.Relations {
-		if cr, dr, err := m.UpgradeTable(ctx, conn, r); err != nil {
+		if cr, dr, err := m.UpgradeTable(ctx, conn, r, t); err != nil {
 			return nil, nil, err
 		} else {
 			up = append(up, cr...)
