@@ -431,7 +431,7 @@ func (e *ExecutionData) checkPartialFetchError(err error, res *Resource, customM
 		}
 	}
 	if strings.Contains(err.Error(), ": socket: too many open files") {
-		// Return a Diagnostic error so that it can be properly propegated back to the user via the CLI
+		// Return a Diagnostic error so that it can be properly propagated back to the user via the CLI
 		partialFetchFailure.Err = diag.FromError(err, diag.WARNING, diag.THROTTLE, e.ResourceName, err.Error(), fdLimitMessage)
 	}
 	// Send information via our channel
