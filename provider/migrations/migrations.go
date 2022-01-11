@@ -16,7 +16,20 @@ import (
 )
 
 // GenerateFull creates initial table migrations for the provider based on it's ResourceMap
-func GenerateFull(ctx context.Context, logger hclog.Logger, p *provider.Provider, outputPath, prefix string) (retErr error) {
+func GenerateFull(ctx context.Context, logger hclog.Logger, p *provider.Provider, dialects []schema.DialectType, outputPath, prefix string) error {
+	for _, d := range dialects {
+		if err := generateFullForDialect(ctx, logger, p, schema.GetDialect(d), filepath.Join(outputPath, string(d)), prefix); err != nil {
+			return fmt.Errorf("failed for %v: %w", d, err)
+		}
+	}
+	return nil
+}
+
+func generateFullForDialect(ctx context.Context, logger hclog.Logger, p *provider.Provider, dialect schema.Dialect, outputPath, prefix string) (retErr error) {
+	if err := os.MkdirAll(outputPath, 0755); err != nil {
+		return err
+	}
+
 	cName, dName := filepath.Join(outputPath, prefix+"up.sql"), filepath.Join(outputPath, prefix+"down.sql")
 
 	defer func() {
@@ -30,7 +43,7 @@ func GenerateFull(ctx context.Context, logger hclog.Logger, p *provider.Provider
 		logger.Info("Generated down migrations", "filename", dName)
 	}()
 
-	tc := NewTableCreator(logger, schema.PostgresDialect{})
+	tc := NewTableCreator(logger, dialect)
 
 	safeClose := func(f *os.File) {
 		err := f.Close()
@@ -86,7 +99,16 @@ func GenerateFull(ctx context.Context, logger hclog.Logger, p *provider.Provider
 }
 
 // GenerateDiff creates incremental table migrations for the provider based on it's ResourceMap. Entities are compared to a given conn.
-func GenerateDiff(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, p *provider.Provider, outputPath, prefix string) (retErr error) {
+func GenerateDiff(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, p *provider.Provider, dialects []schema.DialectType, outputPath, prefix string) error {
+	for _, d := range dialects {
+		if err := generateDiffForDialect(ctx, logger, conn, p, schema.GetDialect(d), filepath.Join(outputPath, string(d)), prefix); err != nil {
+			return fmt.Errorf("failed for %v: %w", d, err)
+		}
+	}
+	return nil
+}
+
+func generateDiffForDialect(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, p *provider.Provider, dialect schema.Dialect, outputPath, prefix string) (retErr error) {
 	cName, dName := filepath.Join(outputPath, prefix+"up.sql"), filepath.Join(outputPath, prefix+"down.sql")
 
 	var errNoChange = fmt.Errorf("no change")
@@ -108,7 +130,7 @@ func GenerateDiff(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, 
 		}
 	}()
 
-	tc := NewTableCreator(logger, schema.PostgresDialect{})
+	tc := NewTableCreator(logger, dialect)
 
 	safeClose := func(f *os.File) {
 		err := f.Close()

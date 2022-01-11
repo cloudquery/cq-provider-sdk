@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/cloudquery/cq-provider-sdk/provider"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/hashicorp/go-hclog"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -21,14 +22,35 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 		outputPath = defaultPath
 	}
 
+	defaultDialectsToProcess := []schema.DialectType{
+		schema.Postgres,
+		schema.TSDB,
+	}
+
 	outputPathParam := flag.String("path", outputPath, "Path to migrations directory")
 	prefixParam := flag.String("prefix", defaultPrefix, "Prefix for files")
 	doFullParam := flag.Bool("full", false, "Generate initial migrations (prefix will be 'init_')")
 	dsnParam := flag.String("dsn", os.Getenv("CQ_DSN"), "DSN to compare changes against")
+	dialectParam := flag.String("dialect", "", "Dialect to generate (empty: all)")
 	flag.Parse()
 	if flag.NArg() > 0 {
 		flag.Usage()
 		return fmt.Errorf("more args than necessary")
+	}
+
+	var dialects []schema.DialectType
+	if *dialectParam == "" {
+		dialects = defaultDialectsToProcess
+	} else {
+		for _, d := range defaultDialectsToProcess {
+			if string(d) == *dialectParam {
+				dialects = append(dialects, d)
+				break
+			}
+		}
+		if len(dialects) == 0 {
+			return fmt.Errorf("invalid dialect %q", *dialectParam)
+		}
 	}
 
 	if *doFullParam {
@@ -36,7 +58,7 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 			*prefixParam = "init_"
 		}
 
-		if err := GenerateFull(ctx, hclog.L(), p, *outputPathParam, *prefixParam); err != nil {
+		if err := GenerateFull(ctx, hclog.L(), p, dialects, *outputPathParam, *prefixParam); err != nil {
 			return fmt.Errorf("failed to generate migrations: %w", err)
 		}
 		return nil
@@ -56,7 +78,7 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 	}
 	defer conn.Release()
 
-	if err := GenerateDiff(ctx, hclog.L(), conn, p, *outputPathParam, *prefixParam); err != nil {
+	if err := GenerateDiff(ctx, hclog.L(), conn, p, dialects, *outputPathParam, *prefixParam); err != nil {
 		return fmt.Errorf("failed to generate migrations: %w", err)
 	}
 

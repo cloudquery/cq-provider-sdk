@@ -13,14 +13,11 @@ const (
 )
 
 type Dialect interface {
-	// DefaultSDKColumns returns default columns of the SDK, these columns are added to each table by default
-	//DefaultSDKColumns() []Column
-
 	// PrimaryKeys returns the primary keys of table according to dialect
 	PrimaryKeys(t *Table) []string
 
 	// Columns returns the columns of table according to dialect
-	Columns(t *Table) []Column
+	Columns(t *Table) ColumnList
 
 	// Constraints returns constraint definitions for table, according to dialect
 	Constraints(t *Table) []string
@@ -51,7 +48,7 @@ func (d PostgresDialect) PrimaryKeys(t *Table) []string {
 	return []string{cqIdColumn.Name}
 }
 
-func (d PostgresDialect) Columns(t *Table) []Column {
+func (d PostgresDialect) Columns(t *Table) ColumnList {
 	return append([]Column{cqIdColumn, cqMeta}, t.Columns...)
 }
 
@@ -79,10 +76,6 @@ func (d PostgresDialect) SupportsForeignKeys() bool {
 	return true
 }
 
-//func (d PostgresDialect) defaultSDKColumns() []Column {
-//	return []Column{cqIdColumn, cqMeta}
-//}
-
 type TSDBDialect struct{}
 
 func (d TSDBDialect) PrimaryKeys(t *Table) []string {
@@ -90,7 +83,7 @@ func (d TSDBDialect) PrimaryKeys(t *Table) []string {
 	return append([]string{cqFetchDateColumn.Name}, v...)
 }
 
-func (d TSDBDialect) Columns(t *Table) []Column {
+func (d TSDBDialect) Columns(t *Table) ColumnList {
 	return append([]Column{cqIdColumn, cqMeta, cqFetchDateColumn}, t.Columns...)
 }
 
@@ -117,10 +110,6 @@ func (d TSDBDialect) DBTypeFromType(v ValueType) string {
 func (d TSDBDialect) SupportsForeignKeys() bool {
 	return false
 }
-
-//func (d TSDBDialect) defaultSDKColumns() []Column {
-//	return []Column{cqIdColumn, cqMeta, cqFetchDateColumn}
-//}
 
 var (
 	_ Dialect = (*PostgresDialect)(nil)

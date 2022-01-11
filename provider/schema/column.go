@@ -321,3 +321,13 @@ func SetColumnMeta(c Column, m *ColumnMeta) Column {
 	c.meta = m
 	return c
 }
+
+type ColumnList []Column
+
+func (c ColumnList) Names() []string {
+	ret := make([]string, len(c))
+	for i := range c {
+		ret[i] = c[i].Name
+	}
+	return ret
+}

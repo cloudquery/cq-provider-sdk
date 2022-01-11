@@ -135,7 +135,7 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, p
 		dbColTypes[existingColumns.Columns[i]] = strings.ToLower(existingColumns.Types[i])
 	}
 
-	columnsToAdd, columnsToRemove := funk.DifferenceString(t.ColumnNames(), existingColumns.Columns)
+	columnsToAdd, columnsToRemove := funk.DifferenceString(m.dialect.Columns(t).Names(), existingColumns.Columns)
 
 	var similars map[string]string
 	{
