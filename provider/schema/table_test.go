@@ -18,7 +18,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"some_string", "cq_id", "meta"},
+		ExpectedColumnNames: []string{"some_string", "cq_id", "cq_meta", "cq_fetch_date"},
 		ExpectedHasId:       false,
 	},
 	{
@@ -36,7 +36,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"some_string", "some_int", "cq_id", "meta"},
+		ExpectedColumnNames: []string{"some_string", "some_int", "cq_id", "cq_meta", "cq_fetch_date"},
 		ExpectedHasId:       true,
 	},
 	{
@@ -62,7 +62,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"some_string", "some_int", "embedded_some_string", "embedded_some_int", "cq_id", "meta"},
+		ExpectedColumnNames: []string{"some_string", "some_int", "embedded_some_string", "embedded_some_int", "cq_id", "cq_meta", "cq_fetch_date"},
 	},
 
 	{
@@ -84,7 +84,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"some_int", "embedded_some_string", "embedded_inner_some_int", "cq_id", "meta"},
+		ExpectedColumnNames: []string{"some_int", "embedded_some_string", "embedded_inner_some_int", "cq_id", "cq_meta", "cq_fetch_date"},
 	},
 	{
 		Name: "simpleTableWithEmbedded",
@@ -109,7 +109,7 @@ var tableDefinitionTestCases = []tableTestCase{
 				},
 			},
 		},
-		ExpectedColumnNames: []string{"some_string", "some_int", "some_string_no_prefix", "some_int_no_prefix", "cq_id", "meta"},
+		ExpectedColumnNames: []string{"some_string", "some_int", "some_string_no_prefix", "some_int_no_prefix", "cq_id", "cq_meta", "cq_fetch_date"},
 	},
 }
 
