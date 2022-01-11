@@ -52,7 +52,7 @@ func (m TableCreator) CreateTable(ctx context.Context, conn *pgxpool.Conn, t, p 
 func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Table, parent *schema.Table) (up, down []string, err error) {
 	b := &strings.Builder{}
 
-	// Build a SQL tocreate a table
+	// Build a SQL to create a table
 	b.WriteString("CREATE TABLE IF NOT EXISTS " + strconv.Quote(t.Name) + " (\n")
 
 	for _, c := range schema.GetDefaultSDKColumns() {
@@ -67,7 +67,7 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 		b.WriteString(",\n")
 	}
 
-	m.buildColumns(b, t.Columns, parent)
+	buildColumns(b, t.Columns, parent)
 	b.WriteString(fmt.Sprintf("\tCONSTRAINT %s_pk PRIMARY KEY(%s)\n", schema.TruncateTableConstraint(t.Name), strings.Join(t.PrimaryKeys(), ",")))
 	b.WriteString(")")
 
@@ -202,10 +202,13 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, p
 	return up, down, nil
 }
 
-func (m TableCreator) buildColumns(b *strings.Builder, cc []schema.Column, parent *schema.Table) {
+func buildColumns(b *strings.Builder, cc []schema.Column, parent *schema.Table) {
 	for _, c := range cc {
 		b.WriteByte('\t')
 		b.WriteString(strconv.Quote(c.Name) + " " + schema.GetPgTypeFromType(c.Type))
+		if c.CreationOptions.NotNull {
+			b.WriteString(" NOT NULL")
+		}
 		if c.CreationOptions.Unique {
 			b.WriteString(" UNIQUE")
 		}

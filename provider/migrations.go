@@ -72,6 +72,7 @@ type Migrator struct {
 }
 
 type MigrationHook interface {
+	BeforeMigrationUp(ctx context.Context, conn *pgx.Conn) error
 	AfterMigrationUp(ctx context.Context, conn *pgx.Conn) error
 	BeforeMigrationDown(ctx context.Context, conn *pgx.Conn) error
 }
