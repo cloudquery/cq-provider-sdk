@@ -30,7 +30,7 @@ func GenerateFull(ctx context.Context, logger hclog.Logger, p *provider.Provider
 		logger.Info("Generated down migrations", "filename", dName)
 	}()
 
-	tc := NewTableCreator(logger)
+	tc := NewTableCreator(logger, schema.PostgresDialect{})
 
 	safeClose := func(f *os.File) {
 		err := f.Close()
@@ -108,7 +108,7 @@ func GenerateDiff(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, 
 		}
 	}()
 
-	tc := NewTableCreator(logger)
+	tc := NewTableCreator(logger, schema.PostgresDialect{})
 
 	safeClose := func(f *os.File) {
 		err := f.Close()

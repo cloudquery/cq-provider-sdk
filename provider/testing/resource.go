@@ -61,7 +61,7 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 	l := testlog.New(t)
 	l.SetLevel(hclog.Debug)
 	resource.Provider.Logger = l
-	tableCreator := migrations.NewTableCreator(l)
+	tableCreator := migrations.NewTableCreator(l, schema.PostgresDialect{})
 	if err := tableCreator.CreateTable(context.Background(), conn, resource.Table, nil); err != nil {
 		assert.FailNow(t, fmt.Sprintf("failed to create tables %s", resource.Table.Name), err)
 	}

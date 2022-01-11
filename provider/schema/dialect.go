@@ -1,9 +1,7 @@
 package schema
 
 import (
-	"bytes"
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -27,37 +25,10 @@ type Dialect interface {
 	// Constraints returns constraint definitions for table, according to dialect
 	Constraints(t *Table) []string
 
-	// GenerateMigration generates up and down migrations for the table
-	GenerateMigration(t, parent *Table) (*Migration, error)
-}
+	// DBTypeFromType returns the database type from the given ValueType
+	DBTypeFromType(v ValueType) string
 
-type Migration struct {
-	Up, Down []string
-}
-
-func (m *Migration) Add(up, down []string) {
-	m.Up = append(m.Up, up...)
-	m.Down = append(m.Down, down...)
-}
-
-func (m *Migration) Ups() []byte {
-	return m.toBytes(m.Up)
-}
-
-func (m *Migration) Downs() []byte {
-	return m.toBytes(m.Down)
-}
-
-func (m *Migration) toBytes(s []string) []byte {
-	b := &bytes.Buffer{}
-	for i := range s {
-		b.WriteString(s[i])
-		if !strings.HasPrefix(s[i], "--") {
-			b.WriteByte(';')
-		}
-		b.WriteByte('\n')
-	}
-	return b.Bytes()
+	SupportsForeignKeys() bool
 }
 
 func GetDialect(t DialectType) Dialect {
@@ -89,7 +60,7 @@ func (d PostgresDialect) Constraints(t *Table) []string {
 
 	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", TruncateTableConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
 
-	for _, c := range t.Columns {
+	for _, c := range d.Columns(t) {
 		if !c.CreationOptions.Unique {
 			continue
 		}
@@ -100,50 +71,12 @@ func (d PostgresDialect) Constraints(t *Table) []string {
 	return ret
 }
 
-func (d PostgresDialect) GenerateMigration(t, parent *Table) (*Migration, error) {
-	b := &strings.Builder{}
+func (d PostgresDialect) DBTypeFromType(v ValueType) string {
+	return GetPgTypeFromType(v)
+}
 
-	// Build a SQL to create a table
-	b.WriteString("CREATE TABLE IF NOT EXISTS " + strconv.Quote(t.Name) + " (\n")
-
-	for _, c := range t.Columns {
-		b.WriteByte('\t')
-		b.WriteString(strconv.Quote(c.Name) + " " + GetPgTypeFromType(c.Type))
-		if c.CreationOptions.NotNull {
-			b.WriteString(" NOT NULL")
-		}
-		// c.CreationOptions.Unique is handled in the Constraints() call below
-		if parent != nil && strings.HasSuffix(c.Name, "cq_id") && c.Name != "cq_id" {
-			b.WriteString(" REFERENCES " + fmt.Sprintf("%s(cq_id)", parent.Name) + " ON DELETE CASCADE")
-		}
-		b.WriteString(",\n")
-	}
-
-	for _, cn := range d.Constraints(t) {
-		b.WriteByte('\t')
-		b.WriteString(cn)
-		b.WriteByte('\n')
-	}
-
-	b.WriteString(")")
-
-	ret := &Migration{}
-	ret.Add([]string{
-		"-- Resource: " + t.Name,
-		b.String(),
-	}, nil)
-
-	// Create relation tables
-	for _, r := range t.Relations {
-		relmig, err := d.GenerateMigration(r, t)
-		if err != nil {
-			return nil, err
-		}
-		ret.Add(relmig.Up, relmig.Down)
-	}
-
-	ret.Add(nil, []string{fmt.Sprintf("DROP TABLE IF EXISTS %s", t.Name)})
-	return ret, nil
+func (d PostgresDialect) SupportsForeignKeys() bool {
+	return true
 }
 
 //func (d PostgresDialect) defaultSDKColumns() []Column {
@@ -166,7 +99,7 @@ func (d TSDBDialect) Constraints(t *Table) []string {
 
 	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", TruncateTableConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
 
-	for _, c := range t.Columns {
+	for _, c := range d.Columns(t) {
 		if !c.CreationOptions.Unique {
 			continue
 		}
@@ -177,48 +110,12 @@ func (d TSDBDialect) Constraints(t *Table) []string {
 	return ret
 }
 
-func (d TSDBDialect) GenerateMigration(t, _ *Table) (*Migration, error) {
-	b := &strings.Builder{}
+func (d TSDBDialect) DBTypeFromType(v ValueType) string {
+	return GetPgTypeFromType(v)
+}
 
-	// Build a SQL to create a table
-	b.WriteString("CREATE TABLE IF NOT EXISTS " + strconv.Quote(t.Name) + " (\n")
-
-	for _, c := range t.Columns {
-		b.WriteByte('\t')
-		b.WriteString(strconv.Quote(c.Name) + " " + GetPgTypeFromType(c.Type))
-		if c.CreationOptions.NotNull {
-			b.WriteString(" NOT NULL")
-		}
-		// c.CreationOptions.Unique is handled in the Constraints() call below
-		// No FK things
-		b.WriteString(",\n")
-	}
-
-	for _, cn := range d.Constraints(t) {
-		b.WriteByte('\t')
-		b.WriteString(cn)
-		b.WriteByte('\n')
-	}
-
-	b.WriteString(")")
-
-	ret := &Migration{}
-	ret.Add([]string{
-		"-- Resource: " + t.Name,
-		b.String(),
-	}, nil)
-
-	// Create relation tables
-	for _, r := range t.Relations {
-		relmig, err := d.GenerateMigration(r, t)
-		if err != nil {
-			return nil, err
-		}
-		ret.Add(relmig.Up, relmig.Down)
-	}
-
-	ret.Add(nil, []string{fmt.Sprintf("DROP TABLE IF EXISTS %s", t.Name)})
-	return ret, nil
+func (d TSDBDialect) SupportsForeignKeys() bool {
+	return false
 }
 
 //func (d TSDBDialect) defaultSDKColumns() []Column {

@@ -25,12 +25,14 @@ const (
 
 // TableCreator handles creation of schema.Table in database as SQL strings
 type TableCreator struct {
-	log hclog.Logger
+	log     hclog.Logger
+	dialect schema.Dialect
 }
 
-func NewTableCreator(log hclog.Logger) *TableCreator {
+func NewTableCreator(log hclog.Logger, dialect schema.Dialect) *TableCreator {
 	return &TableCreator{
-		log,
+		log:     log,
+		dialect: dialect,
 	}
 }
 
@@ -55,20 +57,31 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 	// Build a SQL to create a table
 	b.WriteString("CREATE TABLE IF NOT EXISTS " + strconv.Quote(t.Name) + " (\n")
 
-	for _, c := range schema.GetDefaultSDKColumns() {
+	for _, c := range m.dialect.Columns(t) {
 		b.WriteByte('\t')
-		b.WriteString(strconv.Quote(c.Name) + ` ` + schema.GetPgTypeFromType(c.Type))
+		b.WriteString(strconv.Quote(c.Name) + " " + m.dialect.DBTypeFromType(c.Type))
 		if c.CreationOptions.NotNull {
 			b.WriteString(" NOT NULL")
 		}
-		if c.CreationOptions.Unique {
-			b.WriteString(" UNIQUE")
+		// c.CreationOptions.Unique is handled in the Constraints() call below
+		if parent != nil && m.dialect.SupportsForeignKeys() && strings.HasSuffix(c.Name, "cq_id") && c.Name != "cq_id" {
+			b.WriteString(" REFERENCES " + fmt.Sprintf("%s(cq_id)", parent.Name) + " ON DELETE CASCADE")
 		}
 		b.WriteString(",\n")
 	}
 
-	buildColumns(b, t.Columns, parent)
-	b.WriteString(fmt.Sprintf("\tCONSTRAINT %s_pk PRIMARY KEY(%s)\n", schema.TruncateTableConstraint(t.Name), strings.Join(t.PrimaryKeys(), ",")))
+	cons := m.dialect.Constraints(t)
+	for i, cn := range cons {
+		b.WriteByte('\t')
+		b.WriteString(cn)
+
+		if i < len(cons)-1 {
+			b.WriteByte(',')
+		}
+
+		b.WriteByte('\n')
+	}
+
 	b.WriteString(")")
 
 	up, down = make([]string, 0, 1+len(t.Relations)), make([]string, 0, 1+len(t.Relations))
@@ -133,7 +146,7 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, p
 			if col == nil {
 				continue
 			}
-			upColsByType[schema.GetPgTypeFromType(col.Type)] = append(upColsByType[schema.GetPgTypeFromType(col.Type)], d)
+			upColsByType[m.dialect.DBTypeFromType(col.Type)] = append(upColsByType[m.dialect.DBTypeFromType(col.Type)], d)
 		}
 		for _, d := range columnsToRemove {
 			if col := t.Column(d); col != nil {
@@ -162,7 +175,7 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, p
 			notice = "; -- could this be " + strconv.Quote(v) + " ?"
 		}
 
-		up = append(up, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), schema.GetPgTypeFromType(col.Type))+notice)
+		up = append(up, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), m.dialect.DBTypeFromType(col.Type))+notice)
 		downLast = append(downLast, fmt.Sprintf(dropColumnFromTable, strconv.Quote(t.Name), strconv.Quote(d))+notice)
 
 		if v, ok := similars[d]; ok {
@@ -200,23 +213,6 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, p
 	down = append(down, downLast...)
 
 	return up, down, nil
-}
-
-func buildColumns(b *strings.Builder, cc []schema.Column, parent *schema.Table) {
-	for _, c := range cc {
-		b.WriteByte('\t')
-		b.WriteString(strconv.Quote(c.Name) + " " + schema.GetPgTypeFromType(c.Type))
-		if c.CreationOptions.NotNull {
-			b.WriteString(" NOT NULL")
-		}
-		if c.CreationOptions.Unique {
-			b.WriteString(" UNIQUE")
-		}
-		if strings.HasSuffix(c.Name, "cq_id") && c.Name != "cq_id" {
-			b.WriteString(" REFERENCES " + fmt.Sprintf("%s(cq_id)", parent.Name) + " ON DELETE CASCADE")
-		}
-		b.WriteString(",\n")
-	}
 }
 
 func findSimilarColumnsWithSameType(setA, setB map[string][]string) map[string]string {
