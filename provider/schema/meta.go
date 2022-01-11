@@ -43,7 +43,8 @@ var (
 			return resource.Set(c.Name, resource.Id())
 		},
 		CreationOptions: ColumnCreationOptions{
-			Unique: true,
+			Unique:  true,
+			NotNull: true,
 		},
 	}
 	cqFetchDateColumn = Column{
