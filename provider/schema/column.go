@@ -141,8 +141,8 @@ type ColumnResolver func(ctx context.Context, meta ClientMeta, resource *Resourc
 
 // ColumnCreationOptions allow modification of how column is defined when table is created
 type ColumnCreationOptions struct {
-	Nullable bool
-	Unique   bool
+	Unique  bool
+	NotNull bool
 }
 
 // Column definition for Table

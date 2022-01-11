@@ -240,7 +240,7 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) error {
 	var resources = make(Resources, 0, len(objects))
 	for _, o := range objects {
-		resource := NewResourceData(e.Table, parent, o, e.extraFields)
+		resource := NewResourceData(e.Table, parent, o, e.extraFields, e.executionStart)
 		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resource); err != nil {
 			if partialFetchErr := e.checkPartialFetchError(err, resource, "failed to resolve resource"); partialFetchErr != nil {

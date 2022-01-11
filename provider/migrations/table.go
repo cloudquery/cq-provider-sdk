@@ -58,6 +58,9 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 	for _, c := range schema.GetDefaultSDKColumns() {
 		b.WriteByte('\t')
 		b.WriteString(strconv.Quote(c.Name) + ` ` + schema.GetPgTypeFromType(c.Type))
+		if c.CreationOptions.NotNull {
+			b.WriteString(" NOT NULL")
+		}
 		if c.CreationOptions.Unique {
 			b.WriteString(" UNIQUE")
 		}

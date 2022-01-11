@@ -3,6 +3,7 @@ package schema
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -13,13 +14,15 @@ type Meta struct {
 
 var (
 	cqMeta = Column{
-		Name:        "meta", // TODO rename to cq_meta
+		Name:        "cq_meta",
 		Type:        TypeJSON,
 		Description: "Meta column holds fetch information",
 		Resolver: func(ctx context.Context, meta ClientMeta, resource *Resource, c Column) error {
 			mi := Meta{
 				LastUpdate: time.Now().UTC(),
-				FetchId:    "", // TODO
+			}
+			if s, ok := resource.extraFields["cq_fetch_id"].(string); ok { // will it work?
+				mi.FetchId = s
 			}
 			b, _ := json.Marshal(mi)
 			return resource.Set(c.Name, b)
@@ -43,9 +46,27 @@ var (
 			Unique: true,
 		},
 	}
+	cqFetchDateColumn = Column{
+		Name:        "cq_fetch_date",
+		Type:        TypeTimestamp,
+		Description: "Time of fetch for this resource",
+		Resolver: func(ctx context.Context, meta ClientMeta, resource *Resource, c Column) error {
+			val, ok := resource.extraFields["cq_fetch_date"]
+			if !ok && !resource.executionStart.IsZero() {
+				val = resource.executionStart
+			}
+			if val == nil {
+				return fmt.Errorf("zero cq_fetch date")
+			}
+			return resource.Set(c.Name, val)
+		},
+		CreationOptions: ColumnCreationOptions{
+			NotNull: true,
+		},
+	}
 )
 
 // GetDefaultSDKColumns Default columns of the SDK, these columns are added to each table by default
 func GetDefaultSDKColumns() []Column {
-	return []Column{cqIdColumn, cqMeta}
+	return []Column{cqIdColumn, cqMeta, cqFetchDateColumn}
 }

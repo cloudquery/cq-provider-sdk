@@ -3,6 +3,7 @@ package schema
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -83,7 +84,7 @@ type zeroValuedStruct struct {
 
 // TestResourcePrimaryKey checks resource id generation when primary key is set on table
 func TestResourcePrimaryKey(t *testing.T) {
-	r := NewResourceData(testPrimaryKeyTable, nil, nil, nil)
+	r := NewResourceData(testPrimaryKeyTable, nil, nil, nil, time.Now())
 	// save random id
 	randomId := r.cqId
 	// test primary table no pk
@@ -103,10 +104,10 @@ func TestResourcePrimaryKey(t *testing.T) {
 }
 
 func TestRelationResourcePrimaryKey(t *testing.T) {
-	r := NewResourceData(testPrimaryKeyTable, nil, nil, nil)
+	r := NewResourceData(testPrimaryKeyTable, nil, nil, nil, time.Now())
 	r2 := NewResourceData(r.table.Relations[0], r, map[string]interface{}{
 		"rel_key_str": "test",
-	}, nil)
+	}, nil, time.Now())
 
 	mockedClient := new(mockedClientMeta)
 	logger := logging.New(&hclog.LoggerOptions{
@@ -126,12 +127,12 @@ func TestRelationResourcePrimaryKey(t *testing.T) {
 
 // TestResourcePrimaryKey checks resource id generation when primary key is set on table
 func TestResourceAddColumns(t *testing.T) {
-	r := NewResourceData(testPrimaryKeyTable, nil, nil, map[string]interface{}{"new_field": 1})
+	r := NewResourceData(testPrimaryKeyTable, nil, nil, map[string]interface{}{"new_field": 1}, time.Now())
 	assert.Equal(t, []string{"primary_key_str", "cq_id", "meta", "new_field"}, r.columns)
 }
 
 func TestResourceColumns(t *testing.T) {
-	r := NewResourceData(testTable, nil, nil, nil)
+	r := NewResourceData(testTable, nil, nil, nil, time.Now())
 	errf := r.Set("name", "test")
 	assert.Nil(t, errf)
 	assert.Equal(t, r.Get("name"), "test")
@@ -173,7 +174,7 @@ func TestResourceResolveColumns(t *testing.T) {
 	t.Run("test resolve column normal", func(t *testing.T) {
 		object := testTableStruct{}
 		_ = defaults.Set(&object)
-		r := NewResourceData(testTable, nil, object, nil)
+		r := NewResourceData(testTable, nil, object, nil, time.Now())
 		assert.Equal(t, r.cqId, r.Id())
 		// columns should be resolved from ColumnResolver functions or default functions
 		logger := logging.New(&hclog.LoggerOptions{
@@ -192,7 +193,7 @@ func TestResourceResolveColumns(t *testing.T) {
 	t.Run("test resolve zero columns", func(t *testing.T) {
 		object := zeroValuedStruct{}
 		_ = defaults.Set(&object)
-		r := NewResourceData(testZeroTable, nil, object, nil)
+		r := NewResourceData(testZeroTable, nil, object, nil, time.Now())
 		assert.Equal(t, r.cqId, r.Id())
 		// columns should be resolved from ColumnResolver functions or default functions
 		logger := logging.New(&hclog.LoggerOptions{
@@ -213,7 +214,7 @@ func TestResourceResolveColumns(t *testing.T) {
 		assert.Equal(t, nil, v[8])
 
 		object.ZeroIntPtr = nil
-		r = NewResourceData(testZeroTable, nil, object, nil)
+		r = NewResourceData(testZeroTable, nil, object, nil, time.Now())
 		err = exec.resolveColumns(context.TODO(), mockedClient, r, testZeroTable.Columns)
 		assert.Nil(t, err)
 		v, _ = r.Values()
@@ -222,8 +223,8 @@ func TestResourceResolveColumns(t *testing.T) {
 }
 
 func TestResources(t *testing.T) {
-	r1 := NewResourceData(testPrimaryKeyTable, nil, nil, map[string]interface{}{"new_field": 1})
-	r2 := NewResourceData(testPrimaryKeyTable, nil, nil, map[string]interface{}{"new_field": 1})
+	r1 := NewResourceData(testPrimaryKeyTable, nil, nil, map[string]interface{}{"new_field": 1}, time.Now())
+	r2 := NewResourceData(testPrimaryKeyTable, nil, nil, map[string]interface{}{"new_field": 1}, time.Now())
 	assert.Equal(t, []string{"primary_key_str", "cq_id", "meta", "new_field"}, r1.columns)
 	assert.Equal(t, []string{"primary_key_str", "cq_id", "meta", "new_field"}, r2.columns)
 

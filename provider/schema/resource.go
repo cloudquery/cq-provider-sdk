@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/hashstructure"
 	"github.com/thoas/go-funk"
@@ -21,22 +22,24 @@ type Resource struct {
 	// Set if this is an embedded table
 	Parent *Resource
 	// internal fields
-	table       *Table
-	data        map[string]interface{}
-	cqId        uuid.UUID
-	extraFields map[string]interface{}
-	columns     []string
+	table          *Table
+	data           map[string]interface{}
+	cqId           uuid.UUID
+	extraFields    map[string]interface{}
+	columns        []string
+	executionStart time.Time
 }
 
-func NewResourceData(t *Table, parent *Resource, item interface{}, extraFields map[string]interface{}) *Resource {
+func NewResourceData(t *Table, parent *Resource, item interface{}, extraFields map[string]interface{}, startTime time.Time) *Resource {
 	return &Resource{
-		Item:        item,
-		Parent:      parent,
-		table:       t,
-		data:        make(map[string]interface{}),
-		cqId:        uuid.New(),
-		columns:     getResourceColumns(t, extraFields),
-		extraFields: extraFields,
+		Item:           item,
+		Parent:         parent,
+		table:          t,
+		data:           make(map[string]interface{}),
+		cqId:           uuid.New(),
+		columns:        getResourceColumns(t, extraFields),
+		extraFields:    extraFields,
+		executionStart: startTime,
 	}
 }
 func (r *Resource) Keys() []string {
