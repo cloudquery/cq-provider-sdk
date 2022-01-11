@@ -32,8 +32,8 @@ var (
 	resources = []Resource{
 		{
 			data: map[string]interface{}{
-				"test": stringJson,
-				"meta": make(map[string]string),
+				"test":    stringJson,
+				"cq_meta": make(map[string]string),
 			},
 			table: &jsonTestTable,
 		},
