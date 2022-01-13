@@ -141,12 +141,12 @@ var (
 
 func TestJsonColumn(t *testing.T) {
 	for _, r := range resources {
-		_, err := getResourceValues(&r)
+		_, err := PostgresDialect{}.GetResourceValues(&r)
 		assert.Nil(t, err)
 	}
 
 	for _, r := range failResources {
-		_, err := getResourceValues(&r)
+		_, err := PostgresDialect{}.GetResourceValues(&r)
 		assert.Error(t, err)
 	}
 }

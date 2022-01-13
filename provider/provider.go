@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 
 	"github.com/thoas/go-funk"
@@ -102,7 +103,7 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	// set database creator
 	if p.databaseCreator == nil {
 		p.databaseCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error) {
-			return schema.NewPgDatabase(ctx, logger, dbURL)
+			return database.New(ctx, logger, dbURL)
 		}
 	}
 

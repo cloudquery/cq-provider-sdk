@@ -6,10 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/hashstructure"
 	"github.com/thoas/go-funk"
-
-	"github.com/google/uuid"
 )
 
 type Resources []*Resource
@@ -107,6 +106,13 @@ func (r *Resource) GenerateCQId() error {
 	}
 	r.cqId = id
 	return nil
+}
+
+func (r *Resource) TableName() string {
+	if r.table == nil {
+		return ""
+	}
+	return r.table.Name
 }
 
 func (r Resource) getColumnByName(column string) *Column {

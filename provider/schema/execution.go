@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
+	"github.com/jackc/pgx/v4"
 	"github.com/modern-go/reflect2"
 
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
@@ -23,6 +24,17 @@ import (
 // executionJitter adds a -1 minute to execution of fetch, so if a user fetches only 1 resources and it finishes
 // faster than the <1s it won't be deleted by remove stale.
 const executionJitter = -1 * time.Minute
+
+//go:generate mockgen -package=mock -destination=./mocks/mock_database.go . Database
+type Database interface {
+	Insert(ctx context.Context, t *Table, instance Resources) error
+	Exec(ctx context.Context, query string, args ...interface{}) error
+	Delete(ctx context.Context, t *Table, kvFilters []interface{}) error
+	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
+	RemoveStaleData(ctx context.Context, t *Table, executionStart time.Time, kvFilters []interface{}) error
+	CopyFrom(ctx context.Context, resources Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error
+	Close()
+}
 
 type ClientMeta interface {
 	Logger() hclog.Logger

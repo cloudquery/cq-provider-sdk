@@ -1,8 +1,12 @@
 package schema
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
+
+	"github.com/modern-go/reflect2"
 )
 
 type DialectType string
@@ -22,10 +26,12 @@ type Dialect interface {
 	// Constraints returns constraint definitions for table, according to dialect
 	Constraints(t *Table) []string
 
-	// DBTypeFromType returns the database type from the given ValueType
+	SupportsForeignKeys() bool
+
+	// DBTypeFromType returns the database type from the given ValueType. Always lowercase.
 	DBTypeFromType(v ValueType) string
 
-	SupportsForeignKeys() bool
+	GetResourceValues(r *Resource) ([]interface{}, error)
 }
 
 func GetDialect(t DialectType) Dialect {
@@ -69,11 +75,114 @@ func (d PostgresDialect) Constraints(t *Table) []string {
 }
 
 func (d PostgresDialect) DBTypeFromType(v ValueType) string {
-	return GetPgTypeFromType(v)
+	switch v {
+	case TypeBool:
+		return "boolean"
+	case TypeInt:
+		return "integer"
+	case TypeBigInt:
+		return "bigint"
+	case TypeSmallInt:
+		return "smallint"
+	case TypeFloat:
+		return "float"
+	case TypeUUID:
+		return "uuid"
+	case TypeString:
+		return "text"
+	case TypeJSON:
+		return "jsonb"
+	case TypeIntArray:
+		return "integer[]"
+	case TypeStringArray:
+		return "text[]"
+	case TypeTimestamp:
+		return "timestamp without time zone"
+	case TypeByteArray:
+		return "bytea"
+	case TypeInvalid:
+		fallthrough
+	case TypeInet:
+		return "inet"
+	case TypeMacAddr:
+		return "mac"
+	case TypeInetArray:
+		return "inet[]"
+	case TypeMacAddrArray:
+		return "mac[]"
+	case TypeCIDR:
+		return "cidr"
+	case TypeCIDRArray:
+		return "cidr[]"
+	default:
+		panic("invalid type")
+	}
 }
 
 func (d PostgresDialect) SupportsForeignKeys() bool {
 	return true
+}
+
+func (d PostgresDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
+	values := make([]interface{}, 0)
+	for _, c := range append(r.table.Columns, GetDefaultSDKColumns()...) {
+		v := r.Get(c.Name)
+		if err := c.ValidateType(v); err != nil {
+			return nil, err
+		}
+		if c.Type == TypeJSON {
+			if v == nil {
+				values = append(values, v)
+				continue
+			}
+			if reflect2.TypeOf(v).Kind() == reflect.Map {
+				values = append(values, v)
+				continue
+			}
+			switch data := v.(type) {
+			case map[string]interface{}:
+				values = append(values, data)
+			case string:
+				newV := make(map[string]interface{})
+				err := json.Unmarshal([]byte(data), &newV)
+				if err != nil {
+					return nil, err
+				}
+				values = append(values, newV)
+			case *string:
+				var newV interface{}
+				err := json.Unmarshal([]byte(*data), &newV)
+				if err != nil {
+					return nil, err
+				}
+				values = append(values, newV)
+			case []byte:
+				var newV interface{}
+				err := json.Unmarshal(data, &newV)
+				if err != nil {
+					return nil, err
+				}
+				values = append(values, newV)
+			default:
+				d, err := json.Marshal(data)
+				if err != nil {
+					return nil, err
+				}
+				var newV interface{}
+				err = json.Unmarshal(d, &newV)
+				if err != nil {
+					return nil, err
+				}
+				values = append(values, newV)
+			}
+		} else {
+			values = append(values, v)
+		}
+	}
+	for _, v := range r.extraFields {
+		values = append(values, v)
+	}
+	return values, nil
 }
 
 type TSDBDialect struct{}
@@ -104,7 +213,11 @@ func (d TSDBDialect) Constraints(t *Table) []string {
 }
 
 func (d TSDBDialect) DBTypeFromType(v ValueType) string {
-	return GetPgTypeFromType(v)
+	return PostgresDialect{}.DBTypeFromType(v)
+}
+
+func (d TSDBDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
+	return PostgresDialect{}.GetResourceValues(r)
 }
 
 func (d TSDBDialect) SupportsForeignKeys() bool {
