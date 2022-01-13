@@ -80,7 +80,7 @@ type MigrationHook interface {
 	BeforeMigrationDown(ctx context.Context, conn *pgx.Conn) error
 }
 
-func NewMigrator(log hclog.Logger, migrationFiles map[string][]byte, dsn string, providerName string) (*Migrator, error) {
+func New(log hclog.Logger, migrationFiles map[string][]byte, dsn string, providerName string) (*Migrator, error) {
 	versionMapper := make(map[string]uint)
 	versions := make(version.Collection, 0)
 	mm := afero.NewMemMapFs()
