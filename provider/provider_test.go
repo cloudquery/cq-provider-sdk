@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/schema/mocks"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/mock"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
@@ -283,7 +283,7 @@ type FetchResourceTableTest struct {
 	Name                   string
 	ExpectedFetchResponses []*cqproto.FetchResourcesResponse
 	ExpectedError          error
-	MockDBFunc             func(ctrl *gomock.Controller) *mocks.MockDatabase
+	MockDBFunc             func(ctrl *gomock.Controller) *mock.MockDatabase
 	PartialFetch           bool
 	ResourcesToFetch       []string
 }
@@ -297,8 +297,8 @@ var fetchCases = []FetchResourceTableTest{
 				Error:        "",
 			}},
 		ExpectedError: nil,
-		MockDBFunc: func(ctrl *gomock.Controller) *mocks.MockDatabase {
-			mockDB := mocks.NewMockDatabase(ctrl)
+		MockDBFunc: func(ctrl *gomock.Controller) *mock.MockDatabase {
+			mockDB := mock.NewMockDatabase(ctrl)
 			//mockDB.EXPECT().Insert(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDB.EXPECT().Close()
 			return mockDB
@@ -314,8 +314,8 @@ var fetchCases = []FetchResourceTableTest{
 				Error:        "bad error",
 			}},
 		ExpectedError: nil,
-		MockDBFunc: func(ctrl *gomock.Controller) *mocks.MockDatabase {
-			mockDB := mocks.NewMockDatabase(ctrl)
+		MockDBFunc: func(ctrl *gomock.Controller) *mock.MockDatabase {
+			mockDB := mock.NewMockDatabase(ctrl)
 			//mockDB.EXPECT().Insert(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDB.EXPECT().Close()
 			return mockDB

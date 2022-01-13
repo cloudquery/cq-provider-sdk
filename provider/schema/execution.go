@@ -25,7 +25,7 @@ import (
 // faster than the <1s it won't be deleted by remove stale.
 const executionJitter = -1 * time.Minute
 
-//go:generate mockgen -package=mock -destination=./mocks/mock_database.go . Database
+//go:generate mockgen -package=mock -destination=./mock/mock_database.go . Database
 type Database interface {
 	Insert(ctx context.Context, t *Table, instance Resources) error
 	Exec(ctx context.Context, query string, args ...interface{}) error
@@ -34,6 +34,7 @@ type Database interface {
 	RemoveStaleData(ctx context.Context, t *Table, executionStart time.Time, kvFilters []interface{}) error
 	CopyFrom(ctx context.Context, resources Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error
 	Close()
+	Dialect() Dialect
 }
 
 type ClientMeta interface {
@@ -252,7 +253,7 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) error {
 	var resources = make(Resources, 0, len(objects))
 	for _, o := range objects {
-		resource := NewResourceData(e.Table, parent, o, e.extraFields, e.executionStart)
+		resource := NewResourceData(e.Db.Dialect(), e.Table, parent, o, e.extraFields, e.executionStart)
 		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resource); err != nil {
 			if partialFetchErr := e.checkPartialFetchError(err, resource, "failed to resolve resource"); partialFetchErr != nil {
@@ -328,7 +329,19 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 			err = fmt.Errorf("recovered from panic: %s", r)
 		}
 	}()
-	if err = e.resolveColumns(ctx, meta, resource, resource.table.Columns); err != nil {
+
+	cols := e.Db.Dialect().Columns(resource.table)
+
+	providerCols, internalCols := make([]Column, 0, len(cols)), make([]Column, 0, len(cols))
+	for i := range cols {
+		if cols[i].Internal {
+			internalCols = append(internalCols, cols[i])
+		} else {
+			providerCols = append(providerCols, cols[i])
+		}
+	}
+
+	if err = e.resolveColumns(ctx, meta, resource, providerCols); err != nil {
 		return fmt.Errorf("resolve columns error: %w", err)
 	}
 	// call PostRowResolver if defined after columns have been resolved
@@ -337,8 +350,8 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 			return fmt.Errorf("post resource resolver failed: %w", err)
 		}
 	}
-	// Finally, resolve default SDK columns resource
-	for _, c := range GetDefaultSDKColumns() {
+	// Finally, resolve columns internal to the SDK
+	for _, c := range internalCols {
 		if err = c.Resolver(ctx, meta, resource, c); err != nil {
 			return fmt.Errorf("default column %s resolver execution failed: %w", c.Name, err)
 		}

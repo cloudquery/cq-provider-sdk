@@ -24,25 +24,27 @@ type Resource struct {
 	table          *Table
 	data           map[string]interface{}
 	cqId           uuid.UUID
-	extraFields    map[string]interface{}
+	metadata       map[string]interface{}
 	columns        []string
+	dialect        Dialect
 	executionStart time.Time
 }
 
-func NewResourceData(t *Table, parent *Resource, item interface{}, extraFields map[string]interface{}, startTime time.Time) *Resource {
+func NewResourceData(dialect Dialect, t *Table, parent *Resource, item interface{}, metadata map[string]interface{}, startTime time.Time) *Resource {
 	return &Resource{
 		Item:           item,
 		Parent:         parent,
 		table:          t,
 		data:           make(map[string]interface{}),
 		cqId:           uuid.New(),
-		columns:        getResourceColumns(t, extraFields),
-		extraFields:    extraFields,
+		columns:        dialect.Columns(t).Names(),
+		metadata:       metadata,
+		dialect:        dialect,
 		executionStart: startTime,
 	}
 }
 func (r *Resource) Keys() []string {
-	tablePrimKeys := r.table.PrimaryKeys()
+	tablePrimKeys := r.dialect.PrimaryKeys(r.table)
 	if len(tablePrimKeys) == 0 {
 		return []string{}
 	}
@@ -75,14 +77,11 @@ func (r *Resource) Id() uuid.UUID {
 
 func (r *Resource) Values() ([]interface{}, error) {
 	values := make([]interface{}, 0)
-	for _, c := range append(r.table.Columns, GetDefaultSDKColumns()...) {
+	for _, c := range r.dialect.Columns(r.table) {
 		v := r.Get(c.Name)
 		if err := c.ValidateType(v); err != nil {
 			return nil, err
 		}
-		values = append(values, v)
-	}
-	for _, v := range r.extraFields {
 		values = append(values, v)
 	}
 	return values, nil
@@ -92,8 +91,9 @@ func (r *Resource) GenerateCQId() error {
 	if len(r.table.Options.PrimaryKeys) == 0 {
 		return nil
 	}
-	objs := make([]interface{}, len(r.table.PrimaryKeys()))
-	for i, pk := range r.table.PrimaryKeys() {
+	pks := r.dialect.PrimaryKeys(r.table)
+	objs := make([]interface{}, len(pks))
+	for i, pk := range pks {
 		value := r.Get(pk)
 		if value == nil {
 			return fmt.Errorf("failed to generate cq_id for %s, pk field missing %s", r.table.Name, pk)
@@ -137,14 +137,6 @@ func hashUUID(objs interface{}) (uuid.UUID, error) {
 	}
 	data := digester.Sum(nil)
 	return uuid.NewSHA1(uuid.Nil, data), nil
-}
-
-func getResourceColumns(t *Table, fields map[string]interface{}) []string {
-	columns := t.ColumnNames()
-	for k := range fields {
-		columns = append(columns, k)
-	}
-	return columns
 }
 
 func (rr Resources) GetIds() []uuid.UUID {

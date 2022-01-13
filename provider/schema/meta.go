@@ -21,12 +21,13 @@ var (
 			mi := Meta{
 				LastUpdate: time.Now().UTC(),
 			}
-			if s, ok := resource.extraFields["cq_fetch_id"].(string); ok { // will it work?
+			if s, ok := resource.metadata["cq_fetch_id"].(string); ok { // will it work?
 				mi.FetchId = s
 			}
 			b, _ := json.Marshal(mi)
 			return resource.Set(c.Name, b)
 		},
+		Internal: true,
 	}
 	cqIdColumn = Column{
 		Name:        "cq_id",
@@ -46,13 +47,14 @@ var (
 			Unique:  true,
 			NotNull: true,
 		},
+		Internal: true,
 	}
 	cqFetchDateColumn = Column{
 		Name:        "cq_fetch_date",
 		Type:        TypeTimestamp,
 		Description: "Time of fetch for this resource",
 		Resolver: func(ctx context.Context, meta ClientMeta, resource *Resource, c Column) error {
-			val, ok := resource.extraFields["cq_fetch_date"]
+			val, ok := resource.metadata["cq_fetch_date"]
 			if !ok && !resource.executionStart.IsZero() {
 				val = resource.executionStart
 			}
@@ -64,10 +66,6 @@ var (
 		CreationOptions: ColumnCreationOptions{
 			NotNull: true,
 		},
+		Internal: true,
 	}
 )
-
-// GetDefaultSDKColumns Default columns of the SDK, these columns are added to each table by default
-func GetDefaultSDKColumns() []Column {
-	return []Column{cqIdColumn, cqMeta, cqFetchDateColumn}
-}

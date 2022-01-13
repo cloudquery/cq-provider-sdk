@@ -116,3 +116,19 @@ func (_m *DatabaseMock) RemoveStaleData(ctx context.Context, t *Table, execution
 
 	return r0
 }
+
+// Dialect mocks base method.
+func (_m *DatabaseMock) Dialect() Dialect {
+	ret := _m.Called()
+
+	var r0 Dialect
+	if rf, ok := ret.Get(0).(func() Dialect); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(Dialect)
+		}
+	}
+
+	return r0
+}

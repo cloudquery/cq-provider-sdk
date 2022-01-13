@@ -11,7 +11,6 @@ import (
 type DB struct {
 	schema.Database
 
-	dialect     schema.Dialect
 	dialectType schema.DialectType
 }
 
@@ -30,7 +29,6 @@ func New(ctx context.Context, logger hclog.Logger, dsn string) (*DB, error) {
 
 	return &DB{
 		Database:    db,
-		dialect:     dialect,
 		dialectType: dType,
 	}, nil
 }

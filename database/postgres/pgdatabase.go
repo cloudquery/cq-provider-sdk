@@ -178,6 +178,10 @@ func (p PgDatabase) Close() {
 	p.pool.Close()
 }
 
+func (p PgDatabase) Dialect() schema.Dialect {
+	return p.sd
+}
+
 func quoteColumns(columns []string) []string {
 	for i, v := range columns {
 		columns[i] = strconv.Quote(v)

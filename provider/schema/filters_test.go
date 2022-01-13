@@ -21,7 +21,7 @@ func TestDeleteParentId(t *testing.T) {
 	mockedClient.On("Logger", mock.Anything).Return(logger)
 
 	object := testTableStruct{}
-	r := NewResourceData(testTable, nil, object, nil, time.Now())
+	r := NewResourceData(PostgresDialect{}, testTable, nil, object, nil, time.Now())
 	_ = r.Set("name", "test")
 	assert.Equal(t, []interface{}{"name", r.Id()}, f(mockedClient, r))
 

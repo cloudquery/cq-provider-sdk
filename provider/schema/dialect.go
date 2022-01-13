@@ -129,7 +129,7 @@ func (d PostgresDialect) SupportsForeignKeys() bool {
 
 func (d PostgresDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
 	values := make([]interface{}, 0)
-	for _, c := range append(r.table.Columns, GetDefaultSDKColumns()...) {
+	for _, c := range d.Columns(r.table) {
 		v := r.Get(c.Name)
 		if err := c.ValidateType(v); err != nil {
 			return nil, err
@@ -183,7 +183,7 @@ func (d PostgresDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
 			values = append(values, v)
 		}
 	}
-	for _, v := range r.extraFields {
+	for _, v := range r.metadata {
 		values = append(values, v)
 	}
 	return values, nil
