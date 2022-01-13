@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cloudquery/cq-provider-sdk/database"
+	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 
 	"github.com/thoas/go-funk"
@@ -61,10 +62,12 @@ type Provider struct {
 	extraFields map[string]interface{}
 	// databaseCreator creates a database based on requested engine
 	databaseCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error)
+	// dialectType is the detected dialect type in databaseCreator
+	dialectType schema.DialectType
 }
 
 func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
-	m, err := ReadMigrationFiles(p.Logger, p.Migrations)
+	m, err := migrator.ReadMigrationFiles(p.Logger, p.dialectType, p.Migrations)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +106,12 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	// set database creator
 	if p.databaseCreator == nil {
 		p.databaseCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error) {
-			return database.New(ctx, logger, dbURL)
+			d, err := database.New(ctx, logger, dbURL)
+			if err != nil {
+				return d, err
+			}
+			p.dialectType = d.DialectType()
+			return d, nil
 		}
 	}
 

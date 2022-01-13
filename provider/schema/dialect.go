@@ -16,6 +16,10 @@ const (
 	TSDB     = DialectType("timescale")
 )
 
+func (t DialectType) MigrationDirectory() string {
+	return string(t)
+}
+
 type Dialect interface {
 	// PrimaryKeys returns the primary keys of table according to dialect
 	PrimaryKeys(t *Table) []string

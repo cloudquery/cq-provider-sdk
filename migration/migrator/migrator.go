@@ -1,4 +1,4 @@
-package provider
+package migrator
 
 import (
 	"context"
@@ -10,14 +10,14 @@ import (
 	"strings"
 
 	"github.com/cloudquery/cq-provider-sdk/helpers"
-	"github.com/hashicorp/go-version"
-
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-version"
 	"github.com/jackc/pgx/v4"
 	"github.com/spf13/afero"
 	"github.com/spf13/cast"
@@ -29,18 +29,21 @@ const (
 	dropTableSQL                    = "DROP TABLE IF EXISTS %s CASCADE"
 )
 
-func ReadMigrationFiles(log hclog.Logger, migrationFiles embed.FS) (map[string][]byte, error) {
+func ReadMigrationFiles(log hclog.Logger, dt schema.DialectType, migrationFiles embed.FS) (map[string][]byte, error) {
 	var (
 		err        error
 		migrations = make(map[string][]byte)
 	)
-	files, err := migrationFiles.ReadDir(migrationsEmbeddedDirectoryPath)
+
+	basePath := path.Join(migrationsEmbeddedDirectoryPath, dt.MigrationDirectory())
+
+	files, err := migrationFiles.ReadDir(basePath)
 	if err != nil {
 		log.Info("Provider doesn't define any migration files")
 		return migrations, nil
 	}
 	for _, m := range files {
-		f, err := migrationFiles.Open(path.Join(migrationsEmbeddedDirectoryPath, m.Name()))
+		f, err := migrationFiles.Open(path.Join(basePath, m.Name()))
 		if err != nil {
 			return nil, err
 		}

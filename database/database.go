@@ -11,7 +11,8 @@ import (
 type DB struct {
 	schema.Database
 
-	dialect schema.Dialect
+	dialect     schema.Dialect
+	dialectType schema.DialectType
 }
 
 func New(ctx context.Context, logger hclog.Logger, dsn string) (*DB, error) {
@@ -28,7 +29,12 @@ func New(ctx context.Context, logger hclog.Logger, dsn string) (*DB, error) {
 	}
 
 	return &DB{
-		Database: db,
-		dialect:  dialect,
+		Database:    db,
+		dialect:     dialect,
+		dialectType: dType,
 	}, nil
+}
+
+func (d *DB) DialectType() schema.DialectType {
+	return d.dialectType
 }
