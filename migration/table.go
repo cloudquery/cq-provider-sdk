@@ -1,4 +1,4 @@
-package migrations
+package migration
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/migrations/longestcommon"
+	"github.com/cloudquery/cq-provider-sdk/migration/longestcommon"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/hashicorp/go-hclog"
