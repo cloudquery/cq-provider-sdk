@@ -71,16 +71,11 @@ type Migrator struct {
 	// maps between semantic version to the timestamp it was created at
 	versionMapper map[string]uint
 	versions      version.Collection
-	migrationHook MigrationHook
+
+	postHook func(context.Context) error
 }
 
-type MigrationHook interface {
-	BeforeMigrationUp(ctx context.Context, conn *pgx.Conn) error
-	AfterMigrationUp(ctx context.Context, conn *pgx.Conn) error
-	BeforeMigrationDown(ctx context.Context, conn *pgx.Conn) error
-}
-
-func New(log hclog.Logger, migrationFiles map[string][]byte, dsn string, providerName string) (*Migrator, error) {
+func New(log hclog.Logger, migrationFiles map[string][]byte, dsn string, providerName string, postHook func(context.Context) error) (*Migrator, error) {
 	versionMapper := make(map[string]uint)
 	versions := make(version.Collection, 0)
 	mm := afero.NewMemMapFs()
@@ -129,11 +124,15 @@ func New(log hclog.Logger, migrationFiles map[string][]byte, dsn string, provide
 		driver:        driver,
 		versionMapper: versionMapper,
 		versions:      versions,
+		postHook:      postHook,
 	}, nil
 }
 
-func (m *Migrator) SetHook(hook MigrationHook) {
-	m.migrationHook = hook
+func (m *Migrator) callPostHook(ctx context.Context) error {
+	if m.postHook == nil {
+		return nil
+	}
+	return m.postHook(ctx)
 }
 
 func (m *Migrator) Close() error {
@@ -141,12 +140,16 @@ func (m *Migrator) Close() error {
 	return dbErr
 }
 
-func (m *Migrator) UpgradeProvider(version string) error {
-	if version == "latest" {
-		if err := m.m.Up(); err != nil {
-			return err
+func (m *Migrator) UpgradeProvider(version string) (retErr error) {
+	defer func() {
+		if retErr != nil {
+			return
 		}
-		return m.applyHook(context.TODO(), false)
+		retErr = m.callPostHook(context.Background())
+	}()
+
+	if version == "latest" {
+		return m.m.Up()
 	}
 
 	mv, err := m.FindLatestMigration(version)
@@ -154,36 +157,37 @@ func (m *Migrator) UpgradeProvider(version string) error {
 		return fmt.Errorf("version %s upgrade doesn't exist", version)
 	}
 	m.log.Debug("upgrading provider version", "version", version, "migrator_version", mv)
-
-	if err := m.m.Migrate(mv); err != nil {
-		return err
-	}
-
-	return m.applyHook(context.TODO(), false)
+	return m.m.Migrate(mv)
 }
 
-func (m *Migrator) DowngradeProvider(version string) error {
+func (m *Migrator) DowngradeProvider(version string) (retErr error) {
+	defer func() {
+		if retErr != nil {
+			return
+		}
+		retErr = m.callPostHook(context.Background())
+	}()
+
 	mv, err := m.FindLatestMigration(version)
 	if err != nil {
 		return fmt.Errorf("version %s upgrade doesn't exist", version)
 	}
 	m.log.Debug("downgrading provider version", "version", version, "migrator_version", mv)
 
-	if err := m.applyHook(context.TODO(), true); err != nil {
-		return err
-	}
-
 	return m.m.Migrate(mv)
 }
 
-func (m *Migrator) DropProvider(ctx context.Context, schema map[string]*schema.Table) error {
+func (m *Migrator) DropProvider(ctx context.Context, schema map[string]*schema.Table) (retErr error) {
+	defer func() {
+		if retErr != nil {
+			return
+		}
+		retErr = m.callPostHook(context.Background())
+	}()
+
 	// we don't use go-migrate's drop since its too violent and it will remove all tables of other providers,
 	// instead we will only drop the migration table and all schema's tables
 	// we additionally don't use a transaction since this results quite often in out of shared memory errors
-	if err := m.applyHook(ctx, true); err != nil {
-		return err
-	}
-
 	conn, err := pgx.Connect(ctx, m.dsn)
 	if err != nil {
 		return err
@@ -219,7 +223,14 @@ func (m *Migrator) Version() (string, bool, error) {
 	return "v0.0.0", dirty, err
 }
 
-func (m *Migrator) SetVersion(requestedVersion string) error {
+func (m *Migrator) SetVersion(requestedVersion string) (retErr error) {
+	defer func() {
+		if retErr != nil {
+			return
+		}
+		retErr = m.callPostHook(context.Background())
+	}()
+
 	mv, err := m.FindLatestMigration(requestedVersion)
 	if err != nil {
 		return err
@@ -260,24 +271,6 @@ func (m *Migrator) FindLatestMigration(requestedVersion string) (uint, error) {
 	}
 	mv = m.versionMapper[m.versions[len(m.versions)-1].Original()]
 	return mv, nil
-}
-
-func (m *Migrator) applyHook(ctx context.Context, pre bool) error {
-	if m.migrationHook == nil {
-		return nil
-	}
-
-	conn, err := pgx.Connect(ctx, m.dsn)
-	if err != nil {
-		return err
-	}
-	defer conn.Close(ctx)
-
-	if pre {
-		return m.migrationHook.BeforeMigrationDown(ctx, conn)
-	}
-
-	return m.migrationHook.AfterMigrationUp(ctx, conn)
 }
 
 func dropTables(ctx context.Context, conn *pgx.Conn, table *schema.Table) error {

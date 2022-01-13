@@ -9,7 +9,14 @@ import (
 )
 
 func init() {
-	dburl.Register(dburl.Scheme{"timescale", dburl.GenPostgres, dburl.TransportUnix, false, []string{"timescaledb", "tsdb", "ts"}, ""})
+	dburl.Register(dburl.Scheme{
+		Driver:    "timescale",
+		Generator: dburl.GenPostgres,
+		Transport: dburl.TransportUnix,
+		Opaque:    false,
+		Aliases:   []string{"timescaledb", "tsdb", "ts"},
+		Override:  "",
+	})
 }
 
 func ParseConnectionString(connString string) (*dburl.URL, error) {

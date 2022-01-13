@@ -45,7 +45,7 @@ var (
 )
 
 func TestMigrations(t *testing.T) {
-	m, err := New(hclog.Default(), simpleMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test")
+	m, err := New(hclog.Default(), simpleMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test", nil)
 	assert.Nil(t, err)
 
 	err = m.DropProvider(context.Background(), nil)
@@ -81,7 +81,7 @@ func TestMigrations(t *testing.T) {
 
 // TestMigrationJumps tests an edge case we request a higher version but latest migration is a previous version
 func TestMigrationJumps(t *testing.T) {
-	m, err := New(hclog.Default(), complexMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test")
+	m, err := New(hclog.Default(), complexMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test", nil)
 	assert.Nil(t, err)
 
 	err = m.DropProvider(context.Background(), nil)
@@ -95,10 +95,10 @@ func TestMigrationJumps(t *testing.T) {
 }
 
 func TestMultiProviderMigrations(t *testing.T) {
-	mtest, err := New(hclog.Default(), simpleMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test")
+	mtest, err := New(hclog.Default(), simpleMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test", nil)
 	assert.Nil(t, err)
 
-	mtest2, err := New(hclog.Default(), simpleMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test2")
+	mtest2, err := New(hclog.Default(), simpleMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test2", nil)
 	assert.Nil(t, err)
 
 	err = mtest.DropProvider(context.Background(), nil)
@@ -130,7 +130,7 @@ func TestMultiProviderMigrations(t *testing.T) {
 }
 
 func TestFindLatestMigration(t *testing.T) {
-	mtest, err := New(hclog.Default(), complexMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test")
+	mtest, err := New(hclog.Default(), complexMigrations, "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable", "test", nil)
 	assert.Nil(t, err)
 	mv, err := mtest.FindLatestMigration("v0.0.3")
 	assert.Nil(t, err)
