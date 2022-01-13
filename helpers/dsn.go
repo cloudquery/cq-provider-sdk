@@ -8,16 +8,22 @@ import (
 	"github.com/xo/dburl"
 )
 
+func init() {
+	dburl.Register(dburl.Scheme{"timescale", dburl.GenPostgres, dburl.TransportUnix, false, []string{"timescaledb", "tsdb", "ts"}, ""})
+}
+
 func ParseConnectionString(connString string) (*dburl.URL, error) {
-	var err error
-	// connString may be a database URL or a DSN
-	if !(strings.HasPrefix(connString, "postgres://") || strings.HasPrefix(connString, "postgresql://")) {
+	u, err := dburl.Parse(connString)
+	if err == dburl.ErrInvalidDatabaseScheme {
+		// connString may be a database URL or a DSN
 		connString, err = convertDSNToURL(connString)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse dsn string, %w", err)
 		}
+		u, err = dburl.Parse(connString)
 	}
-	return dburl.Parse(connString)
+
+	return u, err
 }
 
 var asciiSpace = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
