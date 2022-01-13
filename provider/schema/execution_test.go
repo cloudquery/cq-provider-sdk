@@ -447,31 +447,6 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	//t.Run("inject fields into execution", func(t *testing.T) {
-	//	mockDb := new(DatabaseMock)
-	//	mockDb.On("Dialect").Return(PostgresDialect{})
-	//	exec := NewExecutionData(mockDb, logger, testTable, false, map[string]interface{}{"injected_field": 1}, false)
-	//	testTable.Resolver = dataReturningSingleResolver
-	//	testTable.DeleteFilter = nil
-	//	var expectedResource *Resource
-	//	testTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
-	//		err := parent.Set("name", "other")
-	//		assert.Nil(t, err)
-	//		expectedResource = parent
-	//		return nil
-	//	}
-	//	mockDb.On("CopyFrom", mock.Anything, mock.Anything, false, map[string]interface{}{"injected_field": 1}).Return(nil)
-	//	count, err := exec.ResolveTable(context.Background(), mockedClient, nil)
-	//	assert.Equal(t, count, uint64(1))
-	//	assert.Nil(t, err)
-	//	assert.Equal(t, expectedResource.data["name"], "other")
-	//	assert.Equal(t, 1, expectedResource.metadata["injected_field"])
-	//	values, err := expectedResource.Values()
-	//	assert.Nil(t, err)
-	//	assert.Equal(t, []string{"name", "name_no_prefix", "prefix_name", "cq_id", "cq_meta", "injected_field"}, expectedResource.columns)
-	//	assert.Equal(t, []interface{}{"other", "name_no_prefix", "prefix_name", expectedResource.cqId, expectedResource.Get("cq_meta"), 1}, values)
-	//})
-
 	t.Run("test partial fetch post resource resolver", func(t *testing.T) {
 		mockDb := new(DatabaseMock)
 		mockDb.On("Dialect").Return(PostgresDialect{})
