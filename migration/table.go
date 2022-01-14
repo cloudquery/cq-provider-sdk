@@ -37,13 +37,13 @@ func NewTableCreator(log hclog.Logger, dialect schema.Dialect) *TableCreator {
 }
 
 // CreateTable generates CREATE TABLE definitions for the given table and runs them on the given conn
-func (m TableCreator) CreateTable(ctx context.Context, conn *pgxpool.Conn, t, p *schema.Table) error {
+func (m TableCreator) CreateTable(ctx context.Context, conn schema.QueryExecer, t, p *schema.Table) error {
 	ups, _, err := m.CreateTableDefinitions(ctx, t, p)
 	if err != nil {
 		return err
 	}
 	for _, sql := range ups {
-		if _, err := conn.Exec(ctx, sql); err != nil {
+		if err := conn.Exec(ctx, sql); err != nil {
 			return err
 		}
 	}

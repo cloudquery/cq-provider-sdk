@@ -27,14 +27,19 @@ const executionJitter = -1 * time.Minute
 
 //go:generate mockgen -package=mock -destination=./mock/mock_database.go . Database
 type Database interface {
+	QueryExecer
+
 	Insert(ctx context.Context, t *Table, instance Resources) error
-	Exec(ctx context.Context, query string, args ...interface{}) error
 	Delete(ctx context.Context, t *Table, kvFilters []interface{}) error
-	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	RemoveStaleData(ctx context.Context, t *Table, executionStart time.Time, kvFilters []interface{}) error
 	CopyFrom(ctx context.Context, resources Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error
 	Close()
 	Dialect() Dialect
+}
+
+type QueryExecer interface {
+	Exec(ctx context.Context, query string, args ...interface{}) error
+	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 }
 
 type ClientMeta interface {
