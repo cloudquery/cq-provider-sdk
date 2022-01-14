@@ -14,6 +14,8 @@ type DialectType string
 const (
 	Postgres = DialectType("postgres")
 	TSDB     = DialectType("timescale")
+
+	fkCommentKey = "x-cq-fk"
 )
 
 func (t DialectType) MigrationDirectory() string {
@@ -235,6 +237,7 @@ func (d TSDBDialect) Extra(t, parent *Table) []string {
 
 	return []string{
 		fmt.Sprintf("CREATE INDEX ON %s (%s, %s)", TruncateTableConstraint(t.Name), cqFetchDateColumn.Name, pc.Name),
+		fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s=%s.%s;'", TruncateTableConstraint(t.Name), pc.Name, fkCommentKey, TruncateTableConstraint(parent.Name), cqIdColumn.Name),
 	}
 }
 
@@ -259,11 +262,43 @@ func findParentIdColumn(t *Table) (ret *Column) {
 	}
 
 	// Support old school columns instead of meta, this is backwards compatibility for providers using SDK prior v0.5.0
-	//for _, c := range t.Columns {
-	//	if strings.HasSuffix(c.Name, "cq_id") && c.Name != "cq_id" {
-	//		return &c
-	//	}
-	//}
+	/*
+		for _, c := range t.Columns {
+			if strings.HasSuffix(c.Name, "cq_id") && c.Name != "cq_id" {
+				return &c
+			}
+		}
+	*/
 
 	return nil
+}
+
+func parseDialectComments(text string) map[string]string {
+	// format is key=value;...
+
+	parts := strings.Split(text, ";")
+	ret := make(map[string]string, len(parts))
+	for i := range parts {
+		kv := strings.SplitN(parts[i], "=", 2)
+		if len(kv) == 1 {
+			ret[kv[0]] = ""
+		} else {
+			ret[kv[0]] = kv[1]
+		}
+	}
+	return ret
+}
+
+// GetFKFromComment gets a column comment and parses the parent table reference from it
+func GetFKFromComment(text string) (table string, column string) {
+	c := parseDialectComments(text)
+	v := c[fkCommentKey]
+	if v == "" {
+		return
+	}
+	tableCol := strings.SplitN(v, ".", 2)
+	if len(tableCol) != 2 {
+		return // invalid
+	}
+	return tableCol[0], tableCol[1]
 }
