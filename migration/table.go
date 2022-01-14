@@ -64,13 +64,10 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 			b.WriteString(" NOT NULL")
 		}
 		// c.CreationOptions.Unique is handled in the Constraints() call below
-		if parent != nil && m.dialect.SupportsForeignKeys() && strings.HasSuffix(c.Name, "cq_id") && c.Name != "cq_id" {
-			b.WriteString(" REFERENCES " + fmt.Sprintf("%s(cq_id)", parent.Name) + " ON DELETE CASCADE")
-		}
 		b.WriteString(",\n")
 	}
 
-	cons := m.dialect.Constraints(t)
+	cons := m.dialect.Constraints(t, parent)
 	for i, cn := range cons {
 		b.WriteByte('\t')
 		b.WriteString(cn)
@@ -86,6 +83,7 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 
 	up, down = make([]string, 0, 1+len(t.Relations)), make([]string, 0, 1+len(t.Relations))
 	up = append(up, b.String())
+	up = append(up, m.dialect.Extra(t, parent)...)
 
 	// Create relation tables
 	for _, r := range t.Relations {

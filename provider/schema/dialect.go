@@ -28,9 +28,10 @@ type Dialect interface {
 	Columns(t *Table) ColumnList
 
 	// Constraints returns constraint definitions for table, according to dialect
-	Constraints(t *Table) []string
+	Constraints(t, parent *Table) []string
 
-	SupportsForeignKeys() bool
+	// Extra returns additional definitions for table outside of the CREATE TABLE statement, according to dialect
+	Extra(t, parent *Table) []string
 
 	// DBTypeFromType returns the database type from the given ValueType. Always lowercase.
 	DBTypeFromType(v ValueType) string
@@ -62,7 +63,7 @@ func (d PostgresDialect) Columns(t *Table) ColumnList {
 	return append([]Column{cqIdColumn, cqMeta}, t.Columns...)
 }
 
-func (d PostgresDialect) Constraints(t *Table) []string {
+func (d PostgresDialect) Constraints(t, parent *Table) []string {
 	ret := make([]string, 0, len(t.Columns))
 
 	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", TruncateTableConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
@@ -75,7 +76,18 @@ func (d PostgresDialect) Constraints(t *Table) []string {
 		ret = append(ret, fmt.Sprintf("UNIQUE(%s)", c.Name))
 	}
 
+	if parent != nil {
+		pc := findParentIdColumn(t)
+		if pc != nil {
+			ret = append(ret, fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s(%s) ON DELETE CASCADE", TruncateTableConstraint(pc.Name), TruncateTableConstraint(parent.Name), cqIdColumn.Name))
+		}
+	}
+
 	return ret
+}
+
+func (d PostgresDialect) Extra(_, _ *Table) []string {
+	return nil
 }
 
 func (d PostgresDialect) DBTypeFromType(v ValueType) string {
@@ -121,10 +133,6 @@ func (d PostgresDialect) DBTypeFromType(v ValueType) string {
 	default:
 		panic("invalid type")
 	}
-}
-
-func (d PostgresDialect) SupportsForeignKeys() bool {
-	return true
 }
 
 func (d PostgresDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
@@ -200,7 +208,7 @@ func (d TSDBDialect) Columns(t *Table) ColumnList {
 	return append([]Column{cqIdColumn, cqMeta, cqFetchDateColumn}, t.Columns...)
 }
 
-func (d TSDBDialect) Constraints(t *Table) []string {
+func (d TSDBDialect) Constraints(t, _ *Table) []string {
 	ret := make([]string, 0, len(t.Columns))
 
 	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", TruncateTableConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
@@ -216,6 +224,20 @@ func (d TSDBDialect) Constraints(t *Table) []string {
 	return ret
 }
 
+func (d TSDBDialect) Extra(t, parent *Table) []string {
+	if parent == nil {
+		return nil
+	}
+	pc := findParentIdColumn(t)
+	if pc == nil {
+		return nil
+	}
+
+	return []string{
+		fmt.Sprintf("CREATE INDEX ON %s (%s, %s)", TruncateTableConstraint(t.Name), cqFetchDateColumn.Name, pc.Name),
+	}
+}
+
 func (d TSDBDialect) DBTypeFromType(v ValueType) string {
 	return PostgresDialect{}.DBTypeFromType(v)
 }
@@ -224,11 +246,24 @@ func (d TSDBDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
 	return PostgresDialect{}.GetResourceValues(r)
 }
 
-func (d TSDBDialect) SupportsForeignKeys() bool {
-	return false
-}
-
 var (
 	_ Dialect = (*PostgresDialect)(nil)
 	_ Dialect = (*TSDBDialect)(nil)
 )
+
+func findParentIdColumn(t *Table) (ret *Column) {
+	for _, c := range t.Columns {
+		if c.Meta().Resolver != nil && c.Meta().Resolver.Name == "schema.ParentIdResolver" {
+			return &c
+		}
+	}
+
+	// Support old school columns instead of meta, this is backwards compatibility for providers using SDK prior v0.5.0
+	//for _, c := range t.Columns {
+	//	if strings.HasSuffix(c.Name, "cq_id") && c.Name != "cq_id" {
+	//		return &c
+	//	}
+	//}
+
+	return nil
+}
