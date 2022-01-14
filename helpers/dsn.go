@@ -12,7 +12,7 @@ func init() {
 	dburl.Register(dburl.Scheme{
 		Driver:    "timescale",
 		Generator: dburl.GenPostgres,
-		Transport: dburl.TransportUnix,
+		Transport: dburl.TransportTCP | dburl.TransportUnix,
 		Opaque:    false,
 		Aliases:   []string{"timescaledb", "tsdb", "ts"},
 		Override:  "",

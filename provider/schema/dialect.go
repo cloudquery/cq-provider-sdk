@@ -81,7 +81,7 @@ func (d PostgresDialect) Constraints(t, parent *Table) []string {
 	if parent != nil {
 		pc := findParentIdColumn(t)
 		if pc != nil {
-			ret = append(ret, fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s(%s) ON DELETE CASCADE", TruncateTableConstraint(pc.Name), TruncateTableConstraint(parent.Name), cqIdColumn.Name))
+			ret = append(ret, fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s(%s) ON DELETE CASCADE", pc.Name, parent.Name, cqIdColumn.Name))
 		}
 	}
 
@@ -236,8 +236,8 @@ func (d TSDBDialect) Extra(t, parent *Table) []string {
 	}
 
 	return []string{
-		fmt.Sprintf("CREATE INDEX ON %s (%s, %s)", TruncateTableConstraint(t.Name), cqFetchDateColumn.Name, pc.Name),
-		fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s=%s.%s;'", TruncateTableConstraint(t.Name), pc.Name, fkCommentKey, TruncateTableConstraint(parent.Name), cqIdColumn.Name),
+		fmt.Sprintf("CREATE INDEX ON %s (%s, %s)", t.Name, cqFetchDateColumn.Name, pc.Name),
+		fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s=%s.%s;'", t.Name, pc.Name, fkCommentKey, parent.Name, cqIdColumn.Name),
 	}
 }
 
