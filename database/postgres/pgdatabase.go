@@ -159,7 +159,7 @@ func (p PgDatabase) Delete(ctx context.Context, t *schema.Table, kvFilters []int
 }
 
 func (p PgDatabase) RemoveStaleData(ctx context.Context, t *schema.Table, executionStart time.Time, kvFilters []interface{}) error {
-	q := goqu.Delete(t.Name).WithDialect("postgres").Where(goqu.L(`extract(epoch from (meta->>'last_updated')::timestamp)`).Lt(executionStart.Unix()))
+	q := goqu.Delete(t.Name).WithDialect("postgres").Where(goqu.L(`extract(epoch from (cq_meta->>'last_updated')::timestamp)`).Lt(executionStart.Unix()))
 	if len(kvFilters)%2 != 0 {
 		return fmt.Errorf("expected even number of k,v delete filters received %s", kvFilters)
 	}

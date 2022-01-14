@@ -29,34 +29,45 @@ const (
 	dropTableSQL                    = "DROP TABLE IF EXISTS %s CASCADE"
 )
 
-func ReadMigrationFiles(log hclog.Logger, dt schema.DialectType, migrationFiles embed.FS) (map[string][]byte, error) {
+func ReadMigrationFiles(log hclog.Logger, migrationFiles embed.FS) (map[string][]byte, error) {
 	var (
 		err        error
 		migrations = make(map[string][]byte)
 	)
 
-	basePath := path.Join(migrationsEmbeddedDirectoryPath, dt.MigrationDirectory())
-
-	files, err := migrationFiles.ReadDir(basePath)
+	dirs, err := migrationFiles.ReadDir(migrationsEmbeddedDirectoryPath)
 	if err != nil {
 		log.Info("Provider doesn't define any migration files")
 		return migrations, nil
 	}
-	for _, m := range files {
-		f, err := migrationFiles.Open(path.Join(basePath, m.Name()))
-		if err != nil {
-			return nil, err
+	for _, d := range dirs {
+		if !d.IsDir() {
+			return nil, fmt.Errorf("bad migrations structure: missing dialect directories")
 		}
-		info, _ := m.Info()
-		if info.Size() == 0 {
-			migrations[m.Name()] = []byte("")
+		basePath := path.Join(migrationsEmbeddedDirectoryPath, d.Name())
+		files, err := migrationFiles.ReadDir(basePath)
+		if err != nil {
+			log.Info("Provider doesn't define any migration files for dialect")
 			continue
 		}
-		data := make([]byte, info.Size())
-		if _, err := f.Read(data); err != nil {
-			return nil, err
+		for _, m := range files {
+			f, err := migrationFiles.Open(path.Join(basePath, m.Name()))
+			if err != nil {
+				return nil, err
+			}
+			key := path.Join(d.Name(), m.Name())
+
+			info, _ := m.Info()
+			if info.Size() == 0 {
+				migrations[key] = []byte("")
+				continue
+			}
+			data := make([]byte, info.Size())
+			if _, err := f.Read(data); err != nil {
+				return nil, err
+			}
+			migrations[key] = data
 		}
-		migrations[m.Name()] = data
 	}
 	return migrations, nil
 }
@@ -75,12 +86,19 @@ type Migrator struct {
 	postHook func(context.Context) error
 }
 
-func New(log hclog.Logger, migrationFiles map[string][]byte, dsn string, providerName string, postHook func(context.Context) error) (*Migrator, error) {
+func New(log hclog.Logger, dt schema.DialectType, migrationFiles map[string][]byte, dsn string, providerName string, postHook func(context.Context) error) (*Migrator, error) {
 	versionMapper := make(map[string]uint)
 	versions := make(version.Collection, 0)
 	mm := afero.NewMemMapFs()
 	_ = mm.Mkdir("migrations", 0755)
+
+	dtDir := dt.MigrationDirectory() + "/"
 	for k, data := range migrationFiles {
+		if !strings.HasPrefix(k, dtDir) {
+			continue
+		}
+		k = strings.TrimPrefix(k, dtDir)
+
 		log.Debug("adding migration file", "file", k)
 		if err := afero.WriteFile(mm, path.Join(migrationsEmbeddedDirectoryPath, k), data, 0644); err != nil {
 			return nil, err
