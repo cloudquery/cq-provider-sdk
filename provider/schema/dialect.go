@@ -41,6 +41,11 @@ type Dialect interface {
 	GetResourceValues(r *Resource) ([]interface{}, error)
 }
 
+var (
+	_ Dialect = (*PostgresDialect)(nil)
+	_ Dialect = (*TSDBDialect)(nil)
+)
+
 func GetDialect(t DialectType) Dialect {
 	switch t {
 	case Postgres:
@@ -138,8 +143,76 @@ func (d PostgresDialect) DBTypeFromType(v ValueType) string {
 }
 
 func (d PostgresDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
+	return doResourceValues(d, r)
+}
+
+type TSDBDialect struct{}
+
+func (d TSDBDialect) PrimaryKeys(t *Table) []string {
+	v := PostgresDialect{}.PrimaryKeys(t)
+	return append([]string{cqFetchDateColumn.Name}, v...)
+}
+
+func (d TSDBDialect) Columns(t *Table) ColumnList {
+	return append([]Column{cqIdColumn, cqMeta, cqFetchDateColumn}, t.Columns...)
+}
+
+func (d TSDBDialect) Constraints(t, _ *Table) []string {
+	ret := make([]string, 0, len(t.Columns))
+
+	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", TruncateTableConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
+
+	for _, c := range d.Columns(t) {
+		if !c.CreationOptions.Unique {
+			continue
+		}
+
+		ret = append(ret, fmt.Sprintf("UNIQUE(%s,%s)", cqFetchDateColumn.Name, c.Name))
+	}
+
+	return ret
+}
+
+func (d TSDBDialect) Extra(t, parent *Table) []string {
+	if parent == nil {
+		return nil
+	}
+	pc := findParentIdColumn(t)
+	if pc == nil {
+		return nil
+	}
+
+	return []string{
+		fmt.Sprintf("CREATE INDEX ON %s (%s, %s)", t.Name, cqFetchDateColumn.Name, pc.Name),
+		fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s=%s.%s;'", t.Name, pc.Name, fkCommentKey, parent.Name, cqIdColumn.Name),
+	}
+}
+
+func (d TSDBDialect) DBTypeFromType(v ValueType) string {
+	return PostgresDialect{}.DBTypeFromType(v)
+}
+
+func (d TSDBDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
+	return doResourceValues(d, r)
+}
+
+// GetFKFromComment gets a column comment and parses the parent table reference from it
+func GetFKFromComment(text string) (table string, column string) {
+	c := parseDialectComments(text)
+	v := c[fkCommentKey]
+	if v == "" {
+		return
+	}
+	tableCol := strings.SplitN(v, ".", 2)
+	if len(tableCol) != 2 {
+		return // invalid
+	}
+	return tableCol[0], tableCol[1]
+}
+
+func doResourceValues(dialect Dialect, r *Resource) ([]interface{}, error) {
 	values := make([]interface{}, 0)
-	for _, c := range d.Columns(r.table) {
+	for _, c := range dialect.Columns(r.table) {
 		v := r.Get(c.Name)
 		if err := c.ValidateType(v); err != nil {
 			return nil, err
@@ -193,66 +266,8 @@ func (d PostgresDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
 			values = append(values, v)
 		}
 	}
-	for _, v := range r.metadata {
-		values = append(values, v)
-	}
 	return values, nil
 }
-
-type TSDBDialect struct{}
-
-func (d TSDBDialect) PrimaryKeys(t *Table) []string {
-	v := PostgresDialect{}.PrimaryKeys(t)
-	return append([]string{cqFetchDateColumn.Name}, v...)
-}
-
-func (d TSDBDialect) Columns(t *Table) ColumnList {
-	return append([]Column{cqIdColumn, cqMeta, cqFetchDateColumn}, t.Columns...)
-}
-
-func (d TSDBDialect) Constraints(t, _ *Table) []string {
-	ret := make([]string, 0, len(t.Columns))
-
-	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", TruncateTableConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
-
-	for _, c := range d.Columns(t) {
-		if !c.CreationOptions.Unique {
-			continue
-		}
-
-		ret = append(ret, fmt.Sprintf("UNIQUE(%s,%s)", cqFetchDateColumn.Name, c.Name))
-	}
-
-	return ret
-}
-
-func (d TSDBDialect) Extra(t, parent *Table) []string {
-	if parent == nil {
-		return nil
-	}
-	pc := findParentIdColumn(t)
-	if pc == nil {
-		return nil
-	}
-
-	return []string{
-		fmt.Sprintf("CREATE INDEX ON %s (%s, %s)", t.Name, cqFetchDateColumn.Name, pc.Name),
-		fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s=%s.%s;'", t.Name, pc.Name, fkCommentKey, parent.Name, cqIdColumn.Name),
-	}
-}
-
-func (d TSDBDialect) DBTypeFromType(v ValueType) string {
-	return PostgresDialect{}.DBTypeFromType(v)
-}
-
-func (d TSDBDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
-	return PostgresDialect{}.GetResourceValues(r)
-}
-
-var (
-	_ Dialect = (*PostgresDialect)(nil)
-	_ Dialect = (*TSDBDialect)(nil)
-)
 
 func findParentIdColumn(t *Table) (ret *Column) {
 	for _, c := range t.Columns {
@@ -287,18 +302,4 @@ func parseDialectComments(text string) map[string]string {
 		}
 	}
 	return ret
-}
-
-// GetFKFromComment gets a column comment and parses the parent table reference from it
-func GetFKFromComment(text string) (table string, column string) {
-	c := parseDialectComments(text)
-	v := c[fkCommentKey]
-	if v == "" {
-		return
-	}
-	tableCol := strings.SplitN(v, ".", 2)
-	if len(tableCol) != 2 {
-		return // invalid
-	}
-	return tableCol[0], tableCol[1]
 }

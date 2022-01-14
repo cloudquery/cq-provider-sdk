@@ -338,12 +338,21 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 	cols := e.Db.Dialect().Columns(resource.table)
 
 	providerCols, internalCols := make([]Column, 0, len(cols)), make([]Column, 0, len(cols))
+	cqIdColIndex := -1
 	for i := range cols {
 		if cols[i].Internal {
+			if cols[i].Name == cqIdColumn.Name {
+				cqIdColIndex = len(internalCols)
+			}
+
 			internalCols = append(internalCols, cols[i])
 		} else {
 			providerCols = append(providerCols, cols[i])
 		}
+	}
+	// resolve cqId last, as it would need other PKs to be resolved, some might be internal (cq_fetch_date)
+	if lastIndex := len(internalCols) - 1; cqIdColIndex > -1 && cqIdColIndex != lastIndex {
+		internalCols[cqIdColIndex], internalCols[lastIndex] = internalCols[lastIndex], internalCols[cqIdColIndex]
 	}
 
 	if err = e.resolveColumns(ctx, meta, resource, providerCols); err != nil {
