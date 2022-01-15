@@ -18,30 +18,34 @@ const (
 )
 
 var (
-	simpleMigrations = map[string][]byte{
-		"postgres/1_v0.0.1.up.sql":        []byte(defaultQuery),
-		"postgres/1_v0.0.1.down.sql":      []byte(defaultQuery),
-		"postgres/3_v0.0.2.up.sql":        []byte(defaultQuery),
-		"postgres/3_v0.0.2.down.sql":      []byte(defaultQuery),
-		"postgres/2_v0.0.2-beta.up.sql":   []byte(defaultQuery),
-		"postgres/2_v0.0.2-beta.down.sql": []byte(defaultQuery),
-		"postgres/4_v0.0.3.up.sql":        []byte(defaultQuery),
-		"postgres/4_v0.0.3.down.sql":      []byte(defaultQuery),
-		"postgres/5_v0.0.4.up.sql":        []byte(emptyQuery),
-		"postgres/5_v0.0.4.down.sql":      []byte(defaultQuery),
+	simpleMigrations = map[string]map[string][]byte{
+		"postgres": {
+			"1_v0.0.1.up.sql":        []byte(defaultQuery),
+			"1_v0.0.1.down.sql":      []byte(defaultQuery),
+			"3_v0.0.2.up.sql":        []byte(defaultQuery),
+			"3_v0.0.2.down.sql":      []byte(defaultQuery),
+			"2_v0.0.2-beta.up.sql":   []byte(defaultQuery),
+			"2_v0.0.2-beta.down.sql": []byte(defaultQuery),
+			"4_v0.0.3.up.sql":        []byte(defaultQuery),
+			"4_v0.0.3.down.sql":      []byte(defaultQuery),
+			"5_v0.0.4.up.sql":        []byte(emptyQuery),
+			"5_v0.0.4.down.sql":      []byte(defaultQuery),
+		},
 	}
 
-	complexMigrations = map[string][]byte{
-		"postgres/1_v0.0.2.up.sql":        []byte(defaultQuery),
-		"postgres/1_v0.0.2.down.sql":      []byte(defaultQuery),
-		"postgres/2_v0.0.3-beta.up.sql":   []byte(defaultQuery),
-		"postgres/2_v0.0.3-beta.down.sql": []byte(defaultQuery),
-		"postgres/3_v0.0.3.up.sql":        []byte(defaultQuery),
-		"postgres/3_v0.0.3.down.sql":      []byte(defaultQuery),
-		"postgres/4_v0.0.6.up.sql":        []byte(defaultQuery),
-		"postgres/4_v0.0.6.down.sql":      []byte(defaultQuery),
-		"postgres/5_v0.1.4.up.sql":        []byte(emptyQuery),
-		"postgres/5_v0.1.4.down.sql":      []byte(defaultQuery),
+	complexMigrations = map[string]map[string][]byte{
+		"postgres": {
+			"1_v0.0.2.up.sql":        []byte(defaultQuery),
+			"1_v0.0.2.down.sql":      []byte(defaultQuery),
+			"2_v0.0.3-beta.up.sql":   []byte(defaultQuery),
+			"2_v0.0.3-beta.down.sql": []byte(defaultQuery),
+			"3_v0.0.3.up.sql":        []byte(defaultQuery),
+			"3_v0.0.3.down.sql":      []byte(defaultQuery),
+			"4_v0.0.6.up.sql":        []byte(defaultQuery),
+			"4_v0.0.6.down.sql":      []byte(defaultQuery),
+			"5_v0.1.4.up.sql":        []byte(emptyQuery),
+			"5_v0.1.4.down.sql":      []byte(defaultQuery),
+		},
 	}
 )
 
