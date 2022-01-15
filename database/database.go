@@ -20,7 +20,10 @@ func New(ctx context.Context, logger hclog.Logger, dsn string) (*DB, error) {
 		return nil, err
 	}
 
-	dialect := schema.GetDialect(dType)
+	dialect, err := schema.GetDialect(dType)
+	if err != nil {
+		return nil, err
+	}
 
 	db, err := postgres.NewPgDatabase(ctx, logger, newDSN, dialect)
 	if err != nil {

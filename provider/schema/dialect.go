@@ -51,14 +51,15 @@ var (
 	_ Dialect = (*TSDBDialect)(nil)
 )
 
-func GetDialect(t DialectType) Dialect {
+// GetDialect creates and returns a dialect specified by the DialectType
+func GetDialect(t DialectType) (Dialect, error) {
 	switch t {
 	case Postgres:
-		return PostgresDialect{}
+		return PostgresDialect{}, nil
 	case TSDB:
-		return TSDBDialect{}
+		return TSDBDialect{}, nil
 	default:
-		return nil
+		return nil, fmt.Errorf("unknown dialect %q", t)
 	}
 }
 
@@ -151,11 +152,12 @@ func (d PostgresDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
 	return doResourceValues(d, r)
 }
 
-type TSDBDialect struct{}
+type TSDBDialect struct {
+	pg PostgresDialect
+}
 
 func (d TSDBDialect) PrimaryKeys(t *Table) []string {
-	v := PostgresDialect{}.PrimaryKeys(t)
-	return append([]string{cqFetchDateColumn.Name}, v...)
+	return append([]string{cqFetchDateColumn.Name}, d.pg.PrimaryKeys(t)...)
 }
 
 func (d TSDBDialect) Columns(t *Table) ColumnList {
@@ -194,7 +196,7 @@ func (d TSDBDialect) Extra(t, parent *Table) []string {
 }
 
 func (d TSDBDialect) DBTypeFromType(v ValueType) string {
-	return PostgresDialect{}.DBTypeFromType(v)
+	return d.pg.DBTypeFromType(v)
 }
 
 func (d TSDBDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
