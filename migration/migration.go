@@ -163,9 +163,9 @@ func generateDiffForDialect(ctx context.Context, logger hclog.Logger, conn *pgxp
 	for _, resName := range resourceKeys(p.ResourceMap) {
 		table := p.ResourceMap[resName]
 
-		ups, downs, err := tc.UpgradeTable(ctx, conn, table, nil)
+		ups, downs, err := tc.DiffTable(ctx, conn, table, nil)
 		if err != nil {
-			return fmt.Errorf("UpgradeTable failed for %s: %w", table.Name, err)
+			return fmt.Errorf("DiffTable failed for %s: %w", table.Name, err)
 		}
 
 		if len(ups)+len(downs) == 0 {

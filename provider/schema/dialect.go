@@ -15,6 +15,11 @@ const (
 	Postgres = DialectType("postgres")
 	TSDB     = DialectType("timescale")
 
+	// fkCommentKey is the identifier to use when marking table columns as FKs to their parenet tables and columns.
+	// This is used for history mode where we can't have proper FKs. Instead we set a Postgres COMMENT for the FK-referencing column in the child table.
+	// TSDBDialect.Extra() creates the SQL to set these comments.
+	// Our machine readable comment format is "key1=value1;key2=value2;". `parseDialectComments` is used to parse any comments internally.
+	// `GetFKFromComment` helper function is used to read any FK reference from the comment.
 	fkCommentKey = "x-cq-fk"
 )
 
@@ -32,7 +37,7 @@ type Dialect interface {
 	// Constraints returns constraint definitions for table, according to dialect
 	Constraints(t, parent *Table) []string
 
-	// Extra returns additional definitions for table outside of the CREATE TABLE statement, according to dialect
+	// Extra returns additional definitions for table outside the CREATE TABLE statement, according to dialect
 	Extra(t, parent *Table) []string
 
 	// DBTypeFromType returns the database type from the given ValueType. Always lowercase.
@@ -73,7 +78,7 @@ func (d PostgresDialect) Columns(t *Table) ColumnList {
 func (d PostgresDialect) Constraints(t, parent *Table) []string {
 	ret := make([]string, 0, len(t.Columns))
 
-	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", TruncateTableConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
+	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", truncatePKConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
 
 	for _, c := range d.Columns(t) {
 		if !c.CreationOptions.Unique {
@@ -160,7 +165,7 @@ func (d TSDBDialect) Columns(t *Table) ColumnList {
 func (d TSDBDialect) Constraints(t, _ *Table) []string {
 	ret := make([]string, 0, len(t.Columns))
 
-	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", TruncateTableConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
+	ret = append(ret, fmt.Sprintf("CONSTRAINT %s_pk PRIMARY KEY(%s)", truncatePKConstraint(t.Name), strings.Join(d.PrimaryKeys(t), ",")))
 
 	for _, c := range d.Columns(t) {
 		if !c.CreationOptions.Unique {
@@ -276,15 +281,6 @@ func findParentIdColumn(t *Table) (ret *Column) {
 		}
 	}
 
-	// Support old school columns instead of meta, this is backwards compatibility for providers using SDK prior v0.5.0
-	/*
-		for _, c := range t.Columns {
-			if strings.HasSuffix(c.Name, "cq_id") && c.Name != "cq_id" {
-				return &c
-			}
-		}
-	*/
-
 	return nil
 }
 
@@ -302,4 +298,16 @@ func parseDialectComments(text string) map[string]string {
 		}
 	}
 	return ret
+}
+
+func truncatePKConstraint(name string) string {
+	const (
+		// MaxTableLength in postgres is 63 when building _fk or _pk we want to truncate the name to 60 chars max
+		maxTableNamePKConstraint = 60
+	)
+
+	if len(name) > maxTableNamePKConstraint {
+		return name[:maxTableNamePKConstraint]
+	}
+	return name
 }

@@ -100,11 +100,12 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 	return up, down, nil
 }
 
-// UpgradeTable reads current table info from the given conn for the given table, and returns ALTER TABLE ADD COLUMN statements for the missing columns.
-// Newly appearing tables will return a CREATE TABLE statement
+// DiffTable reads current table info from the given conn for the given table, and returns ALTER TABLE ADD COLUMN statements for the missing columns.
+// Newly appearing tables will return a CREATE TABLE statement.
 // Column renamings are detected (best effort) and ALTER TABLE RENAME COLUMN statements are generated as comments.
 // Table renamings or removals are not detected.
-func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, parent *schema.Table) (up, down []string, err error) {
+// FK changes are not detected.
+func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, t, parent *schema.Table) (up, down []string, err error) {
 	rows, err := conn.Query(ctx, queryTableColumns, t.Name)
 	if err != nil {
 		return nil, nil, err
@@ -134,27 +135,7 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, p
 	}
 
 	columnsToAdd, columnsToRemove := funk.DifferenceString(m.dialect.Columns(t).Names(), existingColumns.Columns)
-
-	var similars map[string]string
-	{
-		upColsByType, downColsByType := make(map[string][]string), make(map[string][]string)
-
-		for _, d := range columnsToAdd {
-			col := t.Column(d)
-			if col == nil {
-				continue
-			}
-			upColsByType[m.dialect.DBTypeFromType(col.Type)] = append(upColsByType[m.dialect.DBTypeFromType(col.Type)], d)
-		}
-		for _, d := range columnsToRemove {
-			if col := t.Column(d); col != nil {
-				continue
-			}
-			downColsByType[dbColTypes[d]] = append(downColsByType[dbColTypes[d]], d)
-		}
-
-		similars = findSimilarColumnsWithSameType(upColsByType, downColsByType)
-	}
+	similars := getSimilars(m.dialect, t, columnsToAdd, columnsToRemove, dbColTypes)
 
 	capSize := len(columnsToAdd) + len(columnsToRemove) // relations not included...
 	up, down = make([]string, 0, capSize), make([]string, 0, capSize)
@@ -200,7 +181,7 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, p
 
 	// Do relation tables
 	for _, r := range t.Relations {
-		if cr, dr, err := m.UpgradeTable(ctx, conn, r, t); err != nil {
+		if cr, dr, err := m.DiffTable(ctx, conn, r, t); err != nil {
 			return nil, nil, err
 		} else {
 			up = append(up, cr...)
@@ -211,6 +192,26 @@ func (m TableCreator) UpgradeTable(ctx context.Context, conn *pgxpool.Conn, t, p
 	down = append(down, downLast...)
 
 	return up, down, nil
+}
+
+func getSimilars(dialect schema.Dialect, t *schema.Table, columnsToAdd, columnsToRemove []string, existingColsTypes map[string]string) map[string]string {
+	upColsByType, downColsByType := make(map[string][]string), make(map[string][]string)
+
+	for _, d := range columnsToAdd {
+		col := t.Column(d)
+		if col == nil {
+			continue
+		}
+		upColsByType[dialect.DBTypeFromType(col.Type)] = append(upColsByType[dialect.DBTypeFromType(col.Type)], d)
+	}
+	for _, d := range columnsToRemove {
+		if col := t.Column(d); col != nil {
+			continue
+		}
+		downColsByType[existingColsTypes[d]] = append(downColsByType[existingColsTypes[d]], d)
+	}
+
+	return findSimilarColumnsWithSameType(upColsByType, downColsByType)
 }
 
 func findSimilarColumnsWithSameType(setA, setB map[string][]string) map[string]string {

@@ -164,9 +164,9 @@ type Column struct {
 	// IgnoreInTests if true this skips this column in tests as sometimes it might be hard
 	// to create a reproducible test environment with this column being non nill. For example various error columns and so on
 	IgnoreInTests bool
-	// Internal is true if this column is managed by the SDK
-	Internal bool
 
+	// internal is true if this column is managed by the SDK
+	internal bool
 	// meta holds serializable information about the column's resolvers and functions
 	meta *ColumnMeta
 }

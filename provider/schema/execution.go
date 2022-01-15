@@ -340,7 +340,7 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 	providerCols, internalCols := make([]Column, 0, len(cols)), make([]Column, 0, len(cols))
 	cqIdColIndex := -1
 	for i := range cols {
-		if cols[i].Internal {
+		if cols[i].internal {
 			if cols[i].Name == cqIdColumn.Name {
 				cqIdColIndex = len(internalCols)
 			}

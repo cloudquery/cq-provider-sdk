@@ -27,7 +27,7 @@ var (
 			b, _ := json.Marshal(mi)
 			return resource.Set(c.Name, b)
 		},
-		Internal: true,
+		internal: true,
 	}
 	cqIdColumn = Column{
 		Name:        "cq_id",
@@ -47,7 +47,7 @@ var (
 			Unique:  true,
 			NotNull: true,
 		},
-		Internal: true,
+		internal: true,
 	}
 	cqFetchDateColumn = Column{
 		Name:        "cq_fetch_date",
@@ -66,6 +66,6 @@ var (
 		CreationOptions: ColumnCreationOptions{
 			NotNull: true,
 		},
-		Internal: true,
+		internal: true,
 	}
 )

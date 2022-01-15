@@ -15,7 +15,7 @@ type DB struct {
 }
 
 func New(ctx context.Context, logger hclog.Logger, dsn string) (*DB, error) {
-	dType, newDSN, err := DSNtoDialect(dsn)
+	dType, newDSN, err := ParseDialectDSN(dsn)
 	if err != nil {
 		return nil, err
 	}
