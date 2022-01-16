@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
-	"github.com/jackc/pgx/v4"
+	"github.com/georgysavva/scany/pgxscan"
 	"github.com/modern-go/reflect2"
 
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
@@ -25,8 +25,8 @@ import (
 // faster than the <1s it won't be deleted by remove stale.
 const executionJitter = -1 * time.Minute
 
-//go:generate mockgen -package=mock -destination=./mock/mock_database.go . Database
-type Database interface {
+//go:generate mockgen -package=mock -destination=./mock/mock_storage.go . Storage
+type Storage interface {
 	QueryExecer
 
 	Insert(ctx context.Context, t *Table, instance Resources) error
@@ -38,8 +38,9 @@ type Database interface {
 }
 
 type QueryExecer interface {
+	pgxscan.Querier
+
 	Exec(ctx context.Context, query string, args ...interface{}) error
-	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 }
 
 type ClientMeta interface {
@@ -53,7 +54,7 @@ type ExecutionData struct {
 	// Table this execution is associated with
 	Table *Table
 	// Database connection to insert data into
-	Db Database
+	Db Storage
 	// Logger associated with this execution
 	Logger hclog.Logger
 	// disableDelete allows disabling deletion of table data for this execution
@@ -95,7 +96,7 @@ const (
 )
 
 // NewExecutionData Create a new execution data
-func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDelete bool, extraFields map[string]interface{}, partialFetch bool) ExecutionData {
+func NewExecutionData(db Storage, logger hclog.Logger, table *Table, disableDelete bool, extraFields map[string]interface{}, partialFetch bool) ExecutionData {
 	return ExecutionData{
 		Table:                     table,
 		Db:                        db,

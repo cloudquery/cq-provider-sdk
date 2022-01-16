@@ -60,8 +60,8 @@ type Provider struct {
 	disableDelete bool
 	// Add extra fields to all resources, these fields don't show up in documentation and are used for internal CQ testing.
 	extraFields map[string]interface{}
-	// databaseCreator creates a database based on requested engine
-	databaseCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error)
+	// storageCreator creates a database based on requested engine
+	storageCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Storage, error)
 }
 
 func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
@@ -102,8 +102,8 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
 	}
 	// set database creator
-	if p.databaseCreator == nil {
-		p.databaseCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error) {
+	if p.storageCreator == nil {
+		p.storageCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Storage, error) {
 			return database.New(ctx, logger, dbURL)
 		}
 	}
@@ -158,7 +158,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		return err
 	}
 
-	conn, err := p.databaseCreator(ctx, p.Logger, p.dbURL)
+	conn, err := p.storageCreator(ctx, p.Logger, p.dbURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database. %w", err)
 	}

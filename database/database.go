@@ -9,7 +9,7 @@ import (
 )
 
 type DB struct {
-	schema.Database
+	schema.Storage
 
 	dialectType schema.DialectType
 }
@@ -31,7 +31,7 @@ func New(ctx context.Context, logger hclog.Logger, dsn string) (*DB, error) {
 	}
 
 	return &DB{
-		Database:    db,
+		Storage:     db,
 		dialectType: dType,
 	}, nil
 }

@@ -37,7 +37,7 @@ func NewPgDatabase(ctx context.Context, logger hclog.Logger, dsn string, sd sche
 	}, nil
 }
 
-var _ schema.Database = (*PgDatabase)(nil)
+var _ schema.Storage = (*PgDatabase)(nil)
 
 // Insert inserts all resources to given table, table and resources are assumed from same table.
 func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schema.Resources) error {
