@@ -16,7 +16,7 @@ const defaultPath = "./resources/provider/migrations"
 
 // Run is the main entry point for CLI usage.
 func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
-	const defaultPrefix = "unreleased_"
+	const defaultPrefix = "unreleased"
 
 	if outputPath == "" {
 		outputPath = defaultPath
@@ -29,7 +29,7 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 
 	outputPathParam := flag.String("path", outputPath, "Path to migrations directory")
 	prefixParam := flag.String("prefix", defaultPrefix, "Prefix for files")
-	doFullParam := flag.Bool("full", false, "Generate initial migrations (prefix will be 'init_')")
+	doFullParam := flag.Bool("full", false, "Generate initial migrations (prefix will be 'init')")
 	dsnParam := flag.String("dsn", os.Getenv("CQ_DSN"), "DSN to compare changes against")
 	dialectParam := flag.String("dialect", "", "Dialect to generate (empty: all)")
 	flag.Parse()
@@ -53,11 +53,16 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 		}
 	}
 
-	if *doFullParam {
-		if *prefixParam == defaultPrefix {
-			*prefixParam = "init_"
-		}
+	if *doFullParam && *prefixParam == defaultPrefix {
+		*prefixParam = "init"
+	}
 
+	if *prefixParam != "" {
+		// Add the first "." in <prefix>.up.sql, only if we have a prefix
+		*prefixParam = *prefixParam + "."
+	}
+
+	if *doFullParam {
 		if err := GenerateFull(ctx, hclog.L(), p, dialects, *outputPathParam, *prefixParam); err != nil {
 			return fmt.Errorf("failed to generate migrations: %w", err)
 		}
