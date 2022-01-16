@@ -102,8 +102,8 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 
 // DiffTable reads current table info from the given conn for the given table, and returns ALTER TABLE ADD COLUMN statements for the missing columns.
 // Newly appearing tables will return a CREATE TABLE statement.
-// Column renamings are detected (best effort) and ALTER TABLE RENAME COLUMN statements are generated as comments.
-// Table renamings or removals are not detected.
+// Column renames are detected (best effort) and ALTER TABLE RENAME COLUMN statements are generated as comments.
+// Table renames or removals are not detected.
 // FK changes are not detected.
 func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, t, parent *schema.Table) (up, down []string, err error) {
 	rows, err := conn.Query(ctx, queryTableColumns, t.Name)

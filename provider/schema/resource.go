@@ -92,13 +92,19 @@ func (r *Resource) GenerateCQId() error {
 		return nil
 	}
 	pks := r.dialect.PrimaryKeys(r.table)
-	objs := make([]interface{}, len(pks))
-	for i, pk := range pks {
+	objs := make([]interface{}, 0, len(pks))
+	for _, pk := range pks {
+		if col := r.getColumnByName(pk); col == nil {
+			return fmt.Errorf("failed to generate cq_id for %s, pk column missing %s", r.table.Name, pk)
+		} else if col.internal {
+			continue
+		}
+
 		value := r.Get(pk)
 		if value == nil {
 			return fmt.Errorf("failed to generate cq_id for %s, pk field missing %s", r.table.Name, pk)
 		}
-		objs[i] = value
+		objs = append(objs, value)
 	}
 	id, err := hashUUID(objs)
 	if err != nil {
