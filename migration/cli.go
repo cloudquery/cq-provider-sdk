@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/provider"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/hashicorp/go-hclog"
@@ -22,35 +23,15 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 		outputPath = defaultPath
 	}
 
-	defaultDialectsToProcess := []schema.DialectType{
-		schema.Postgres,
-		schema.TSDB,
-	}
-
 	outputPathParam := flag.String("path", outputPath, "Path to migrations directory")
 	prefixParam := flag.String("prefix", defaultPrefix, "Prefix for files")
 	doFullParam := flag.Bool("full", false, "Generate initial migrations (prefix will be 'init')")
-	dsnParam := flag.String("dsn", os.Getenv("CQ_DSN"), "DSN to compare changes against")
-	dialectParam := flag.String("dialect", "", "Dialect to generate (empty: all)")
+	dialectParam := flag.String("dialect", "", "Dialect to generate initial migrations (empty: all)")
+	dsnParam := flag.String("dsn", os.Getenv("CQ_DSN"), "DSN to compare changes against in upgrade mode")
 	flag.Parse()
 	if flag.NArg() > 0 {
 		flag.Usage()
 		return fmt.Errorf("more args than necessary")
-	}
-
-	var dialects []schema.DialectType
-	if *dialectParam == "" {
-		dialects = defaultDialectsToProcess
-	} else {
-		for _, d := range defaultDialectsToProcess {
-			if string(d) == *dialectParam {
-				dialects = append(dialects, d)
-				break
-			}
-		}
-		if len(dialects) == 0 {
-			return fmt.Errorf("invalid dialect %q", *dialectParam)
-		}
 	}
 
 	if *doFullParam && *prefixParam == defaultPrefix {
@@ -63,6 +44,11 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 	}
 
 	if *doFullParam {
+		dialects, err := parseInputDialect(dialectParam)
+		if err != nil {
+			return err
+		}
+
 		if err := GenerateFull(ctx, hclog.L(), p, dialects, *outputPathParam, *prefixParam); err != nil {
 			return fmt.Errorf("failed to generate migrations: %w", err)
 		}
@@ -73,7 +59,7 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 		return fmt.Errorf("DSN not specified: Use -dsn or set CQ_DSN")
 	}
 
-	pool, err := connect(ctx, *dsnParam)
+	pool, dialectType, err := connect(ctx, *dsnParam)
 	if err != nil {
 		return err
 	}
@@ -83,18 +69,48 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 	}
 	defer conn.Release()
 
-	if err := GenerateDiff(ctx, hclog.L(), conn, p, dialects, *outputPathParam, *prefixParam); err != nil {
+	if err := GenerateDiff(ctx, hclog.L(), conn, *dialectType, p, *outputPathParam, *prefixParam); err != nil {
 		return fmt.Errorf("failed to generate migrations: %w", err)
 	}
 
 	return nil
 }
 
-func connect(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	poolCfg, err := pgxpool.ParseConfig(dsn)
+func connect(ctx context.Context, dsn string) (*pgxpool.Pool, *schema.DialectType, error) {
+	detectedDialect, newDSN, err := database.ParseDialectDSN(dsn)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("could not parse dsn: %w", err)
+	}
+
+	poolCfg, err := pgxpool.ParseConfig(newDSN)
+	if err != nil {
+		return nil, nil, err
 	}
 	poolCfg.LazyConnect = true
-	return pgxpool.ConnectConfig(ctx, poolCfg)
+	pool, err := pgxpool.ConnectConfig(ctx, poolCfg)
+	return pool, &detectedDialect, err
+}
+
+func parseInputDialect(inputDialect *string) ([]schema.DialectType, error) {
+	defaultDialectsFullMode := []schema.DialectType{
+		schema.Postgres,
+		schema.TSDB,
+	}
+
+	var dialects []schema.DialectType
+	if *inputDialect == "" {
+		dialects = defaultDialectsFullMode
+	} else {
+		for _, d := range defaultDialectsFullMode {
+			if string(d) == *inputDialect {
+				dialects = append(dialects, d)
+				break
+			}
+		}
+		if len(dialects) == 0 {
+			return nil, fmt.Errorf("invalid dialect %q", *inputDialect)
+		}
+	}
+
+	return dialects, nil
 }

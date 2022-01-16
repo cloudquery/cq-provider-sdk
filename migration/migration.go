@@ -30,17 +30,12 @@ func GenerateFull(ctx context.Context, logger hclog.Logger, p *provider.Provider
 }
 
 // GenerateDiff creates incremental table migrations for the provider based on it's ResourceMap. Entities are compared to a given conn.
-func GenerateDiff(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, p *provider.Provider, dialects []schema.DialectType, outputPath, prefix string) error {
-	for _, d := range dialects {
-		dialect, err := schema.GetDialect(d)
-		if err != nil {
-			return err
-		}
-		if err := generateDiffForDialect(ctx, logger, conn, p, dialect, filepath.Join(outputPath, string(d)), prefix); err != nil {
-			return fmt.Errorf("failed for %v: %w", d, err)
-		}
+func GenerateDiff(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, dialectType schema.DialectType, p *provider.Provider, outputPath, prefix string) error {
+	dialect, err := schema.GetDialect(dialectType)
+	if err != nil {
+		return err
 	}
-	return nil
+	return generateDiffForDialect(ctx, logger, conn, p, dialect, filepath.Join(outputPath, dialectType.MigrationDirectory()), prefix)
 }
 
 func generateFullForDialect(ctx context.Context, logger hclog.Logger, p *provider.Provider, dialect schema.Dialect, outputPath, prefix string) (retErr error) {

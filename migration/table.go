@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	queryTableColumns   = `SELECT array_agg(column_name::text) AS columns, array_agg(data_type::text) AS types FROM information_schema.columns WHERE table_name = $1`
+	queryTableColumns   = `SELECT array_agg(column_name::text) AS columns, array_agg(data_type::text) AS types FROM information_schema.columns WHERE table_name = $1 AND table_schema = $2`
 	addColumnToTable    = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %v %v`
 	dropColumnFromTable = `ALTER TABLE %s DROP COLUMN IF EXISTS %v`
 	renameColumnInTable = `-- ALTER TABLE %s RENAME COLUMN %v TO %v; -- uncomment to activate, remove ADD/DROP COLUMN above and below` // Can't have IF EXISTS here
@@ -106,7 +106,7 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 // Table renames or removals are not detected.
 // FK changes are not detected.
 func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, t, parent *schema.Table) (up, down []string, err error) {
-	rows, err := conn.Query(ctx, queryTableColumns, t.Name)
+	rows, err := conn.Query(ctx, queryTableColumns, t.Name, "public")
 	if err != nil {
 		return nil, nil, err
 	}
