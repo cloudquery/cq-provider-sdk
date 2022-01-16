@@ -105,8 +105,8 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 // Column renames are detected (best effort) and ALTER TABLE RENAME COLUMN statements are generated as comments.
 // Table renames or removals are not detected.
 // FK changes are not detected.
-func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, t, parent *schema.Table) (up, down []string, err error) {
-	rows, err := conn.Query(ctx, queryTableColumns, t.Name, "public")
+func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaName string, t, parent *schema.Table) (up, down []string, err error) {
+	rows, err := conn.Query(ctx, queryTableColumns, t.Name, schemaName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -181,7 +181,7 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, t, pare
 
 	// Do relation tables
 	for _, r := range t.Relations {
-		if cr, dr, err := m.DiffTable(ctx, conn, r, t); err != nil {
+		if cr, dr, err := m.DiffTable(ctx, conn, schemaName, r, t); err != nil {
 			return nil, nil, err
 		} else {
 			up = append(up, cr...)

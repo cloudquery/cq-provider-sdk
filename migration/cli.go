@@ -28,6 +28,7 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 	doFullParam := flag.Bool("full", false, "Generate initial migrations (prefix will be 'init')")
 	dialectParam := flag.String("dialect", "", "Dialect to generate initial migrations (empty: all)")
 	dsnParam := flag.String("dsn", os.Getenv("CQ_DSN"), "DSN to compare changes against in upgrade mode")
+	schemaName := flag.String("schema", "public", "Schema to compare tables from in upgrade mode")
 	flag.Parse()
 	if flag.NArg() > 0 {
 		flag.Usage()
@@ -69,7 +70,7 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 	}
 	defer conn.Release()
 
-	if err := GenerateDiff(ctx, hclog.L(), conn, *dialectType, p, *outputPathParam, *prefixParam); err != nil {
+	if err := GenerateDiff(ctx, hclog.L(), conn, *schemaName, *dialectType, p, *outputPathParam, *prefixParam); err != nil {
 		return fmt.Errorf("failed to generate migrations: %w", err)
 	}
 
