@@ -59,7 +59,7 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 
 	if *prefixParam != "" {
 		// Add the first "." in <prefix>.up.sql, only if we have a prefix
-		*prefixParam = *prefixParam + "."
+		*prefixParam += "."
 	}
 
 	if *doFullParam {
