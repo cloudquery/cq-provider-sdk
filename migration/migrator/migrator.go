@@ -183,6 +183,10 @@ func (m *Migrator) DowngradeProvider(version string) (retErr error) {
 		retErr = m.callPostHook(context.Background())
 	}()
 
+	if version == "down_testing" { // Used in testing
+		return m.m.Down()
+	}
+
 	mv, err := m.FindLatestMigration(version)
 	if err != nil {
 		return fmt.Errorf("version %s upgrade doesn't exist", version)
@@ -262,6 +266,9 @@ func (m *Migrator) SetVersion(requestedVersion string) (retErr error) {
 func (m *Migrator) FindLatestMigration(requestedVersion string) (uint, error) {
 	if requestedVersion == "latest" {
 		mv := m.versionMapper[m.versions[len(m.versions)-1].Original()]
+		return mv, nil
+	} else if requestedVersion == "oldest" {
+		mv := m.versionMapper[m.versions[0].Original()]
 		return mv, nil
 	}
 	// if we have a migration for specific version return that mv number
