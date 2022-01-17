@@ -122,7 +122,7 @@ func (r *Resource) TableName() string {
 }
 
 func (r Resource) getColumnByName(column string) *Column {
-	for _, c := range r.table.Columns {
+	for _, c := range r.dialect.Columns(r.table) {
 		if strings.Compare(column, c.Name) == 0 {
 			return &c
 		}
