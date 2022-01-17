@@ -174,17 +174,17 @@ func (d TSDBDialect) Constraints(t, _ *Table) []string {
 }
 
 func (d TSDBDialect) Extra(t, parent *Table) []string {
-	if parent == nil {
-		return nil
-	}
 	pc := findParentIdColumn(t)
-	if pc == nil {
-		return nil
+
+	if parent == nil || pc == nil {
+		return []string{
+			fmt.Sprintf("SELECT setup_tsdb_parent('%s')", t.Name),
+		}
 	}
 
 	return []string{
 		fmt.Sprintf("CREATE INDEX ON %s (%s, %s)", t.Name, cqFetchDateColumn.Name, pc.Name),
-		fmt.Sprintf("SELECT DEFINE_FK('%s', '%s', '%s', '%s')", t.Name, pc.Name, parent.Name, cqIdColumn.Name),
+		fmt.Sprintf("SELECT setup_tsdb_trigger('%s', '%s', '%s', '%s')", t.Name, pc.Name, parent.Name, cqIdColumn.Name),
 	}
 }
 
