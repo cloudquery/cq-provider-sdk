@@ -36,6 +36,7 @@ type Dialect interface {
 	// DBTypeFromType returns the database type from the given ValueType. Always lowercase.
 	DBTypeFromType(v ValueType) string
 
+	// GetResourceValues will return column values from the resource, ready to go in pgx.CopyFromSlice
 	GetResourceValues(r *Resource) ([]interface{}, error)
 }
 

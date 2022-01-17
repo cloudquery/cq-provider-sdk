@@ -28,6 +28,31 @@ func RunMigrationsTest(t *testing.T, prov *provider.Provider, additionalVersions
 func DoMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provider.Provider, additionalVersionsToTest []string) {
 	var dialect schema.DialectType
 
+	const (
+		setupTSDBChildFnMock = `CREATE OR REPLACE FUNCTION setup_tsdb_child(_table_name text, _column_name text, _parent_table_name text, _parent_column_name text)
+					RETURNS integer
+					LANGUAGE 'plpgsql'
+					COST 100
+					VOLATILE PARALLEL UNSAFE
+				AS $BODY$
+				BEGIN
+					return 0;
+				END;
+				$BODY$;`
+		setupTSDBParentFnMock = `CREATE OR REPLACE FUNCTION setup_tsdb_parent(_table_name text)
+					RETURNS integer
+					LANGUAGE 'plpgsql'
+					COST 100
+					VOLATILE PARALLEL UNSAFE
+				AS $BODY$
+				DECLARE
+					result integer;
+				BEGIN
+					return 0;
+				END;
+				$BODY$;`
+	)
+
 	t.Run("Setup", func(t *testing.T) {
 		pool, _, err := connect(ctx, dsn)
 		assert.NoError(t, err)
@@ -42,29 +67,8 @@ func DoMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 		if dialect == schema.TSDB {
 			// mock history functions... in the default schema
 			for _, sql := range []string{
-				`CREATE OR REPLACE FUNCTION setup_tsdb_child(_table_name text, _column_name text, _parent_table_name text, _parent_column_name text)
-					RETURNS integer
-					LANGUAGE 'plpgsql'
-					COST 100
-					VOLATILE PARALLEL UNSAFE
-				AS $BODY$
-				BEGIN
-					return 0;
-				END;
-				$BODY$;`,
-
-				`CREATE OR REPLACE FUNCTION setup_tsdb_parent(_table_name text)
-					RETURNS integer
-					LANGUAGE 'plpgsql'
-					COST 100
-					VOLATILE PARALLEL UNSAFE
-				AS $BODY$
-				DECLARE
-					result integer;
-				BEGIN
-					return 0;
-				END;
-				$BODY$;`,
+				setupTSDBChildFnMock,
+				setupTSDBParentFnMock,
 			} {
 				_, err := conn.Exec(ctx, sql)
 				assert.NoError(t, err)

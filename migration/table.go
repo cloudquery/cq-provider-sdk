@@ -16,8 +16,8 @@ import (
 
 const (
 	queryTableColumns   = `SELECT array_agg(column_name::text) AS columns, array_agg(data_type::text) AS types FROM information_schema.columns WHERE table_name = $1 AND table_schema = $2`
-	addColumnToTable    = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %v %v`
-	dropColumnFromTable = `ALTER TABLE %s DROP COLUMN IF EXISTS %v`
+	addColumnToTable    = `ALTER TABLE IF EXISTS %s ADD COLUMN IF NOT EXISTS %v %v`
+	dropColumnFromTable = `ALTER TABLE IF EXISTS %s DROP COLUMN IF EXISTS %v`
 	renameColumnInTable = `-- ALTER TABLE %s RENAME COLUMN %v TO %v; -- uncomment to activate, remove ADD/DROP COLUMN above and below` // Can't have IF EXISTS here
 
 	dropTable = `DROP TABLE IF EXISTS %s`

@@ -8,12 +8,14 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+// DB encapsulates a schema.Storage and the (auto-detected) dialect it was configured with
 type DB struct {
 	schema.Storage
 
 	dialectType schema.DialectType
 }
 
+// New creates a new DB using the provided DSN. It will auto detect the dialect based on the DSN and pass that info to NewPgDatabase
 func New(ctx context.Context, logger hclog.Logger, dsn string) (*DB, error) {
 	dType, newDSN, err := ParseDialectDSN(dsn)
 	if err != nil {
@@ -36,6 +38,7 @@ func New(ctx context.Context, logger hclog.Logger, dsn string) (*DB, error) {
 	}, nil
 }
 
+// DialectType returns the dialect type the DB was configured with
 func (d *DB) DialectType() schema.DialectType {
 	return d.dialectType
 }

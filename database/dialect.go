@@ -17,7 +17,8 @@ func ParseDialectDSN(inputDSN string) (d schema.DialectType, newDSN string, err 
 
 	switch u.Scheme {
 	case "timescaledb", "tsdb", "timescale":
-		// TODO remove
+		// Replace tsdb schemes to look like postgres, so that postgres-protocol compatible tools (like go-migrate) work
+		// Keep/return the DialectType separately from the DSN so we can refer to it later
 		fixedDSN := strings.Replace(u.String(), u.Scheme+"://", "postgres://", 1)
 		return schema.TSDB, fixedDSN, nil
 	default:
