@@ -33,6 +33,20 @@ func ParseConnectionString(connString string) (*dburl.URL, error) {
 	return u, err
 }
 
+func SetDSNElement(dsn string, elems map[string]string) (string, error) {
+	u, err := ParseConnectionString(dsn)
+	if err != nil {
+		return "", err
+	}
+
+	vals := u.Query()
+	for k, v := range elems {
+		vals.Set(k, v)
+	}
+	u.RawQuery = vals.Encode()
+	return u.String(), nil
+}
+
 var asciiSpace = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
 
 // ParseDSNSettings taken from https://github.com/jackc/pgconn
