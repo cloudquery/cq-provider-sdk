@@ -336,25 +336,7 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 		}
 	}()
 
-	cols := e.Db.Dialect().Columns(resource.table)
-
-	providerCols, internalCols := make([]Column, 0, len(cols)), make([]Column, 0, len(cols))
-	cqIdColIndex := -1
-	for i := range cols {
-		if cols[i].internal {
-			if cols[i].Name == cqIdColumn.Name {
-				cqIdColIndex = len(internalCols)
-			}
-
-			internalCols = append(internalCols, cols[i])
-		} else {
-			providerCols = append(providerCols, cols[i])
-		}
-	}
-	// resolve cqId last, as it would need other PKs to be resolved, some might be internal (cq_fetch_date)
-	if lastIndex := len(internalCols) - 1; cqIdColIndex > -1 && cqIdColIndex != lastIndex {
-		internalCols[cqIdColIndex], internalCols[lastIndex] = internalCols[lastIndex], internalCols[cqIdColIndex]
-	}
+	providerCols, internalCols := siftColumns(e.Db.Dialect().Columns(resource.table))
 
 	if err = e.resolveColumns(ctx, meta, resource, providerCols); err != nil {
 		return fmt.Errorf("resolve columns error: %w", err)
@@ -477,4 +459,29 @@ func (e *ExecutionData) checkPartialFetchError(err error, res *Resource, customM
 	// Send information via our channel
 	e.partialFetchChan <- partialFetchFailure
 	return nil
+}
+
+// siftColumns gets a column list and returns a list of provider columns, and another list of internal columns, cqId column being the very last one
+func siftColumns(cols []Column) ([]Column, []Column) {
+	providerCols, internalCols := make([]Column, 0, len(cols)), make([]Column, 0, len(cols))
+
+	cqIdColIndex := -1
+	for i := range cols {
+		if cols[i].internal {
+			if cols[i].Name == cqIdColumn.Name {
+				cqIdColIndex = len(internalCols)
+			}
+
+			internalCols = append(internalCols, cols[i])
+		} else {
+			providerCols = append(providerCols, cols[i])
+		}
+	}
+
+	// resolve cqId last, as it would need other PKs to be resolved, some might be internal (cq_fetch_date)
+	if lastIndex := len(internalCols) - 1; cqIdColIndex > -1 && cqIdColIndex != lastIndex {
+		internalCols[cqIdColIndex], internalCols[lastIndex] = internalCols[lastIndex], internalCols[cqIdColIndex]
+	}
+
+	return providerCols, internalCols
 }
