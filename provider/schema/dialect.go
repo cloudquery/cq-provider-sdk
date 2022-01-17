@@ -179,13 +179,13 @@ func (d TSDBDialect) Extra(t, parent *Table) []string {
 
 	if parent == nil || pc == nil {
 		return []string{
-			fmt.Sprintf("SELECT setup_tsdb_parent('%s')", t.Name),
+			fmt.Sprintf("SELECT setup_tsdb_parent('%s');", t.Name),
 		}
 	}
 
 	return []string{
-		fmt.Sprintf("CREATE INDEX ON %s (%s, %s)", t.Name, cqFetchDateColumn.Name, pc.Name),
-		fmt.Sprintf("SELECT setup_tsdb_child('%s', '%s', '%s', '%s')", t.Name, pc.Name, parent.Name, cqIdColumn.Name),
+		fmt.Sprintf("CREATE INDEX ON %s (%s, %s);", t.Name, cqFetchDateColumn.Name, pc.Name),
+		fmt.Sprintf("SELECT setup_tsdb_child('%s', '%s', '%s', '%s');", t.Name, pc.Name, parent.Name, cqIdColumn.Name),
 	}
 }
 

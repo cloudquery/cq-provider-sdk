@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/provider"
@@ -97,14 +96,14 @@ func generateFullForDialect(ctx context.Context, logger hclog.Logger, p *provide
 			if _, err := cf.WriteString(s); err != nil {
 				return err
 			}
-			_, _ = cf.Write([]byte{';', '\n'})
+			_, _ = cf.Write([]byte{'\n'})
 		}
 
 		for _, s := range downs {
 			if _, err := df.WriteString(s); err != nil {
 				return err
 			}
-			_, _ = df.Write([]byte{';', '\n'})
+			_, _ = df.Write([]byte{'\n'})
 		}
 	}
 
@@ -182,18 +181,12 @@ func generateDiffForDialect(ctx context.Context, logger hclog.Logger, conn *pgxp
 			if _, err := cf.WriteString(s); err != nil {
 				return err
 			}
-			if !strings.Contains(s, ";") {
-				_, _ = cf.Write([]byte{';'})
-			}
 			_, _ = cf.Write([]byte{'\n'})
 		}
 
 		for _, s := range downs {
 			if _, err := df.WriteString(s); err != nil {
 				return err
-			}
-			if !strings.Contains(s, ";") {
-				_, _ = df.Write([]byte{';'})
 			}
 			_, _ = df.Write([]byte{'\n'})
 		}

@@ -16,11 +16,11 @@ import (
 
 const (
 	queryTableColumns   = `SELECT array_agg(column_name::text) AS columns, array_agg(data_type::text) AS types FROM information_schema.columns WHERE table_name = $1 AND table_schema = $2`
-	addColumnToTable    = `ALTER TABLE IF EXISTS %s ADD COLUMN IF NOT EXISTS %v %v`
-	dropColumnFromTable = `ALTER TABLE IF EXISTS %s DROP COLUMN IF EXISTS %v`
+	addColumnToTable    = `ALTER TABLE IF EXISTS %s ADD COLUMN IF NOT EXISTS %v %v;`
+	dropColumnFromTable = `ALTER TABLE IF EXISTS %s DROP COLUMN IF EXISTS %v;`
 	renameColumnInTable = `-- ALTER TABLE %s RENAME COLUMN %v TO %v; -- uncomment to activate, remove ADD/DROP COLUMN above and below` // Can't have IF EXISTS here
 
-	dropTable = `DROP TABLE IF EXISTS %s`
+	dropTable = `DROP TABLE IF EXISTS %s;`
 )
 
 // TableCreator handles creation of schema.Table in database as SQL strings
@@ -79,7 +79,7 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 		b.WriteByte('\n')
 	}
 
-	b.WriteString(")")
+	b.WriteString(");")
 
 	up, down = make([]string, 0, 1+len(t.Relations)), make([]string, 0, 1+len(t.Relations))
 	up = append(up, b.String())
@@ -151,7 +151,7 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 
 		var notice string
 		if v, ok := similars[d]; ok {
-			notice = "; -- could this be " + strconv.Quote(v) + " ?"
+			notice = " -- could this be " + strconv.Quote(v) + " ?"
 		}
 
 		up = append(up, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), m.dialect.DBTypeFromType(col.Type))+notice)
@@ -172,7 +172,7 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 
 		var notice string
 		if v, ok := similars[d]; ok {
-			notice = "; -- could this be " + strconv.Quote(v) + " ? Check the RENAME COLUMN statement above"
+			notice = " -- could this be " + strconv.Quote(v) + " ? Check the RENAME COLUMN statement above"
 		}
 
 		up = append(up, fmt.Sprintf(dropColumnFromTable, strconv.Quote(t.Name), strconv.Quote(d))+notice)
