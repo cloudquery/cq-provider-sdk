@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudquery/cq-provider-sdk/helpers"
+	"github.com/cloudquery/cq-provider-sdk/database/dsn"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -89,7 +89,7 @@ type Migrator struct {
 	postHook func(context.Context) error
 }
 
-func New(log hclog.Logger, dt schema.DialectType, migrationFiles map[string]map[string][]byte, dsn string, providerName string, postHook func(context.Context) error) (*Migrator, error) {
+func New(log hclog.Logger, dt schema.DialectType, migrationFiles map[string]map[string][]byte, dsnURI, providerName string, postHook func(context.Context) error) (*Migrator, error) {
 	versionMapper := make(map[string]uint)
 	versions := make(version.Collection, 0)
 	mm := afero.NewMemMapFs()
@@ -116,7 +116,7 @@ func New(log hclog.Logger, dt schema.DialectType, migrationFiles map[string]map[
 	if err != nil {
 		return nil, err
 	}
-	u, err := helpers.ParseConnectionString(dsn)
+	u, err := dsn.ParseConnectionString(dsnURI)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func New(log hclog.Logger, dt schema.DialectType, migrationFiles map[string]map[
 	return &Migrator{
 		log:           log,
 		provider:      providerName,
-		dsn:           dsn,
+		dsn:           dsnURI,
 		migratorUrl:   u,
 		m:             m,
 		driver:        driver,
