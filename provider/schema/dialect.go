@@ -14,13 +14,6 @@ type DialectType string
 const (
 	Postgres = DialectType("postgres")
 	TSDB     = DialectType("timescale")
-
-	// fkCommentKey is the identifier to use when marking table columns as FKs to their parenet tables and columns.
-	// This is used for history mode where we can't have proper FKs. Instead we set a Postgres COMMENT for the FK-referencing column in the child table.
-	// TSDBDialect.Extra() creates the SQL to set these comments.
-	// Our machine readable comment format is "key1=value1;key2=value2;". `parseDialectComments` is used to parse any comments internally.
-	// `GetFKFromComment` helper function is used to read any FK reference from the comment.
-	fkCommentKey = "x-cq-fk"
 )
 
 func (t DialectType) MigrationDirectory() string {
@@ -191,7 +184,7 @@ func (d TSDBDialect) Extra(t, parent *Table) []string {
 
 	return []string{
 		fmt.Sprintf("CREATE INDEX ON %s (%s, %s)", t.Name, cqFetchDateColumn.Name, pc.Name),
-		fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s=%s.%s;'", t.Name, pc.Name, fkCommentKey, parent.Name, cqIdColumn.Name),
+		fmt.Sprintf("SELECT DEFINE_FK('%s', '%s', '%s', '%s')", t.Name, pc.Name, parent.Name, cqIdColumn.Name),
 	}
 }
 
@@ -201,20 +194,6 @@ func (d TSDBDialect) DBTypeFromType(v ValueType) string {
 
 func (d TSDBDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
 	return doResourceValues(d, r)
-}
-
-// GetFKFromComment gets a column comment and parses the parent table reference from it
-func GetFKFromComment(text string) (table string, column string) {
-	c := parseDialectComments(text)
-	v := c[fkCommentKey]
-	if v == "" {
-		return
-	}
-	tableCol := strings.SplitN(v, ".", 2)
-	if len(tableCol) != 2 {
-		return // invalid
-	}
-	return tableCol[0], tableCol[1]
 }
 
 func doResourceValues(dialect Dialect, r *Resource) ([]interface{}, error) {
@@ -284,22 +263,6 @@ func findParentIdColumn(t *Table) (ret *Column) {
 	}
 
 	return nil
-}
-
-func parseDialectComments(text string) map[string]string {
-	// format is key=value;...
-
-	parts := strings.Split(text, ";")
-	ret := make(map[string]string, len(parts))
-	for i := range parts {
-		kv := strings.SplitN(parts[i], "=", 2)
-		if len(kv) == 1 {
-			ret[kv[0]] = ""
-		} else {
-			ret[kv[0]] = kv[1]
-		}
-	}
-	return ret
 }
 
 func truncatePKConstraint(name string) string {
