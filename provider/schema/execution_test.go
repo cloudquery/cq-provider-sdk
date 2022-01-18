@@ -328,7 +328,6 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		mockDb := new(DatabaseMock)
 		mockDb.On("Dialect").Return(PostgresDialect{})
 		exec := NewExecutionData(mockDb, logger, testTable, nil, false)
-		//mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 		testTable.Resolver = dataReturningSingleResolver
 		testTable.DeleteFilter = func(meta ClientMeta, r *Resource) []interface{} {
 			return nil
@@ -341,27 +340,27 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 			return nil
 		}
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-		mockDb.On("Delete", mock.Anything, testTable, mock.Anything).Return(nil)
 		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-		mockDb.AssertNumberOfCalls(t, "Delete", 0)
 		_, err := exec.ResolveTable(context.Background(), mockedClient, nil)
-		mockDb.AssertNumberOfCalls(t, "Delete", 0)
 		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
 		assert.Equal(t, expectedResource.data["name"], "other")
 		assert.Nil(t, err)
+
+		// new mockDb, new call counts
+		mockDb = new(DatabaseMock)
+		mockDb.On("Dialect").Return(PostgresDialect{})
 		exec = NewExecutionData(mockDb, logger, testTable, nil, false)
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
 		_, err = exec.ResolveTable(context.Background(), mockedClient, nil)
-		mockDb.AssertNumberOfCalls(t, "RemoveStaleData", 2)
-		mockDb.AssertNumberOfCalls(t, "CopyFrom", 2)
+		mockDb.AssertNumberOfCalls(t, "RemoveStaleData", 1)
+		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
 		assert.Nil(t, err)
 	})
 	t.Run("disable delete w/deleteFilter", func(t *testing.T) {
 		mockDb := new(DatabaseMock)
 		mockDb.On("Dialect").Return(PostgresDialect{})
 		exec := NewExecutionData(mockDb, logger, testTable, map[string]interface{}{"test": 1}, false)
-		//mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 		testTable.Resolver = dataReturningSingleResolver
 		testTable.DeleteFilter = func(meta ClientMeta, r *Resource) []interface{} {
 			return []interface{}{"a", 2}
@@ -374,20 +373,21 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 			return nil
 		}
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-		mockDb.On("Delete", mock.Anything, testTable, mock.Anything).Return(nil)
 		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, []interface{}{"test", 1, "a", 2}).Return(nil)
-		mockDb.AssertNumberOfCalls(t, "Delete", 0)
 		_, err := exec.ResolveTable(context.Background(), mockedClient, nil)
-		mockDb.AssertNumberOfCalls(t, "Delete", 0)
 		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
 		assert.Equal(t, expectedResource.data["name"], "other")
 		assert.Nil(t, err)
+
+		// new mockDb, new call counts
+		mockDb = new(DatabaseMock)
+		mockDb.On("Dialect").Return(PostgresDialect{})
 		exec = NewExecutionData(mockDb, logger, testTable, nil, false)
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
 		_, err = exec.ResolveTable(context.Background(), mockedClient, nil)
-		mockDb.AssertNumberOfCalls(t, "RemoveStaleData", 2)
-		mockDb.AssertNumberOfCalls(t, "CopyFrom", 2)
+		mockDb.AssertNumberOfCalls(t, "RemoveStaleData", 1)
+		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
 		assert.Nil(t, err)
 	})
 
@@ -409,10 +409,7 @@ func TestExecutionData_ResolveTable(t *testing.T) {
 		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
 		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(fmt.Errorf("some error"))
 		mockDb.On("Insert", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockDb.On("Delete", mock.Anything, testTable, mock.Anything).Return(nil)
-		mockDb.AssertNumberOfCalls(t, "Delete", 0)
 		_, err := exec.ResolveTable(context.Background(), mockedClient, nil)
-		mockDb.AssertNumberOfCalls(t, "Delete", 0)
 		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
 		mockDb.AssertNumberOfCalls(t, "Insert", 1)
 		assert.Equal(t, expectedResource.data["name"], "other")
