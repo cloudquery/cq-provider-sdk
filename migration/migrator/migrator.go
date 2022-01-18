@@ -25,6 +25,10 @@ import (
 )
 
 const (
+	Latest  = "latest"
+	Initial = "initial"
+	Down    = "down_testing" // used in testing
+
 	migrationsEmbeddedDirectoryPath = "migrations"
 	dropTableSQL                    = "DROP TABLE IF EXISTS %s CASCADE"
 )
@@ -163,7 +167,7 @@ func (m *Migrator) UpgradeProvider(version string) (retErr error) {
 		retErr = m.callPostHook(context.Background())
 	}()
 
-	if version == "latest" {
+	if version == Latest {
 		return m.m.Up()
 	}
 
@@ -183,7 +187,7 @@ func (m *Migrator) DowngradeProvider(version string) (retErr error) {
 		retErr = m.callPostHook(context.Background())
 	}()
 
-	if version == "down_testing" { // Used in testing
+	if version == Down { // Used in testing
 		return m.m.Down()
 	}
 
@@ -264,10 +268,10 @@ func (m *Migrator) SetVersion(requestedVersion string) (retErr error) {
 // if we ask for 004 we get 001
 // if we ask for 005 we get 005
 func (m *Migrator) FindLatestMigration(requestedVersion string) (uint, error) {
-	if requestedVersion == "latest" {
+	if requestedVersion == Latest {
 		mv := m.versionMapper[m.versions[len(m.versions)-1].Original()]
 		return mv, nil
-	} else if requestedVersion == "initial" {
+	} else if requestedVersion == Initial {
 		mv := m.versionMapper[m.versions[0].Original()]
 		return mv, nil
 	}

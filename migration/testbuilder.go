@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// RunMigrationsTest tests the migration files of the provider using the database (and dialect) specified in CQ_MIGRATION_TEST_DSN
+// RunMigrationsTest helper tests the migration files of the provider using the database (and dialect) specified in CQ_MIGRATION_TEST_DSN
 func RunMigrationsTest(t *testing.T, prov *provider.Provider, additionalVersionsToTest []string) {
 	dsn := os.Getenv("CQ_MIGRATION_TEST_DSN")
 	if dsn == "" {
@@ -87,17 +87,17 @@ func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 	assert.NoError(t, mig.DropProvider(ctx, prov.ResourceMap))
 
 	t.Run("Up", func(t *testing.T) {
-		assert.NoError(t, mig.UpgradeProvider("latest"))
+		assert.NoError(t, mig.UpgradeProvider(migrator.Latest))
 	})
 	t.Run("DowngradeToOldest", func(t *testing.T) {
-		err := mig.DowngradeProvider("initial")
+		err := mig.DowngradeProvider(migrator.Initial)
 		if err == migrate.ErrNoChange {
 			err = nil
 		}
 		assert.NoError(t, err)
 	})
 	t.Run("Down", func(t *testing.T) {
-		assert.NoError(t, mig.DowngradeProvider("down_testing"))
+		assert.NoError(t, mig.DowngradeProvider(migrator.Down))
 	})
 
 	// Run user supplied versions

@@ -55,10 +55,10 @@ func TestMigrations(t *testing.T) {
 	err = m.DropProvider(context.Background(), nil)
 	assert.Nil(t, err)
 
-	err = m.UpgradeProvider("latest")
+	err = m.UpgradeProvider(Latest)
 	assert.Nil(t, err)
 
-	err = m.UpgradeProvider("latest")
+	err = m.UpgradeProvider(Latest)
 	assert.Equal(t, err, migrate.ErrNoChange)
 
 	err = m.DowngradeProvider("v0.0.2-beta")
@@ -70,7 +70,7 @@ func TestMigrations(t *testing.T) {
 	version, dirty, err := m.Version()
 	assert.Equal(t, []interface{}{"v0.0.3", false, nil}, []interface{}{version, dirty, err})
 
-	err = m.UpgradeProvider("latest")
+	err = m.UpgradeProvider(Latest)
 	assert.Nil(t, err)
 
 	version, dirty, err = m.Version()
@@ -110,9 +110,9 @@ func TestMultiProviderMigrations(t *testing.T) {
 	err = mtest2.DropProvider(context.Background(), nil)
 	assert.Nil(t, err)
 
-	err = mtest.UpgradeProvider("latest")
+	err = mtest.UpgradeProvider(Latest)
 	assert.Nil(t, err)
-	err = mtest.UpgradeProvider("latest")
+	err = mtest.UpgradeProvider(Latest)
 	assert.Equal(t, err, migrate.ErrNoChange)
 	version, dirty, err := mtest.Version()
 	assert.Equal(t, []interface{}{"v0.0.4", false, nil}, []interface{}{version, dirty, err})
@@ -156,7 +156,7 @@ func TestFindLatestMigration(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, uint(0), mv)
 
-	mv, err = mtest.FindLatestMigration("latest")
+	mv, err = mtest.FindLatestMigration(Latest)
 	assert.Nil(t, err)
 	assert.Equal(t, uint(5), mv)
 }
