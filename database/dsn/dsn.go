@@ -19,13 +19,14 @@ func init() {
 	})
 }
 
+// ParseConnectionString will try and parse any type of connection string and return a dburl
 func ParseConnectionString(connString string) (*dburl.URL, error) {
 	u, err := dburl.Parse(connString)
 	if err == dburl.ErrInvalidDatabaseScheme {
 		// connString may be a database URL or a DSN
 		connString, err = convertDSNToURL(connString)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse dsn string, %w", err)
+			return nil, fmt.Errorf("failed to parse dsn string: %w", err)
 		}
 		u, err = dburl.Parse(connString)
 	}
@@ -33,6 +34,7 @@ func ParseConnectionString(connString string) (*dburl.URL, error) {
 	return u, err
 }
 
+// SetDSNElement parses the given DSN and sets/adds the given map values as query parameters, returning a URI DSN
 func SetDSNElement(dsn string, elems map[string]string) (string, error) {
 	u, err := ParseConnectionString(dsn)
 	if err != nil {

@@ -22,10 +22,10 @@ func RunMigrationsTest(t *testing.T, prov *provider.Provider, additionalVersions
 		return
 	}
 
-	DoMigrationsTest(t, context.Background(), dsn, prov, additionalVersionsToTest)
+	doMigrationsTest(t, context.Background(), dsn, prov, additionalVersionsToTest)
 }
 
-func DoMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provider.Provider, additionalVersionsToTest []string) {
+func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provider.Provider, additionalVersionsToTest []string) {
 	var dialect schema.DialectType
 
 	const (
@@ -90,7 +90,7 @@ func DoMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 		assert.NoError(t, mig.UpgradeProvider("latest"))
 	})
 	t.Run("DowngradeToOldest", func(t *testing.T) {
-		err := mig.DowngradeProvider("oldest")
+		err := mig.DowngradeProvider("initial")
 		if err == migrate.ErrNoChange {
 			err = nil
 		}

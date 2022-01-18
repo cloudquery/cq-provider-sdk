@@ -267,7 +267,7 @@ func (m *Migrator) FindLatestMigration(requestedVersion string) (uint, error) {
 	if requestedVersion == "latest" {
 		mv := m.versionMapper[m.versions[len(m.versions)-1].Original()]
 		return mv, nil
-	} else if requestedVersion == "oldest" {
+	} else if requestedVersion == "initial" {
 		mv := m.versionMapper[m.versions[0].Original()]
 		return mv, nil
 	}
