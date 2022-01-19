@@ -3,10 +3,13 @@ package provider
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
 
+	"github.com/cloudquery/cq-provider-sdk/database"
+	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 
 	"github.com/thoas/go-funk"
@@ -53,16 +56,14 @@ type Provider struct {
 	dbURL string
 	// meta is the provider's client created when configure is called
 	meta schema.ClientMeta
-	// Whether provider should all Delete on every table before fetching
-	disableDelete bool
 	// Add extra fields to all resources, these fields don't show up in documentation and are used for internal CQ testing.
 	extraFields map[string]interface{}
-	// databaseCreator creates a database based on requested engine
-	databaseCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error)
+	// storageCreator creates a database based on requested engine
+	storageCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Storage, error)
 }
 
 func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
-	m, err := readProviderMigrationFiles(p.Logger, p.Migrations)
+	m, err := migrator.ReadMigrationFiles(p.Logger, p.Migrations)
 	if err != nil {
 		return nil, err
 	}
@@ -93,19 +94,18 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
 	if p.meta != nil {
-		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s was already configured", p.Name)}, nil
+		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s was already configured", p.Name)}, fmt.Errorf("provider %s was already configured", p.Name)
 	}
 	if p.Logger == nil {
-		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, nil
+		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
 	}
 	// set database creator
-	if p.databaseCreator == nil {
-		p.databaseCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error) {
-			return schema.NewPgDatabase(ctx, logger, dbURL)
+	if p.storageCreator == nil {
+		p.storageCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Storage, error) {
+			return database.New(ctx, logger, dbURL)
 		}
 	}
 
-	p.disableDelete = request.DisableDelete
 	p.extraFields = request.ExtraFields
 	p.dbURL = request.Connection.DSN
 	providerConfig := p.Config()
@@ -115,9 +115,13 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	// if we received an empty config we notify in log and only use defaults.
 	if len(request.Config) == 0 {
 		p.Logger.Info("Received empty configuration, using only defaults")
-	} else if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
-		p.Logger.Error("Failed to load configuration.", "error", err)
-		return &cqproto.ConfigureProviderResponse{}, err
+	} else if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
+		p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)
+		// this part will be deprecated.
+		if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
+			p.Logger.Error("Failed to load configuration.", "error", err)
+			return &cqproto.ConfigureProviderResponse{}, err
+		}
 	}
 
 	client, err := p.Configure(p.Logger, providerConfig)
@@ -151,7 +155,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		return err
 	}
 
-	conn, err := p.databaseCreator(ctx, p.Logger, p.dbURL)
+	conn, err := p.storageCreator(ctx, p.Logger, p.dbURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database. %w", err)
 	}
@@ -173,7 +177,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		execData := schema.NewExecutionData(conn, p.Logger, table, p.disableDelete, p.extraFields, request.PartialFetchingEnabled)
+		execData := schema.NewExecutionData(conn, p.Logger, table, p.extraFields, request.PartialFetchingEnabled)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource
@@ -244,6 +248,11 @@ func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec sc
 	p.Logger.Debug("collecting diagnostics for resource execution", "resource", exec.ResourceName)
 	diagnostics := make(diag.Diagnostics, 0)
 	for _, e := range exec.PartialFetchFailureResult {
+		var execErr *diag.ExecutionError
+		if errors.As(e.Err, &execErr) {
+			diagnostics = append(diagnostics, execErr)
+			continue
+		}
 		if d, ok := e.Err.(diag.Diagnostic); ok {
 			diagnostics = append(diagnostics, d)
 			continue

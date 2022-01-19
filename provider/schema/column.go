@@ -141,8 +141,8 @@ type ColumnResolver func(ctx context.Context, meta ClientMeta, resource *Resourc
 
 // ColumnCreationOptions allow modification of how column is defined when table is created
 type ColumnCreationOptions struct {
-	Nullable bool
-	Unique   bool
+	Unique  bool
+	NotNull bool
 }
 
 // Column definition for Table
@@ -161,7 +161,12 @@ type Column struct {
 	IgnoreError IgnoreErrorFunc
 	// Creation options allow modifying how column is defined when table is created
 	CreationOptions ColumnCreationOptions
+	// IgnoreInTests if true this skips this column in tests as sometimes it might be hard
+	// to create a reproducible test environment with this column being non nill. For example various error columns and so on
+	IgnoreInTests bool
 
+	// internal is true if this column is managed by the SDK
+	internal bool
 	// meta holds serializable information about the column's resolvers and functions
 	meta *ColumnMeta
 }
@@ -317,4 +322,14 @@ type ColumnMeta struct {
 func SetColumnMeta(c Column, m *ColumnMeta) Column {
 	c.meta = m
 	return c
+}
+
+type ColumnList []Column
+
+func (c ColumnList) Names() []string {
+	ret := make([]string, len(c))
+	for i := range c {
+		ret[i] = c[i].Name
+	}
+	return ret
 }

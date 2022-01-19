@@ -1,23 +1,72 @@
-package helpers
+package dsn
 
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/xo/dburl"
 )
 
+func init() {
+	dburl.Register(dburl.Scheme{
+		Driver:    "timescale",
+		Generator: dburl.GenPostgres,
+		Transport: dburl.TransportTCP | dburl.TransportUnix,
+		Opaque:    false,
+		Aliases:   []string{"timescaledb", "tsdb", "ts"},
+		Override:  "",
+	})
+}
+
+// ParseConnectionString will try and parse any type of connection string and return a dburl
 func ParseConnectionString(connString string) (*dburl.URL, error) {
-	var err error
-	// connString may be a database URL or a DSN
-	if !(strings.HasPrefix(connString, "postgres://") || strings.HasPrefix(connString, "postgresql://")) {
+	u, err := dburl.Parse(connString)
+	if err == dburl.ErrInvalidDatabaseScheme {
+		// connString may be a database URL or a DSN
 		connString, err = convertDSNToURL(connString)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse dsn string, %w", err)
+			return nil, fmt.Errorf("failed to parse dsn string: %w", RedactParseError(err))
 		}
+		u, err = dburl.Parse(connString)
 	}
-	return dburl.Parse(connString)
+
+	return u, RedactParseError(err)
+}
+
+// SetDSNElement parses the given DSN and sets/adds the given map values as query parameters, returning a URI DSN
+func SetDSNElement(dsn string, elems map[string]string) (string, error) {
+	u, err := ParseConnectionString(dsn)
+	if err != nil {
+		return "", err
+	}
+
+	vals := u.Query()
+	for k, v := range elems {
+		vals.Set(k, v)
+	}
+	u.RawQuery = vals.Encode()
+	return u.String(), nil
+}
+
+// RedactParseError looks for url.Error and redacts the URL (DSN)
+// The original message wrapping the url.Error is lost.
+func RedactParseError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// pgconn does a good job of redacting the password, but it wraps the net/url's parse error, which includes the original URI
+	// dburl returns url.Parse errors as-is
+
+	var e *url.Error
+	if errors.As(err, &e) {
+		e.URL = "DSN redacted"
+		return e
+	}
+
+	return err
 }
 
 var asciiSpace = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}

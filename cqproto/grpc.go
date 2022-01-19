@@ -26,7 +26,7 @@ func (g GRPCClient) GetProviderSchema(ctx context.Context, _ *GetProviderSchemaR
 		Name:           res.GetName(),
 		Version:        res.GetVersion(),
 		ResourceTables: tablesFromProto(res.GetResourceTables()),
-		Migrations:     res.Migrations,
+		Migrations:     migrationsFromProto(res.GetMigrations()),
 	}
 
 	return resp, nil
@@ -53,9 +53,8 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 			Type: internal.ConnectionType_POSTGRES,
 			Dsn:  request.Connection.DSN,
 		},
-		Config:        request.Config,
-		DisableDelete: request.DisableDelete,
-		ExtraFields:   fieldsData,
+		Config:      request.Config,
+		ExtraFields: fieldsData,
 	})
 	if err != nil {
 		return nil, err
@@ -116,7 +115,7 @@ func (g *GRPCServer) GetProviderSchema(ctx context.Context, _ *internal.GetProvi
 		Name:           resp.Name,
 		Version:        resp.Version,
 		ResourceTables: tablesToProto(resp.ResourceTables),
-		Migrations:     resp.Migrations,
+		Migrations:     migrationsToProto(resp.Migrations),
 	}, nil
 
 }
@@ -143,9 +142,8 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 			Type: string(request.Connection.GetType()),
 			DSN:  request.Connection.GetDsn(),
 		},
-		Config:        request.Config,
-		DisableDelete: request.DisableDelete,
-		ExtraFields:   eFields,
+		Config:      request.Config,
+		ExtraFields: eFields,
 	})
 	if err != nil {
 		return nil, err
@@ -368,4 +366,22 @@ func PartialFetchToCQProto(in []schema.ResourceFetchError) []*FailedResourceFetc
 		}
 	}
 	return failedResources
+}
+
+func migrationsFromProto(in map[string]*internal.DialectMigration) map[string]map[string][]byte {
+	ret := make(map[string]map[string][]byte, len(in))
+	for k := range in {
+		ret[k] = in[k].Migrations
+	}
+	return ret
+}
+
+func migrationsToProto(in map[string]map[string][]byte) map[string]*internal.DialectMigration {
+	ret := make(map[string]*internal.DialectMigration, len(in))
+	for k := range in {
+		ret[k] = &internal.DialectMigration{
+			Migrations: in[k],
+		}
+	}
+	return ret
 }

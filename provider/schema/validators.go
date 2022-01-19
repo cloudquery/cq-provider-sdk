@@ -5,9 +5,10 @@ import (
 	"fmt"
 )
 
-const maxTableName = 63
-
-const maxColumnName = 63
+const (
+	maxTableName  = 63 // maximum allowed identifier length is 63 bytes https://www.postgresql.org/docs/13/limits.html
+	maxColumnName = 63
+)
 
 var defaultValidators = []TableValidator{
 	LengthTableValidator{},
@@ -33,7 +34,7 @@ func validateTableAttributesNameLength(t *Table) error {
 	}
 
 	// validate table columns
-	for _, col := range t.ColumnNames() {
+	for _, col := range t.Columns.Names() {
 		if len(col) > maxColumnName {
 			return fmt.Errorf("column name %s has exceeded max length", col)
 		}

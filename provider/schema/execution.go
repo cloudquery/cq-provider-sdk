@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"reflect"
 	"runtime/debug"
+	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
+	"github.com/georgysavva/scany/pgxscan"
 	"github.com/modern-go/reflect2"
 
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
@@ -22,6 +25,24 @@ import (
 // faster than the <1s it won't be deleted by remove stale.
 const executionJitter = -1 * time.Minute
 
+//go:generate mockgen -package=mock -destination=./mock/mock_storage.go . Storage
+type Storage interface {
+	QueryExecer
+
+	Insert(ctx context.Context, t *Table, instance Resources) error
+	Delete(ctx context.Context, t *Table, kvFilters []interface{}) error
+	RemoveStaleData(ctx context.Context, t *Table, executionStart time.Time, kvFilters []interface{}) error
+	CopyFrom(ctx context.Context, resources Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error
+	Close()
+	Dialect() Dialect
+}
+
+type QueryExecer interface {
+	pgxscan.Querier
+
+	Exec(ctx context.Context, query string, args ...interface{}) error
+}
+
 type ClientMeta interface {
 	Logger() hclog.Logger
 }
@@ -33,16 +54,14 @@ type ExecutionData struct {
 	// Table this execution is associated with
 	Table *Table
 	// Database connection to insert data into
-	Db Database
+	Db Storage
 	// Logger associated with this execution
 	Logger hclog.Logger
-	// disableDelete allows disabling deletion of table data for this execution
-	disableDelete bool
 	// extraFields to be passed to each created resource in the execution
 	extraFields map[string]interface{}
 	// partialFetch if true allows partial fetching of resources
 	partialFetch bool
-	// PartialFetchFailureResult is a map of resources where the fetch process failed
+	// PartialFetchFailureResult is a an array of resources where the fetch process failed
 	PartialFetchFailureResult []ResourceFetchError
 	// partialFetchChan is the channel that is used to send failed resource fetches
 	partialFetchChan chan ResourceFetchError
@@ -66,16 +85,20 @@ func (p ResourceFetchError) Error() string {
 	return p.Err.Error()
 }
 
-// partialFetchFailureBufferLength defines the buffer length for the partialFetchChan.
-const partialFetchFailureBufferLength = 10
+const (
+	// partialFetchFailureBufferLength defines the buffer length for the partialFetchChan.
+	partialFetchFailureBufferLength = 10
+
+	// fdLimitMessage defines the message for when a client isn't able to fetch because the open fd limit is hit
+	fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
+)
 
 // NewExecutionData Create a new execution data
-func NewExecutionData(db Database, logger hclog.Logger, table *Table, disableDelete bool, extraFields map[string]interface{}, partialFetch bool) ExecutionData {
+func NewExecutionData(db Storage, logger hclog.Logger, table *Table, extraFields map[string]interface{}, partialFetch bool) ExecutionData {
 	return ExecutionData{
 		Table:                     table,
 		Db:                        db,
 		Logger:                    logger,
-		disableDelete:             disableDelete,
 		extraFields:               extraFields,
 		PartialFetchFailureResult: []ResourceFetchError{},
 		partialFetch:              partialFetch,
@@ -130,7 +153,6 @@ func (e *ExecutionData) WithTable(t *Table) *ExecutionData {
 		ResourceName:              e.ResourceName,
 		Db:                        e.Db,
 		Logger:                    e.Logger,
-		disableDelete:             e.disableDelete,
 		extraFields:               e.extraFields,
 		partialFetch:              e.partialFetch,
 		PartialFetchFailureResult: []ResourceFetchError{},
@@ -141,7 +163,7 @@ func (e ExecutionData) truncateTable(ctx context.Context, client ClientMeta, par
 	if e.Table.DeleteFilter == nil {
 		return nil
 	}
-	if e.disableDelete && !e.Table.AlwaysDelete {
+	if !e.Table.AlwaysDelete {
 		client.Logger().Debug("skipping table truncate", "table", e.Table.Name)
 		return nil
 	}
@@ -157,10 +179,6 @@ func (e ExecutionData) truncateTable(ctx context.Context, client ClientMeta, par
 func (e ExecutionData) cleanupStaleData(ctx context.Context, client ClientMeta, parent *Resource) error {
 	// Only clean top level tables
 	if parent != nil {
-		return nil
-	}
-	if !e.disableDelete {
-		client.Logger().Debug("skipping stale data removal", "table", e.Table.Name)
 		return nil
 	}
 	client.Logger().Debug("cleaning table table stale data", "table", e.Table.Name, "last_update", e.executionStart)
@@ -233,7 +251,7 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) error {
 	var resources = make(Resources, 0, len(objects))
 	for _, o := range objects {
-		resource := NewResourceData(e.Table, parent, o, e.extraFields)
+		resource := NewResourceData(e.Db.Dialect(), e.Table, parent, o, e.extraFields, e.executionStart)
 		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resource); err != nil {
 			if partialFetchErr := e.checkPartialFetchError(err, resource, "failed to resolve resource"); partialFetchErr != nil {
@@ -245,9 +263,8 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 		resources = append(resources, resource)
 	}
 
-	// only top level tables should cascade, disable delete is turned on.
-	// if we didn't disable delete all data should be wiped before resolve
-	shouldCascade := parent == nil && e.disableDelete
+	// only top level tables should cascade
+	shouldCascade := parent == nil
 	var err error
 	resources, err = e.copyDataIntoDB(ctx, resources, shouldCascade)
 	if err != nil {
@@ -309,7 +326,10 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 			err = fmt.Errorf("recovered from panic: %s", r)
 		}
 	}()
-	if err = e.resolveColumns(ctx, meta, resource, resource.table.Columns); err != nil {
+
+	providerCols, internalCols := siftColumns(e.Db.Dialect().Columns(resource.table))
+
+	if err = e.resolveColumns(ctx, meta, resource, providerCols); err != nil {
 		return fmt.Errorf("resolve columns error: %w", err)
 	}
 	// call PostRowResolver if defined after columns have been resolved
@@ -318,8 +338,8 @@ func (e *ExecutionData) resolveResourceValues(ctx context.Context, meta ClientMe
 			return fmt.Errorf("post resource resolver failed: %w", err)
 		}
 	}
-	// Finally, resolve default SDK columns resource
-	for _, c := range GetDefaultSDKColumns() {
+	// Finally, resolve columns internal to the SDK
+	for _, c := range internalCols {
 		if err = c.Resolver(ctx, meta, resource, c); err != nil {
 			return fmt.Errorf("default column %s resolver execution failed: %w", c.Name, err)
 		}
@@ -401,7 +421,7 @@ func (e *ExecutionData) checkPartialFetchError(err error, res *Resource, customM
 		TableName: e.Table.Name,
 		Err:       fmt.Errorf("%s: %w", customMsg, err),
 	}
-	e.Logger.Debug("fetch error occurred and partial fetch is enabled", "msg", partialFetchFailure.Error, "table", e.Table.Name)
+	e.Logger.Debug("fetch error occurred and partial fetch is enabled", "msg", partialFetchFailure.Error(), "table", e.Table.Name)
 
 	// If resource is given
 	if res != nil {
@@ -423,7 +443,36 @@ func (e *ExecutionData) checkPartialFetchError(err error, res *Resource, customM
 			partialFetchFailure.RootPrimaryKeyValues = root.Keys()
 		}
 	}
+	if strings.Contains(err.Error(), ": socket: too many open files") {
+		// Return a Diagnostic error so that it can be properly propegated back to the user via the CLI
+		partialFetchFailure.Err = diag.FromError(err, diag.WARNING, diag.THROTTLE, e.ResourceName, err.Error(), fdLimitMessage)
+	}
 	// Send information via our channel
 	e.partialFetchChan <- partialFetchFailure
 	return nil
+}
+
+// siftColumns gets a column list and returns a list of provider columns, and another list of internal columns, cqId column being the very last one
+func siftColumns(cols []Column) ([]Column, []Column) {
+	providerCols, internalCols := make([]Column, 0, len(cols)), make([]Column, 0, len(cols))
+
+	cqIdColIndex := -1
+	for i := range cols {
+		if cols[i].internal {
+			if cols[i].Name == cqIdColumn.Name {
+				cqIdColIndex = len(internalCols)
+			}
+
+			internalCols = append(internalCols, cols[i])
+		} else {
+			providerCols = append(providerCols, cols[i])
+		}
+	}
+
+	// resolve cqId last, as it would need other PKs to be resolved, some might be internal (cq_fetch_date)
+	if lastIndex := len(internalCols) - 1; cqIdColIndex > -1 && cqIdColIndex != lastIndex {
+		internalCols[cqIdColIndex], internalCols[lastIndex] = internalCols[lastIndex], internalCols[cqIdColIndex]
+	}
+
+	return providerCols, internalCols
 }

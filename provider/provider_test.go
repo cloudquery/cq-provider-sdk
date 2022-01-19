@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/schema/mocks"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/mock"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
@@ -55,7 +55,7 @@ var (
 			},
 		},
 	}
-	testResolverFunc = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan interface{}) error {
+	testResolverFunc = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
 		for i := 0; i < 10; i++ {
 			t := testStruct{}
 			time.Sleep(50 * time.Millisecond)
@@ -103,7 +103,7 @@ var (
 				},
 				"bad_resource": {
 					Name: "bad_resource",
-					Resolver: func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan interface{}) error {
+					Resolver: func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
 						return errors.New("bad error")
 					},
 				},
@@ -112,7 +112,7 @@ var (
 					IgnoreError: func(err error) bool {
 						return true
 					},
-					Resolver: func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan interface{}) error {
+					Resolver: func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
 						return errors.New("bad error")
 					},
 				},
@@ -258,12 +258,11 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:        nil,
-		DisableDelete: true,
-		ExtraFields:   nil,
+		Config:      nil,
+		ExtraFields: nil,
 	})
 	assert.Equal(t, "provider unitest logger not defined, make sure to run it with serve", resp.Error)
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	// set logger this time
 	tp.Logger = hclog.Default()
 	resp, err = tp.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
@@ -271,9 +270,8 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:        nil,
-		DisableDelete: true,
-		ExtraFields:   nil,
+		Config:      nil,
+		ExtraFields: nil,
 	})
 	assert.Equal(t, "", resp.Error)
 	assert.Error(t, err)
@@ -283,7 +281,7 @@ type FetchResourceTableTest struct {
 	Name                   string
 	ExpectedFetchResponses []*cqproto.FetchResourcesResponse
 	ExpectedError          error
-	MockDBFunc             func(ctrl *gomock.Controller) *mocks.MockDatabase
+	MockStorageFunc        func(ctrl *gomock.Controller) *mock.MockStorage
 	PartialFetch           bool
 	ResourcesToFetch       []string
 }
@@ -297,8 +295,9 @@ var fetchCases = []FetchResourceTableTest{
 				Error:        "",
 			}},
 		ExpectedError: nil,
-		MockDBFunc: func(ctrl *gomock.Controller) *mocks.MockDatabase {
-			mockDB := mocks.NewMockDatabase(ctrl)
+		MockStorageFunc: func(ctrl *gomock.Controller) *mock.MockStorage {
+			mockDB := mock.NewMockStorage(ctrl)
+			mockDB.EXPECT().RemoveStaleData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			//mockDB.EXPECT().Insert(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDB.EXPECT().Close()
 			return mockDB
@@ -314,8 +313,8 @@ var fetchCases = []FetchResourceTableTest{
 				Error:        "bad error",
 			}},
 		ExpectedError: nil,
-		MockDBFunc: func(ctrl *gomock.Controller) *mocks.MockDatabase {
-			mockDB := mocks.NewMockDatabase(ctrl)
+		MockStorageFunc: func(ctrl *gomock.Controller) *mock.MockStorage {
+			mockDB := mock.NewMockStorage(ctrl)
 			//mockDB.EXPECT().Insert(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDB.EXPECT().Close()
 			return mockDB
@@ -336,15 +335,14 @@ func TestProvider_FetchResources(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:        nil,
-		DisableDelete: false,
-		ExtraFields:   nil,
+		Config:      nil,
+		ExtraFields: nil,
 	})
 	ctrl := gomock.NewController(t)
 	for _, tt := range fetchCases {
 		t.Run(tt.Name, func(t *testing.T) {
-			tp.databaseCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Database, error) {
-				return tt.MockDBFunc(ctrl), nil
+			tp.storageCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Storage, error) {
+				return tt.MockStorageFunc(ctrl), nil
 			}
 			err = tp.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{
 				Resources:              tt.ResourcesToFetch,
@@ -387,9 +385,8 @@ func TestProvider_FetchResourcesParallelLimit(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:        nil,
-		DisableDelete: true,
-		ExtraFields:   nil,
+		Config:      nil,
+		ExtraFields: nil,
 	})
 	assert.Equal(t, "", resp.Error)
 	assert.Nil(t, err)

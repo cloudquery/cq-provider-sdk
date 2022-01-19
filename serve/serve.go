@@ -6,13 +6,12 @@ import (
 	"log"
 	"os"
 
-	"github.com/cloudquery/cq-provider-sdk/provider"
-
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
-	"google.golang.org/grpc"
+	"github.com/cloudquery/cq-provider-sdk/provider"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
+	"google.golang.org/grpc"
 )
 
 var Handshake = plugin.HandshakeConfig{
@@ -20,8 +19,13 @@ var Handshake = plugin.HandshakeConfig{
 	MagicCookieValue: "6753812e-79c2-4af5-ad01-e6083c374e1f",
 }
 
+const pluginExecutionMsg = `This binary is a plugin. These are not meant to be executed directly.
+Please execute the program that consumes these plugins, which will load any plugins automatically.
+Set CQ_PROVIDER_DEBUG=1 to run plugin in debug mode, for additional info see https://docs.cloudquery.io/docs/developers/debugging.
+`
+
 type Options struct {
-	// Required: Name of provider.
+	// Required: Name of provider
 	Name string
 
 	// Required: Provider is the actual provider that will be served.
@@ -104,10 +108,15 @@ func serve(opts *Options) {
 		// make use of it automatically.
 		log.SetOutput(opts.Logger.StandardWriter(&hclog.StandardLoggerOptions{InferLevels: true}))
 	}
+
+	if opts.TestConfig == nil && os.Getenv(Handshake.MagicCookieKey) != Handshake.MagicCookieValue {
+		fmt.Print(pluginExecutionMsg)
+		os.Exit(1)
+	}
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
 		VersionedPlugins: map[int]plugin.PluginSet{
-			2: {
+			cqproto.V4: {
 				"provider": &cqproto.CQPlugin{Impl: opts.Provider},
 			}},
 		GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {
