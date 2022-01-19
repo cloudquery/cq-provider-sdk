@@ -134,7 +134,9 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 		dbColTypes[existingColumns.Columns[i]] = strings.ToLower(existingColumns.Types[i])
 	}
 
-	columnsToAdd, columnsToRemove := funk.DifferenceString(m.dialect.Columns(t).Names(), existingColumns.Columns)
+	tableColsWithDialect := m.dialect.Columns(t)
+
+	columnsToAdd, columnsToRemove := funk.DifferenceString(tableColsWithDialect.Names(), existingColumns.Columns)
 	similars := getSimilars(m.dialect, t, columnsToAdd, columnsToRemove, dbColTypes)
 
 	capSize := len(columnsToAdd) + len(columnsToRemove) // relations not included...
@@ -143,7 +145,7 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 
 	for _, d := range columnsToAdd {
 		m.log.Debug("adding column", "column", d)
-		col := t.Column(d)
+		col := tableColsWithDialect.Get(d)
 		if col == nil {
 			m.log.Warn("column missing from table, not adding it", "table", t.Name, "column", d)
 			continue

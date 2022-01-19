@@ -333,3 +333,12 @@ func (c ColumnList) Names() []string {
 	}
 	return ret
 }
+
+func (c ColumnList) Get(name string) *Column {
+	for i := range c {
+		if c[i].Name == name {
+			return &c[i]
+		}
+	}
+	return nil
+}
