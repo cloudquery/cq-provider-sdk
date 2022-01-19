@@ -150,6 +150,9 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 			m.log.Warn("column missing from table, not adding it", "table", t.Name, "column", d)
 			continue
 		}
+		if col.Internal() {
+			continue
+		}
 
 		var notice string
 		if v, ok := similars[d]; ok {
@@ -168,7 +171,9 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 	for _, d := range columnsToRemove {
 		m.log.Debug("removing column", "column", d)
 		if col := t.Column(d); col != nil {
-			m.log.Warn("column still in table, not removing it", "table", t.Name, "column", d)
+			if !col.Internal() {
+				m.log.Warn("column still in table, not removing it", "table", t.Name, "column", d)
+			}
 			continue
 		}
 
