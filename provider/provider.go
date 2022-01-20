@@ -60,6 +60,8 @@ type Provider struct {
 	extraFields map[string]interface{}
 	// storageCreator creates a database based on requested engine
 	storageCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Storage, error)
+	// unmanaged tells if the provider is being run in unmanaged mode
+	unmanaged bool
 }
 
 func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
@@ -93,12 +95,19 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 }
 
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
-	if p.meta != nil {
-		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s was already configured", p.Name)}, fmt.Errorf("provider %s was already configured", p.Name)
-	}
 	if p.Logger == nil {
 		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
 	}
+
+	if p.meta != nil {
+		if !p.Unmanaged() {
+			return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s was already configured", p.Name)}, fmt.Errorf("provider %s was already configured", p.Name)
+		}
+
+		p.Logger.Info("Reconfiguring provider: Previous configuration has been reset.")
+		p.storageCreator = nil
+	}
+
 	// set database creator
 	if p.storageCreator == nil {
 		p.storageCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Storage, error) {
@@ -238,6 +247,16 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		})
 	}
 	return g.Wait()
+}
+
+// SetUnmanaged sets the provider running in unmanaged mode
+func (p *Provider) SetUnmanaged() {
+	p.unmanaged = true
+}
+
+// Unmanaged returns true if the provider is running in unmanaged mode
+func (p *Provider) Unmanaged() bool {
+	return p.unmanaged
 }
 
 func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec schema.ExecutionData) diag.Diagnostics {
