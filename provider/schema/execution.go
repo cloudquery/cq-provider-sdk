@@ -268,10 +268,10 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 	shouldCascade := parent == nil
 	var err error
 	resources, err = e.copyDataIntoDB(ctx, resources, shouldCascade)
-	totalCount := uint64(len(resources))
 	if err != nil {
-		return totalCount, err
+		return 0, err
 	}
+	totalCount := uint64(len(resources))
 
 	// Finally, resolve relations of each resource
 	for _, rel := range e.Table.Relations {
