@@ -248,19 +248,21 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	return nc, nil
 }
 
-func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) error {
+func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) (int, error) {
 	var resources = make(Resources, 0, len(objects))
+	count := 0
 	for _, o := range objects {
 		resource := NewResourceData(e.Db.Dialect(), e.Table, parent, o, e.extraFields, e.executionStart)
 		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resource); err != nil {
 			if partialFetchErr := e.checkPartialFetchError(err, resource, "failed to resolve resource"); partialFetchErr != nil {
-				return partialFetchErr
+				return count, partialFetchErr
 			}
 			e.Logger.Warn("skipping failed resolved resource", "reason", err.Error())
 			continue
 		}
 		resources = append(resources, resource)
+		count++
 	}
 
 	// only top level tables should cascade
@@ -268,8 +270,9 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 	var err error
 	resources, err = e.copyDataIntoDB(ctx, resources, shouldCascade)
 	if err != nil {
-		return err
+		return count, err // incorrect count
 	}
+	count = len(resources) // ?
 
 	// Finally, resolve relations of each resource
 	for _, rel := range e.Table.Relations {
@@ -279,12 +282,12 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 			_, err := e.WithTable(rel).ResolveTable(ctx, meta, r)
 			if err != nil {
 				if partialFetchErr := e.checkPartialFetchError(err, r, "resolve relation error"); partialFetchErr != nil {
-					return partialFetchErr
+					return count, partialFetchErr
 				}
 			}
 		}
 	}
-	return nil
+	return count, nil
 }
 
 func (e *ExecutionData) copyDataIntoDB(ctx context.Context, resources Resources, shouldCascade bool) (Resources, error) {
