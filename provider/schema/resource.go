@@ -43,7 +43,7 @@ func NewResourceData(dialect Dialect, t *Table, parent *Resource, item interface
 		executionStart: startTime,
 	}
 }
-func (r *Resource) Keys() []string {
+func (r *Resource) PrimaryKeyValues() []string {
 	tablePrimKeys := r.dialect.PrimaryKeys(r.table)
 	if len(tablePrimKeys) == 0 {
 		return []string{}
@@ -52,7 +52,7 @@ func (r *Resource) Keys() []string {
 	for _, primKey := range tablePrimKeys {
 		data := r.Get(primKey)
 		if data != nil {
-			results = append(results, fmt.Sprintf("%v", data))
+			results = append(results, fmt.Sprintf("%s", data))
 		}
 	}
 	return results

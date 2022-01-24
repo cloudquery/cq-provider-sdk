@@ -100,7 +100,7 @@ func TestResourcePrimaryKey(t *testing.T) {
 	assert.Nil(t, r.GenerateCQId())
 	assert.Equal(t, randomId, r.cqId)
 	// check key length of array is as expected
-	assert.Len(t, r.Keys(), 1)
+	assert.Len(t, r.PrimaryKeyValues(), 1)
 }
 
 func TestRelationResourcePrimaryKey(t *testing.T) {
