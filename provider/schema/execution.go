@@ -228,10 +228,11 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 		if len(objects) == 0 {
 			continue
 		}
-		if err := e.resolveResources(ctx, client, parent, objects); err != nil {
+		resolvedCount, err := e.resolveResources(ctx, client, parent, objects)
+		if err != nil {
 			return 0, err
 		}
-		nc += uint64(len(objects))
+		nc += resolvedCount
 	}
 	// check if channel iteration stopped because of resolver failure
 	if resolverErr != nil {
@@ -248,14 +249,14 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 	return nc, nil
 }
 
-func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) error {
+func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, parent *Resource, objects []interface{}) (uint64, error) {
 	var resources = make(Resources, 0, len(objects))
 	for _, o := range objects {
 		resource := NewResourceData(e.Db.Dialect(), e.Table, parent, o, e.extraFields, e.executionStart)
 		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resource); err != nil {
 			if partialFetchErr := e.checkPartialFetchError(err, resource, "failed to resolve resource"); partialFetchErr != nil {
-				return partialFetchErr
+				return 0, err
 			}
 			e.Logger.Warn("skipping failed resolved resource", "reason", err.Error())
 			continue
@@ -267,24 +268,28 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 	shouldCascade := parent == nil
 	var err error
 	resources, err = e.copyDataIntoDB(ctx, resources, shouldCascade)
+	totalCount := uint64(len(resources))
 	if err != nil {
-		return err
+		return totalCount, err
 	}
+
+
 
 	// Finally, resolve relations of each resource
 	for _, rel := range e.Table.Relations {
 		meta.Logger().Debug("resolving table relation", "table", e.Table.Name, "relation", rel.Name)
 		for _, r := range resources {
 			// ignore relation resource count
-			_, err := e.WithTable(rel).ResolveTable(ctx, meta, r)
+			relationCount, err := e.WithTable(rel).ResolveTable(ctx, meta, r)
+			totalCount += relationCount
 			if err != nil {
 				if partialFetchErr := e.checkPartialFetchError(err, r, "resolve relation error"); partialFetchErr != nil {
-					return partialFetchErr
+					return totalCount, partialFetchErr
 				}
 			}
 		}
 	}
-	return nil
+	return totalCount, nil
 }
 
 func (e *ExecutionData) copyDataIntoDB(ctx context.Context, resources Resources, shouldCascade bool) (Resources, error) {
