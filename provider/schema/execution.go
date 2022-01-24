@@ -228,10 +228,11 @@ func (e ExecutionData) callTableResolve(ctx context.Context, client ClientMeta, 
 		if len(objects) == 0 {
 			continue
 		}
-		if err := e.resolveResources(ctx, client, parent, objects); err != nil {
+		count, err := e.resolveResources(ctx, client, parent, objects)
+		if err != nil {
 			return 0, err
 		}
-		nc += uint64(len(objects))
+		nc += uint64(count)
 	}
 	// check if channel iteration stopped because of resolver failure
 	if resolverErr != nil {
