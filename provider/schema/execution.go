@@ -273,15 +273,12 @@ func (e *ExecutionData) resolveResources(ctx context.Context, meta ClientMeta, p
 		return totalCount, err
 	}
 
-
-
 	// Finally, resolve relations of each resource
 	for _, rel := range e.Table.Relations {
 		meta.Logger().Debug("resolving table relation", "table", e.Table.Name, "relation", rel.Name)
 		for _, r := range resources {
 			// ignore relation resource count
-			relationCount, err := e.WithTable(rel).ResolveTable(ctx, meta, r)
-			totalCount += relationCount
+			_, err := e.WithTable(rel).ResolveTable(ctx, meta, r)
 			if err != nil {
 				if partialFetchErr := e.checkPartialFetchError(err, r, "resolve relation error"); partialFetchErr != nil {
 					return totalCount, partialFetchErr
@@ -307,7 +304,7 @@ func (e *ExecutionData) copyDataIntoDB(ctx context.Context, resources Resources,
 	e.Logger.Error("failed insert to db", "error", err, "table", e.Table.Name)
 
 	// Partial fetch check
-	if partialFetchErr := e.checkPartialFetchError(err, nil, "failed to copy resources into the db"); partialFetchErr != nil {
+	if partialFetchErr := e.checkPartialFetchError(err, nil, "failed to insert resources into the db"); partialFetchErr != nil {
 		return nil, partialFetchErr
 	}
 
