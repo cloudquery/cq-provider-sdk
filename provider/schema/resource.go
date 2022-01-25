@@ -57,12 +57,12 @@ func (r *Resource) PrimaryKeyValues() []string {
 		// we can have more types, but PKs are usually either ints, strings or a structure
 		// hopefully supporting Stringer interface, otherwise we fallback
 		switch v := data.(type) {
+		case fmt.Stringer:
+			results = append(results, v.String())
 		case *string:
 			results = append(results, *v)
 		case *int:
 			results = append(results, fmt.Sprintf("%d", *v))
-		case fmt.Stringer:
-			results = append(results, v.String())
 		default:
 			results = append(results, fmt.Sprintf("%v", v))
 		}
