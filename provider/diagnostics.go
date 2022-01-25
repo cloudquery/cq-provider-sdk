@@ -9,6 +9,6 @@ import (
 // for errors returned from fetch execution
 func DefaultErrorClassifier(_ schema.ClientMeta, resourceName string, err error) []diag.Diagnostic {
 	return []diag.Diagnostic{
-		diag.FromError(err, diag.ERROR, diag.RESOLVING, resourceName, err.Error(), ""),
+		diag.NewExecutionErrorWithError(err, diag.ERROR, diag.RESOLVING, resourceName, err.Error(), ""),
 	}
 }

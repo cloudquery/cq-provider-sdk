@@ -1,5 +1,11 @@
 package diag
 
+import (
+	"fmt"
+	"github.com/hashicorp/errwrap"
+	"github.com/hashicorp/hcl/v2"
+)
+
 type Severity int
 
 const (
@@ -9,6 +15,8 @@ const (
 	WARNING
 	// ERROR severity are diagnostics that were fatal in the fetch execution and should be fixed.
 	ERROR
+	// PANIC severity are diagnostics that are returned from a panic in the underlying code.
+	PANIC
 )
 
 type DiagnosticType int
@@ -37,6 +45,8 @@ const (
 	ACCESS
 	THROTTLE
 	DATABASE
+	SCHEMA
+	INTERNAL
 )
 
 type Diagnostic interface {
@@ -54,9 +64,51 @@ type Description struct {
 
 type Diagnostics []Diagnostic
 
-func (dd Diagnostics) Warnings() uint64 {
+func (diags Diagnostics) Error() string {
+	panic("implement me")
+}
+
+func (diags Diagnostics) Append(new ...interface{}) Diagnostics{
+	for _, item := range new {
+		if item == nil {
+			continue
+		}
+
+		switch ti := item.(type) {
+		case Diagnostic:
+			diags = append(diags, ti)
+		case Diagnostics:
+			diags = append(diags, ti...) // flatten
+		case error:
+			switch {
+			case errwrap.ContainsType(ti, Diagnostics(nil)):
+				// If we have an errwrap wrapper with a Diagnostics hiding
+				// inside then we'll unpick it here to get access to the
+				// individual diagnostics.
+				diags = diags.Append(errwrap.GetType(ti, Diagnostics(nil)))
+			case errwrap.ContainsType(ti, hcl.Diagnostics(nil)):
+				// Likewise, if we have HCL diagnostics we'll unpick that too.
+				diags = diags.Append(errwrap.GetType(ti, hcl.Diagnostics(nil)))
+			default:
+				diags = append(diags, nativeError{ti})
+			}
+		default:
+			panic(fmt.Errorf("can't construct diagnostic(s) from %T", item))
+		}
+	}
+
+	// Given the above, we should never end up with a non-nil empty slice
+	// here, but we'll make sure of that so callers can rely on empty == nil
+	if len(diags) == 0 {
+		return nil
+	}
+
+	return diags
+}
+
+func (diags Diagnostics) Warnings() uint64 {
 	var warningsCount uint64 = 0
-	for _, d := range dd {
+	for _, d := range diags {
 		if d.Severity() == WARNING {
 			warningsCount++
 		}
@@ -64,9 +116,9 @@ func (dd Diagnostics) Warnings() uint64 {
 	return warningsCount
 }
 
-func (dd Diagnostics) Errors() uint64 {
+func (diags Diagnostics) Errors() uint64 {
 	var errorCount uint64 = 0
-	for _, d := range dd {
+	for _, d := range diags {
 		if d.Severity() == ERROR {
 			errorCount++
 		}
@@ -74,8 +126,8 @@ func (dd Diagnostics) Errors() uint64 {
 	return errorCount
 }
 
-func (dd Diagnostics) Len() int      { return len(dd) }
-func (dd Diagnostics) Swap(i, j int) { dd[i], dd[j] = dd[j], dd[i] }
-func (dd Diagnostics) Less(i, j int) bool {
-	return dd[i].Severity() > dd[j].Severity() && dd[i].Type() > dd[j].Type()
+func (diags Diagnostics) Len() int      { return len(diags) }
+func (diags Diagnostics) Swap(i, j int) { diags[i], diags[j] = diags[j], diags[i] }
+func (diags Diagnostics) Less(i, j int) bool {
+	return diags[i].Severity() > diags[j].Severity() && diags[i].Type() > diags[j].Type()
 }

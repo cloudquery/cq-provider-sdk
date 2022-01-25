@@ -1,5 +1,7 @@
 package diag
 
+import "fmt"
+
 // ExecutionError is a generic error returned when execution is run, ExecutionError satisfies
 type ExecutionError struct {
 	// Err is the underlying go error this diagnostic wraps
@@ -39,17 +41,50 @@ func (e ExecutionError) Type() DiagnosticType {
 }
 
 func (e ExecutionError) Error() string {
-	return e.Err.Error()
+	// return original error
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return e.summary
 }
 
-// FromError creates an ExecutionError from given error
-func FromError(err error, severity Severity, dt DiagnosticType, resource, summary, details string) *ExecutionError {
+// NewExecutionErrorWithError creates an ExecutionError from given error
+func NewExecutionErrorWithError(err error, severity Severity, dt DiagnosticType, resource, summary, details string) *ExecutionError {
 	return &ExecutionError{
 		Err:            err,
 		severity:       severity,
 		resource:       resource,
 		summary:        summary,
 		detail:         details,
+		diagnosticType: dt,
+	}
+}
+
+func FromError(severity Severity, diagnosticType DiagnosticType, err error) Diagnostic {
+	switch ti := err.(type) {
+	case Diagnostic:
+		return ti
+	default:
+		return &ExecutionError{Err: err, severity: severity, diagnosticType: diagnosticType}
+	}
+}
+
+func FromErrorf(severity Severity, diagnosticType DiagnosticType, err error, msg string) Diagnostic {
+	switch ti := err.(type) {
+	case Diagnostic:
+		return ti
+	default:
+		return &ExecutionError{Err: fmt.Errorf("%s: %w", msg, err), severity: severity, diagnosticType: diagnosticType}
+	}
+}
+
+func NewExecutionError(severity Severity, dt DiagnosticType, resource, summary string, args ...interface{}) *ExecutionError {
+	s := fmt.Sprintf(summary, args)
+	return &ExecutionError{
+		severity:       severity,
+		summary:        s,
+		resource:       resource,
+		detail:         "",
 		diagnosticType: dt,
 	}
 }

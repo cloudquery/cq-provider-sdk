@@ -272,7 +272,7 @@ func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, exec sc
 			continue
 		}
 		// if error wasn't classified by provider mark it as error
-		diagnostics = append(diagnostics, diag.FromError(e.Err, diag.ERROR, diag.RESOLVING, exec.ResourceName, e.Error(), ""))
+		diagnostics = append(diagnostics, diag.NewExecutionErrorWithError(e.Err, diag.ERROR, diag.RESOLVING, exec.ResourceName, e.Error(), ""))
 	}
 	return diagnostics
 }
