@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/execution"
+
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/mock"
 	"github.com/golang/mock/gomock"
 
@@ -341,7 +343,7 @@ func TestProvider_FetchResources(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range fetchCases {
 		t.Run(tt.Name, func(t *testing.T) {
-			tp.storageCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (schema.Storage, error) {
+			tp.storageCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (execution.Storage, error) {
 				return tt.MockStorageFunc(ctrl), nil
 			}
 			err = tp.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{

@@ -2,6 +2,7 @@ package diag
 
 import (
 	"fmt"
+
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/hcl/v2"
 )
@@ -32,15 +33,15 @@ func (d DiagnosticType) String() string {
 		return "Throttle"
 	case DATABASE:
 		return "Database"
-	case Unknown:
+	case UNKNOWN:
 		fallthrough
 	default:
-		return "Unknown"
+		return "UNKNOWN"
 	}
 }
 
 const (
-	Unknown DiagnosticType = iota
+	UNKNOWN DiagnosticType = iota
 	RESOLVING
 	ACCESS
 	THROTTLE
@@ -68,7 +69,11 @@ func (diags Diagnostics) Error() string {
 	panic("implement me")
 }
 
-func (diags Diagnostics) Append(new ...interface{}) Diagnostics{
+func (diags Diagnostics) HasErrors() bool {
+	return len(diags) > 0
+}
+
+func (diags Diagnostics) Append(new ...interface{}) Diagnostics {
 	for _, item := range new {
 		if item == nil {
 			continue

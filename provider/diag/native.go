@@ -1,6 +1,5 @@
 package diag
 
-
 type nativeError struct {
 	err error
 }
@@ -15,13 +14,11 @@ func (n nativeError) Type() DiagnosticType {
 
 func (n nativeError) Description() Description {
 	return Description{
-		Resource: "",
-		Summary:  n.err.Error(),
-		Detail:   "",
+		Summary: n.err.Error(),
+		Detail:  "",
 	}
 }
 
 func (n nativeError) Error() string {
 	return n.err.Error()
 }
-

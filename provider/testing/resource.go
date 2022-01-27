@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/execution"
+
 	sq "github.com/Masterminds/squirrel"
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/database"
@@ -105,7 +107,7 @@ func fetch(t *testing.T, resource *ResourceTestCase) error {
 	return nil
 }
 
-func deleteTables(conn schema.QueryExecer, table *schema.Table) error {
+func deleteTables(conn execution.QueryExecer, table *schema.Table) error {
 	s := sq.Delete(table.Name)
 	sql, args, err := s.ToSql()
 	if err != nil {
@@ -206,11 +208,11 @@ func (f *fakeResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 
 var (
 	dbConnOnce sync.Once
-	pool       schema.QueryExecer
+	pool       execution.QueryExecer
 	dbErr      error
 )
 
-func setupDatabase() (schema.QueryExecer, error) {
+func setupDatabase() (execution.QueryExecer, error) {
 	dbConnOnce.Do(func() {
 		pool, dbErr = database.New(context.Background(), hclog.NewNullLogger(), getEnv("DATABASE_URL", "host=localhost user=postgres password=pass DB.name=postgres port=5432"))
 		if dbErr != nil {
