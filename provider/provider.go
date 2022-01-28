@@ -125,11 +125,12 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	if len(request.Config) == 0 {
 		p.Logger.Info("Received empty configuration, using only defaults")
 	} else if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
+		hclErr := fmt.Errorf("failed to read config as hcl: %w", err)
 		p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)
 		// this part will be deprecated.
 		if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
 			p.Logger.Error("Failed to load configuration.", "error", err)
-			return &cqproto.ConfigureProviderResponse{}, err
+			return &cqproto.ConfigureProviderResponse{}, fmt.Errorf("%s\nfailed to read config as json: %w", hclErr.Error(), err)
 		}
 	}
 
