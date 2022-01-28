@@ -130,6 +130,17 @@ const (
 	ResourceFetchCanceled
 )
 
+var resourceFetchStatusName = map[ResourceFetchStatus]string{
+	ResourceFetchComplete: "COMPLETE",
+	ResourceFetchFailed:   "FAILED",
+	ResourceFetchPartial:  "PARTIAL",
+	ResourceFetchCanceled: "CANCELED",
+}
+
+func (s ResourceFetchStatus) String() string {
+	return resourceFetchStatusName[s]
+}
+
 // ResourceFetchSummary includes a summarized report of a fetched resource, such as total amount of resources collected,
 // status of the fetch and any diagnostics found while executing fetch on it.
 type ResourceFetchSummary struct {
