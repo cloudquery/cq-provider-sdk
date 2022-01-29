@@ -35,8 +35,9 @@ func (e Error) Severity() diag.Severity {
 
 func (e Error) Description() diag.Description {
 	return diag.Description{
-		Summary: e.summary,
-		Detail:  e.detail,
+		Resource: e.resource,
+		Summary:  e.summary,
+		Detail:   e.detail,
 	}
 }
 

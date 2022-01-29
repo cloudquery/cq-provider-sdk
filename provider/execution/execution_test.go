@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
@@ -35,8 +36,25 @@ func (e executionClient) Logger() hclog.Logger {
 }
 
 var (
+	commonColumns     = []schema.Column{{Name: "name", Type: schema.TypeString}}
 	doNothingResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
 		return nil
+	}
+	returnErrorResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
+		return fmt.Errorf("some error")
+	}
+
+	returnValueResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
+		res <- map[string]string{"name": "test"}
+		return nil
+	}
+
+	panicResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
+		panic("resolver panic")
+	}
+
+	simpleMultiplexer = func(meta schema.ClientMeta) []schema.ClientMeta {
+		return []schema.ClientMeta{meta, meta}
 	}
 )
 
@@ -55,7 +73,50 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			Table: &schema.Table{
 				Name:     "simple",
 				Resolver: doNothingResolver,
-				Columns:  []schema.Column{{Name: "name", Type: schema.TypeString}},
+				Columns:  commonColumns,
+			},
+		},
+		{
+			Name: "multiplex",
+			Table: &schema.Table{
+				Name:      "simple",
+				Multiplex: simpleMultiplexer,
+				Resolver:  doNothingResolver,
+				Columns:   commonColumns,
+			},
+		},
+		{
+			Name: "multiplex_relation",
+			Table: &schema.Table{
+				Name:      "multiplex_relation",
+				Multiplex: simpleMultiplexer,
+				Resolver:  returnValueResolver,
+				Columns:   commonColumns,
+				Relations: []*schema.Table{
+					{
+						Resolver:  doNothingResolver,
+						Multiplex: simpleMultiplexer,
+						Name:      "relation_with_multiplex",
+						Columns:   commonColumns,
+					},
+				},
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
+					Resource: "multiplex_relation",
+					Severity: diag.WARNING,
+					Summary:  "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
+					Type:     diag.SCHEMA,
+				},
+				{
+					Err:      "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
+					Resource: "multiplex_relation",
+					Severity: diag.WARNING,
+					Summary:  "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
+					Type:     diag.SCHEMA,
+				},
 			},
 		},
 		{
@@ -64,7 +125,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			Description: "if tables don't define a resolver, an execution error by execution",
 			Table: &schema.Table{
 				Name:    "no-resolver",
-				Columns: []schema.Column{{Name: "name", Type: schema.TypeString}},
+				Columns: commonColumns,
 			},
 			ErrorExpected: true,
 			ExpectedDiags: []diagFlat{
@@ -82,22 +143,126 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			Name: "missing_table_relation_resolver",
 			Table: &schema.Table{
 				Name:     "no-resolver",
-				Resolver: doNothingResolver,
-				Columns:  []schema.Column{{Name: "name", Type: schema.TypeString}},
+				Resolver: returnValueResolver,
+				Columns:  commonColumns,
 				Relations: []*schema.Table{
 					{
 						Name:    "relation-no-resolver",
-						Columns: []schema.Column{{Name: "name", Type: schema.TypeString}},
+						Columns: commonColumns,
 					},
 				},
 			},
 			ErrorExpected: true,
 			ExpectedDiags: []diagFlat{
 				{
-					Resource: "relation-no-resolver",
+					Err:      "table relation-no-resolver missing resolver, make sure table implements the resolver",
+					Resource: "missing_table_relation_resolver",
 					Severity: diag.ERROR,
 					Summary:  "table relation-no-resolver missing resolver, make sure table implements the resolver",
 					Type:     diag.SCHEMA,
+				},
+			},
+		},
+		{
+			Name: "panic_resolver",
+			Table: &schema.Table{
+				Name:     "panic_resolver",
+				Resolver: panicResolver,
+				Columns:  commonColumns,
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "table resolver panic: resolver panic",
+					Resource: "panic_resolver",
+					Severity: diag.PANIC,
+					Summary:  "panic on resource table panic_resolver fetch",
+					Type:     diag.RESOLVING,
+				},
+			},
+		},
+		{
+			Name: "panic_relation_resolver",
+			Table: &schema.Table{
+				Name:     "panic_resolver",
+				Resolver: returnValueResolver,
+				Columns:  commonColumns,
+				Relations: []*schema.Table{
+					{
+						Name:     "relation_panic_resolver",
+						Resolver: panicResolver,
+						Columns:  commonColumns,
+					},
+				},
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "table resolver panic: resolver panic",
+					Resource: "panic_relation_resolver",
+					Severity: diag.PANIC,
+					Summary:  "panic on resource table relation_panic_resolver fetch",
+					Type:     diag.RESOLVING,
+				},
+			},
+		},
+		{
+			Name: "error_returning",
+			Table: &schema.Table{
+				Name:     "simple",
+				Resolver: returnErrorResolver,
+				Columns:  commonColumns,
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "some error",
+					Resource: "error_returning",
+					Severity: diag.ERROR,
+					Summary:  "failed to resolve resource error_returning",
+					Type:     diag.RESOLVING,
+				},
+			},
+		},
+		{
+			Name: "error_returning_ignore_fail",
+			Table: &schema.Table{
+				IgnoreError: func(err error) bool {
+					return false
+				},
+				Name:     "simple",
+				Resolver: returnErrorResolver,
+				Columns:  commonColumns,
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "some error",
+					Resource: "error_returning_ignore_fail",
+					Severity: diag.ERROR,
+					Summary:  "failed to resolve resource error_returning_ignore_fail",
+					Type:     diag.RESOLVING,
+				},
+			},
+		},
+		{
+			Name: "error_returning_ignore",
+			Table: &schema.Table{
+				IgnoreError: func(err error) bool {
+					return true
+				},
+				Name:     "simple",
+				Resolver: returnErrorResolver,
+				Columns:  commonColumns,
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "table resolver ignored error. Error: simple",
+					Resource: "error_returning_ignore",
+					Severity: diag.IGNORE,
+					Summary:  "table resolver ignored error. Error: simple",
+					Type:     diag.RESOLVING,
 				},
 			},
 		},
@@ -114,9 +279,9 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			count, diags := exec.Resolve(context.Background(), executionClient, nil)
 			assert.Equal(t, tc.ExpectedResourceCount, count)
 			if tc.ErrorExpected {
-				require.True(t, diags.HasErrors())
+				require.True(t, diags.HasDiags())
 				if tc.ExpectedDiags != nil {
-					assert.ElementsMatch(t, tc.ExpectedDiags, flattenDiags(diags))
+					assert.Equal(t, tc.ExpectedDiags, flattenDiags(diags))
 				}
 			} else {
 				require.Nil(t, diags)

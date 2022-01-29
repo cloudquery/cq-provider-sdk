@@ -61,22 +61,42 @@ func CreateTableExecutor(resourceName string, db Storage, logger hclog.Logger, t
 }
 
 func (e *TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
-	var clients []schema.ClientMeta
-	clients = append(clients, meta)
-	if e.Table.Multiplex != nil {
-		if parent != nil {
-			meta.Logger().Warn("relation client multiplexing is not allowed, skipping multiplex", "table", e.Table.Name)
-		} else {
-			clients = e.Table.Multiplex(meta)
-			meta.Logger().Debug("multiplexing client", "count", len(clients), "table", e.Table.Name)
-		}
+	// if table doesn't define multiplex call normal table resolve
+	if e.Table.Multiplex == nil {
+		return e.callTableResolve(ctx, meta, parent)
 	}
+	// we have multiplex defined, make sure this is a root table, if it is we are allowed to multiplex
+	if parent == nil {
+		return e.doMultiplexResolve(ctx, meta, parent)
+	}
+	// add diagnostic that multiplexing isn't allowed for relational tables and call normal table resolve.
+	var diags diag.Diagnostics
+	meta.Logger().Warn("relation client multiplexing is not allowed, skipping multiplex", "table", e.Table.Name)
+	diags = diags.Append(NewError(diag.WARNING, diag.SCHEMA, e.ResourceName, "multiplex on relation table %s is not allowed, skipping multiplex", e.Table.Name))
+	count, resolveDiags := e.callTableResolve(ctx, meta, parent)
+	return count, diags.Append(resolveDiags)
+}
+
+func (e *TableExecutor) WithTable(t *schema.Table) *TableExecutor {
+	return &TableExecutor{
+		Table:        t,
+		ResourceName: e.ResourceName,
+		Db:           e.Db,
+		Logger:       e.Logger,
+		extraFields:  e.extraFields,
+		parent:       e,
+	}
+}
+
+func (e TableExecutor) doMultiplexResolve(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
 	var (
+		clients        []schema.ClientMeta
 		diagsChan      = make(chan diag.Diagnostics)
 		totalResources uint64
 		wg             sync.WaitGroup
 	)
-
+	clients = e.Table.Multiplex(meta)
+	meta.Logger().Debug("multiplexing client", "count", len(clients), "table", e.Table.Name)
 	defer close(diagsChan)
 	wg.Add(len(clients))
 	for _, client := range clients {
@@ -97,30 +117,16 @@ func (e *TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta, par
 	return totalResources, allDiags
 }
 
-func (e *TableExecutor) WithTable(t *schema.Table) *TableExecutor {
-	return &TableExecutor{
-		Table:        t,
-		ResourceName: e.ResourceName,
-		Db:           e.Db,
-		Logger:       e.Logger,
-		extraFields:  e.extraFields,
-		parent:       e,
-	}
-}
-
 func (e TableExecutor) truncateTable(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
 	if e.Table.DeleteFilter == nil {
 		return nil
 	}
-	if !e.Table.AlwaysDelete {
-		client.Logger().Debug("skipping table truncate", "table", e.Table.Name)
-		return nil
+	if e.Table.AlwaysDelete {
+		// Delete previous fetch
+		client.Logger().Debug("cleaning table previous fetch", "table", e.Table.Name, "always_delete", e.Table.AlwaysDelete)
+		return e.Db.Delete(ctx, e.Table, e.Table.DeleteFilter(client, parent))
 	}
-	// Delete previous fetch
-	client.Logger().Debug("cleaning table previous fetch", "table", e.Table.Name, "always_delete", e.Table.AlwaysDelete)
-	if err := e.Db.Delete(ctx, e.Table, e.Table.DeleteFilter(client, parent)); err != nil {
-		return err
-	}
+	client.Logger().Debug("skipping table truncate", "table", e.Table.Name)
 	return nil
 }
 
@@ -165,8 +171,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 			}
 			close(res)
 		}()
-		err := e.Table.Resolver(ctx, client, parent, res)
-		if err != nil {
+		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
 				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
 				resolverErr = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table resolver ignored error. Error: %s", e.Table.Name)
@@ -183,10 +188,9 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		if len(objects) == 0 {
 			continue
 		}
-		resolvedCount, err := e.resolveResources(ctx, client, parent, objects)
-		if err != nil {
-			return 0, err
-		}
+		resolvedCount, dd := e.resolveResources(ctx, client, parent, objects)
+		// append any diags from resolve resources
+		diags = dd.Append(dd)
 		nc += resolvedCount
 	}
 	// check if channel iteration stopped because of resolver failure
@@ -223,10 +227,9 @@ func (e *TableExecutor) resolveResources(ctx context.Context, meta schema.Client
 
 	// only top level tables should cascade
 	shouldCascade := parent == nil
-	var err error
-	resources, err = e.copyDataIntoDB(ctx, resources, shouldCascade)
-	if err != nil {
-		return 0, diags.Append(err)
+	resources, diags = e.copyDataIntoDB(ctx, resources, shouldCascade)
+	if diags.HasErrors() {
+		return 0, diags.Append(diags)
 	}
 	totalCount := uint64(len(resources))
 
@@ -235,7 +238,7 @@ func (e *TableExecutor) resolveResources(ctx context.Context, meta schema.Client
 		meta.Logger().Debug("resolving table relation", "table", e.Table.Name, "relation", rel.Name)
 		for _, r := range resources {
 			// ignore relation resource count
-			if _, innerDiags := e.WithTable(rel).Resolve(ctx, meta, r); err != nil {
+			if _, innerDiags := e.WithTable(rel).Resolve(ctx, meta, r); innerDiags.HasErrors() {
 				diags = diags.Append(innerDiags)
 			}
 		}

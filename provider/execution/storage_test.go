@@ -35,9 +35,7 @@ func (f doNothingStorage) CopyFrom(ctx context.Context, resources schema.Resourc
 	return nil
 }
 
-func (f doNothingStorage) Close() {
-	return
-}
+func (f doNothingStorage) Close() {}
 
 func (f doNothingStorage) Dialect() schema.Dialect {
 	return doNothingDialect{}

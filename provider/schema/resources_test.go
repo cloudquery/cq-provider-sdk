@@ -9,40 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testZeroTable = &Table{
-	Name: "test_zero_table",
-	Columns: []Column{
-		{
-			Name: "zero_bool",
-			Type: TypeBool,
-		},
-		{
-			Name: "zero_int",
-			Type: TypeBigInt,
-		},
-		{
-			Name: "not_zero_bool",
-			Type: TypeBool,
-		},
-		{
-			Name: "not_zero_int",
-			Type: TypeBigInt,
-		},
-		{
-			Name: "zero_int_ptr",
-			Type: TypeBigInt,
-		},
-		{
-			Name: "not_zero_int_ptr",
-			Type: TypeBigInt,
-		},
-		{
-			Name: "zero_string",
-			Type: TypeString,
-		},
-	},
-}
-
 var testPrimaryKeyTable = &Table{
 	Name:    "test_pk_table",
 	Options: TableCreationOptions{PrimaryKeys: []string{"primary_key_str"}},
@@ -64,16 +30,6 @@ var testPrimaryKeyTable = &Table{
 			},
 		},
 	},
-}
-
-type zeroValuedStruct struct {
-	ZeroBool      bool   `default:"false"`
-	ZeroInt       int    `default:"0"`
-	NotZeroInt    int    `default:"5"`
-	NotZeroBool   bool   `default:"true"`
-	ZeroIntPtr    *int   `default:"0"`
-	NotZeroIntPtr *int   `default:"5"`
-	ZeroString    string `default:""`
 }
 
 // TestResourcePrimaryKey checks resource id generation when primary key is set on table

@@ -73,6 +73,10 @@ func (diags Diagnostics) HasErrors() bool {
 	return len(diags) > 0
 }
 
+func (diags Diagnostics) HasDiags() bool {
+	return len(diags) > 0
+}
+
 func (diags Diagnostics) Append(new ...interface{}) Diagnostics {
 	for _, item := range new {
 		if item == nil {
