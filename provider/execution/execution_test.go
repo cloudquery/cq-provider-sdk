@@ -1,5 +1,145 @@
 package execution
 
+import (
+	"context"
+	"testing"
+
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
+
+	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+	"github.com/cloudquery/cq-provider-sdk/testlog"
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+type ExecutionTestCase struct {
+	Name        string
+	Description string
+
+	Table       *schema.Table
+	ExtraFields map[string]interface{}
+
+	SetupStorage          func(t *testing.T) Storage
+	ExpectedResourceCount uint64
+	ErrorExpected         bool
+	ExpectedDiags         []diagFlat
+}
+
+type executionClient struct {
+	l hclog.Logger
+}
+
+func (e executionClient) Logger() hclog.Logger {
+	return e.l
+}
+
+var (
+	doNothingResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
+		return nil
+	}
+)
+
+type diagFlat struct {
+	Err      string
+	Resource string
+	Type     diag.DiagnosticType
+	Severity diag.Severity
+	Summary  string
+}
+
+func TestTableExecutor_Resolve(t *testing.T) {
+	testCases := []ExecutionTestCase{
+		{
+			Name: "simple",
+			Table: &schema.Table{
+				Name:     "simple",
+				Resolver: doNothingResolver,
+				Columns:  []schema.Column{{Name: "name", Type: schema.TypeString}},
+			},
+		},
+		{
+			// if tables don't define a resolver, an execution error by execution
+			Name:        "missing_table_resolver",
+			Description: "if tables don't define a resolver, an execution error by execution",
+			Table: &schema.Table{
+				Name:    "no-resolver",
+				Columns: []schema.Column{{Name: "name", Type: schema.TypeString}},
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "table no-resolver missing resolver, make sure table implements the resolver",
+					Resource: "missing_table_resolver",
+					Severity: diag.ERROR,
+					Summary:  "table no-resolver missing resolver, make sure table implements the resolver",
+					Type:     diag.SCHEMA,
+				},
+			},
+		},
+		{
+			// if tables don't define a resolver, an execution error by execution, we check here that a relation will cause an error
+			Name: "missing_table_relation_resolver",
+			Table: &schema.Table{
+				Name:     "no-resolver",
+				Resolver: doNothingResolver,
+				Columns:  []schema.Column{{Name: "name", Type: schema.TypeString}},
+				Relations: []*schema.Table{
+					{
+						Name:    "relation-no-resolver",
+						Columns: []schema.Column{{Name: "name", Type: schema.TypeString}},
+					},
+				},
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Resource: "relation-no-resolver",
+					Severity: diag.ERROR,
+					Summary:  "table relation-no-resolver missing resolver, make sure table implements the resolver",
+					Type:     diag.SCHEMA,
+				},
+			},
+		},
+	}
+
+	executionClient := executionClient{testlog.New(t)}
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			var storage Storage = doNothingStorage{}
+			if tc.SetupStorage != nil {
+				storage = tc.SetupStorage(t)
+			}
+			exec := CreateTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, tc.ExtraFields)
+			count, diags := exec.Resolve(context.Background(), executionClient, nil)
+			assert.Equal(t, tc.ExpectedResourceCount, count)
+			if tc.ErrorExpected {
+				require.True(t, diags.HasErrors())
+				if tc.ExpectedDiags != nil {
+					assert.ElementsMatch(t, tc.ExpectedDiags, flattenDiags(diags))
+				}
+			} else {
+				require.Nil(t, diags)
+			}
+		})
+	}
+}
+
+func flattenDiags(dd diag.Diagnostics) []diagFlat {
+	df := make([]diagFlat, len(dd))
+	for i, d := range dd {
+
+		df[i] = diagFlat{
+			Err:      d.Error(),
+			Resource: d.Description().Resource,
+			Type:     d.Type(),
+			Severity: d.Severity(),
+			Summary:  d.Description().Summary,
+		}
+	}
+	return df
+}
+
 //
 //import (
 //	"context"

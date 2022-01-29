@@ -68,7 +68,7 @@ func WithType(dt diag.DiagnosticType) Option {
 
 func WithSummary(summary string, args ...interface{}) Option {
 	return func(e *Error) {
-		e.summary = fmt.Sprintf(summary, args)
+		e.summary = fmt.Sprintf(summary, args...)
 	}
 }
 
@@ -84,7 +84,7 @@ const (
 )
 
 func WithErrorClassifier(e *Error) {
-	if strings.Contains(e.Err.Error(), ": socket: too many open files") {
+	if e.Err != nil && strings.Contains(e.Err.Error(), ": socket: too many open files") {
 		// Return a Diagnostic error so that it can be properly propagated back to the user via the CLI
 		e.severity = diag.WARNING
 		e.summary = fdLimitMessage

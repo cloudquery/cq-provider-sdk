@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -48,8 +49,9 @@ const (
 )
 
 // CreateTableExecutor creates a new TableExecutor for given schema.Table
-func CreateTableExecutor(db Storage, logger hclog.Logger, table *schema.Table, extraFields map[string]interface{}) TableExecutor {
+func CreateTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields map[string]interface{}) TableExecutor {
 	return TableExecutor{
+		ResourceName:   resourceName,
 		Table:          table,
 		Db:             db,
 		Logger:         logger,
@@ -70,7 +72,7 @@ func (e *TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta, par
 		}
 	}
 	var (
-		diagsChan      chan diag.Diagnostics
+		diagsChan      = make(chan diag.Diagnostics)
 		totalResources uint64
 		wg             sync.WaitGroup
 	)
@@ -78,11 +80,11 @@ func (e *TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta, par
 	defer close(diagsChan)
 	wg.Add(len(clients))
 	for _, client := range clients {
-		go func(c schema.ClientMeta) {
+		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics) {
 			count, resolveDiags := e.callTableResolve(ctx, c, parent)
 			atomic.AddUint64(&totalResources, count)
 			diagsChan <- resolveDiags
-		}(client)
+		}(client, diagsChan)
 	}
 	var allDiags diag.Diagnostics
 	go func() {
@@ -158,19 +160,21 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		defer func() {
 			if r := recover(); r != nil {
 				client.Logger().Error("table resolver recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
-				resolverErr = FromError(r.(error), WithResource(e.ResourceName), WithSeverity(diag.PANIC),
+				resolverErr = FromError(fmt.Errorf("table resolver panic: %s", r), WithResource(e.ResourceName), WithSeverity(diag.PANIC),
 					WithType(diag.RESOLVING), WithSummary("panic on resource table %s fetch", e.Table.Name))
 			}
 			close(res)
 		}()
 		err := e.Table.Resolver(ctx, client, parent, res)
-		if err != nil && e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
-			client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-			resolverErr = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table resolver ignored error. Error: %s", e.Table.Name)
-			return
+		if err != nil {
+			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
+				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
+				resolverErr = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table resolver ignored error. Error: %s", e.Table.Name)
+			} else {
+				resolverErr = FromError(err, WithResource(e.ResourceName), WithSeverity(diag.ERROR), WithType(diag.RESOLVING),
+					WithSummary("failed to resolve resource %s", e.ResourceName), WithErrorClassifier)
+			}
 		}
-		resolverErr = FromError(err, WithResource(e.ResourceName), WithSeverity(diag.ERROR), WithType(diag.RESOLVING),
-			WithSummary("failed to resolver resource %s", e.ResourceName), WithErrorClassifier)
 	}()
 
 	nc := uint64(0)
@@ -273,7 +277,7 @@ func (e *TableExecutor) resolveResourceValues(ctx context.Context, meta schema.C
 	defer func() {
 		if r := recover(); r != nil {
 			e.Logger.Error("resolve resource recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
-			err = FromError(r.(error), WithResource(e.ResourceName), WithSeverity(diag.PANIC),
+			err = FromError(fmt.Errorf("column resolve panic: %s", r), WithResource(e.ResourceName), WithSeverity(diag.PANIC),
 				WithType(diag.RESOLVING), WithSummary("resolve resource %s recovered from panic.", e.Table.Name))
 		}
 	}()
