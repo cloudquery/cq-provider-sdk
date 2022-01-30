@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,6 +26,21 @@ import (
 // faster than the <1s it won't be deleted by remove stale.
 const executionJitter = -1 * time.Minute
 
+const (
+	// fdLimitMessage defines the message for when a client isn't able to fetch because the open fd limit is hit
+	fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
+)
+
+type ErrorClassifier func(meta schema.ClientMeta, resource string, err error) diag.Diagnostics
+
+func defaultErrorClassifier(meta schema.ClientMeta, resource string, err error) diag.Diagnostics {
+	if strings.Contains(err.Error(), ": socket: too many open files") {
+		// Return a Diagnostic error so that it can be properly propagated back to the user via the CLI
+		return FromError(err, WithResource(resource), WithSummary(fdLimitMessage), WithType(diag.THROTTLE), WithSeverity(diag.WARNING))
+	}
+	return nil
+}
+
 // TableExecutor marks all the related execution info passed to TableResolver and ColumnResolver giving access to the Runner's meta
 type TableExecutor struct {
 	// ResourceName name of top-level resource associated with table
@@ -35,6 +51,8 @@ type TableExecutor struct {
 	Db Storage
 	// Logger associated with this execution
 	Logger hclog.Logger
+	// classifiers
+	classifiers []ErrorClassifier
 	// extraFields to be passed to each created resource in the execution
 	extraFields map[string]interface{}
 	// When the execution started
@@ -43,19 +61,16 @@ type TableExecutor struct {
 	parent *TableExecutor
 }
 
-const (
-// TODO: move this to the provider when it loops over all errors
-
-)
-
 // CreateTableExecutor creates a new TableExecutor for given schema.Table
-func CreateTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields map[string]interface{}) TableExecutor {
+func CreateTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table,
+	extraFields map[string]interface{}, classifiers []ErrorClassifier) TableExecutor {
 	return TableExecutor{
 		ResourceName:   resourceName,
 		Table:          table,
 		Db:             db,
 		Logger:         logger,
 		extraFields:    extraFields,
+		classifiers:    append(classifiers, defaultErrorClassifier),
 		executionStart: time.Now().Add(executionJitter),
 	}
 }
@@ -157,7 +172,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 
 	}
 	if err := e.truncateTable(ctx, client, parent); err != nil {
-		return 0, diags.Append(FromError(err, WithErrorClassifier))
+		return 0, diags.Append(FromError(err, WithResource(e.ResourceName), WithErrorClassifier))
 	}
 
 	res := make(chan interface{})
@@ -174,10 +189,9 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
 				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-				resolverErr = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table resolver ignored error. Error: %s", e.Table.Name)
+				resolverErr = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table[%s] resolver ignored error. Error: %s", e.Table.Name, err)
 			} else {
-				resolverErr = FromError(err, WithResource(e.ResourceName), WithSeverity(diag.ERROR), WithType(diag.RESOLVING),
-					WithSummary("failed to resolve resource %s", e.ResourceName), WithErrorClassifier)
+				resolverErr = e.handleResolveError(client, err)
 			}
 		}
 	}()
@@ -190,7 +204,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		}
 		resolvedCount, dd := e.resolveResources(ctx, client, parent, objects)
 		// append any diags from resolve resources
-		diags = dd.Append(dd)
+		diags = diags.Append(dd)
 		nc += resolvedCount
 	}
 	// check if channel iteration stopped because of resolver failure
@@ -205,7 +219,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 	if err := e.cleanupStaleData(ctx, client, parent); err != nil {
 		return nc, diags.Append(FromError(err, WithType(diag.DATABASE), WithSummary("failed to cleanup stale data on table %s", e.Table.Name)))
 	}
-	return nc, nil
+	return nc, diags
 }
 
 func (e *TableExecutor) resolveResources(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, objects []interface{}) (uint64, diag.Diagnostics) {
@@ -227,10 +241,8 @@ func (e *TableExecutor) resolveResources(ctx context.Context, meta schema.Client
 
 	// only top level tables should cascade
 	shouldCascade := parent == nil
-	resources, diags = e.copyDataIntoDB(ctx, resources, shouldCascade)
-	if diags.HasErrors() {
-		return 0, diags.Append(diags)
-	}
+	resources, dbDiags := e.copyDataIntoDB(ctx, resources, shouldCascade)
+	diags = diags.Append(dbDiags)
 	totalCount := uint64(len(resources))
 
 	// Finally, resolve relations of each resource
@@ -238,7 +250,7 @@ func (e *TableExecutor) resolveResources(ctx context.Context, meta schema.Client
 		meta.Logger().Debug("resolving table relation", "table", e.Table.Name, "relation", rel.Name)
 		for _, r := range resources {
 			// ignore relation resource count
-			if _, innerDiags := e.WithTable(rel).Resolve(ctx, meta, r); innerDiags.HasErrors() {
+			if _, innerDiags := e.WithTable(rel).Resolve(ctx, meta, r); innerDiags.HasDiags() {
 				diags = diags.Append(innerDiags)
 			}
 		}
@@ -293,7 +305,7 @@ func (e *TableExecutor) resolveResourceValues(ctx context.Context, meta schema.C
 	// call PostRowResolver if defined after columns have been resolved
 	if e.Table.PostResourceResolver != nil {
 		if err = e.Table.PostResourceResolver(ctx, meta, resource); err != nil {
-			return FromError(err, WithResource(e.ResourceName), WithSummary("failed post resource resolver"), WithErrorClassifier)
+			return e.handleResolveError(meta, err)
 		}
 	}
 	// Finally, resolve columns internal to the SDK
@@ -319,7 +331,7 @@ func (e *TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMe
 			}
 			// check if column resolver defined an IgnoreError function, if it does check if ignore should be ignored.
 			if c.IgnoreError == nil || !c.IgnoreError(err) {
-				return FromError(err, WithResource(e.ResourceName), WithSummary("failed to resolve column %s@%s", e.Table.Name, c.Name), WithErrorClassifier)
+				return e.handleResolveError(meta, err)
 			}
 			// TODO: double check logic here
 			if reflect2.IsNil(c.Default) {
@@ -346,4 +358,14 @@ func (e *TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMe
 		}
 	}
 	return nil
+}
+
+func (e TableExecutor) handleResolveError(meta schema.ClientMeta, err error) diag.Diagnostics {
+	for _, c := range e.classifiers {
+		if diags := c(meta, e.ResourceName, err); diags != nil {
+			return diags
+		}
+	}
+	return FromError(err, WithResource(e.ResourceName), WithSeverity(diag.ERROR), WithType(diag.RESOLVING),
+		WithSummary("failed to resolve resource %s", e.ResourceName))
 }

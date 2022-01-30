@@ -10,7 +10,7 @@ import (
 // Error is a generic error returned when execution is run, ExecutionError satisfies
 type Error struct {
 	// Err is the underlying go error this diagnostic wraps
-	Err error
+	err error
 
 	// Resource indicates the resource that failed in the execution
 	resource string
@@ -27,6 +27,10 @@ type Error struct {
 
 	// DiagnosticType indicates the classification family of this diagnostic
 	diagnosticType diag.DiagnosticType
+}
+
+func (e Error) Err() error {
+	return e.err
 }
 
 func (e Error) Severity() diag.Severity {
@@ -47,8 +51,8 @@ func (e Error) Type() diag.DiagnosticType {
 
 func (e Error) Error() string {
 	// return original error
-	if e.Err != nil {
-		return e.Err.Error()
+	if e.err != nil {
+		return e.err.Error()
 	}
 	return e.summary
 }
@@ -79,13 +83,8 @@ func WithResource(resource string) Option {
 	}
 }
 
-const (
-	// fdLimitMessage defines the message for when a client isn't able to fetch because the open fd limit is hit
-	fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
-)
-
 func WithErrorClassifier(e *Error) {
-	if e.Err != nil && strings.Contains(e.Err.Error(), ": socket: too many open files") {
+	if e.err != nil && strings.Contains(e.err.Error(), ": socket: too many open files") {
 		// Return a Diagnostic error so that it can be properly propagated back to the user via the CLI
 		e.severity = diag.WARNING
 		e.summary = fdLimitMessage
@@ -101,7 +100,7 @@ func FromError(err error, opts ...Option) diag.Diagnostics {
 		return ti
 	default:
 		e := &Error{
-			Err:            err,
+			err:            err,
 			severity:       diag.ERROR,
 			diagnosticType: diag.RESOLVING,
 		}
@@ -113,12 +112,12 @@ func FromError(err error, opts ...Option) diag.Diagnostics {
 }
 
 // NewError creates an ExecutionError from given error
-func NewError(severity diag.Severity, dt diag.DiagnosticType, resource, summary string, args interface{}) *Error {
+func NewError(severity diag.Severity, dt diag.DiagnosticType, resource, summary string, args ...interface{}) *Error {
 	return &Error{
-		Err:            fmt.Errorf(summary, args),
+		err:            fmt.Errorf(summary, args...),
 		severity:       severity,
 		resource:       resource,
-		summary:        fmt.Sprintf(summary, args),
+		summary:        fmt.Sprintf(summary, args...),
 		detail:         "",
 		diagnosticType: dt,
 	}

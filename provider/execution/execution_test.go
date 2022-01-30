@@ -2,8 +2,11 @@ package execution
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/mock"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 
@@ -56,6 +59,13 @@ var (
 	simpleMultiplexer = func(meta schema.ClientMeta) []schema.ClientMeta {
 		return []schema.ClientMeta{meta, meta}
 	}
+
+	postResourceResolver = func(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) error {
+		return resource.Set("name", "data")
+	}
+	postResourceResolverError = func(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) error {
+		return diag.Diagnostics{NewError(diag.ERROR, diag.RESOLVING, resource.TableName(), "some error"), NewError(diag.ERROR, diag.RESOLVING, resource.TableName(), "some error 2")}
+	}
 )
 
 type diagFlat struct {
@@ -101,7 +111,8 @@ func TestTableExecutor_Resolve(t *testing.T) {
 					},
 				},
 			},
-			ErrorExpected: true,
+			ExpectedResourceCount: 2,
+			ErrorExpected:         true,
 			ExpectedDiags: []diagFlat{
 				{
 					Err:      "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
@@ -152,7 +163,8 @@ func TestTableExecutor_Resolve(t *testing.T) {
 					},
 				},
 			},
-			ErrorExpected: true,
+			ExpectedResourceCount: 1,
+			ErrorExpected:         true,
 			ExpectedDiags: []diagFlat{
 				{
 					Err:      "table relation-no-resolver missing resolver, make sure table implements the resolver",
@@ -195,7 +207,8 @@ func TestTableExecutor_Resolve(t *testing.T) {
 					},
 				},
 			},
-			ErrorExpected: true,
+			ExpectedResourceCount: 1,
+			ErrorExpected:         true,
 			ExpectedDiags: []diagFlat{
 				{
 					Err:      "table resolver panic: resolver panic",
@@ -258,11 +271,132 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			ErrorExpected: true,
 			ExpectedDiags: []diagFlat{
 				{
-					Err:      "table resolver ignored error. Error: simple",
+					Err:      "table[simple] resolver ignored error. Error: some error",
 					Resource: "error_returning_ignore",
 					Severity: diag.IGNORE,
-					Summary:  "table resolver ignored error. Error: simple",
+					Summary:  "table[simple] resolver ignored error. Error: some error",
 					Type:     diag.RESOLVING,
+				},
+			},
+		},
+		{
+			Name: "always_delete",
+			SetupStorage: func(t *testing.T) Storage {
+				db := new(DatabaseMock)
+				db.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				return db
+			},
+			Table: &schema.Table{
+				Name:         "simple",
+				AlwaysDelete: true,
+				DeleteFilter: func(meta schema.ClientMeta, parent *schema.Resource) []interface{} {
+					return []interface{}{}
+				},
+				Resolver: doNothingResolver,
+				Columns:  commonColumns,
+			},
+		},
+		{
+			Name: "always_delete_fail",
+			SetupStorage: func(t *testing.T) Storage {
+				db := new(DatabaseMock)
+				db.On("Delete", mock.Anything, mock.Anything, mock.Anything).
+					Return(FromError(errors.New("failed delete"), WithResource("always_delete_fail"), WithType(diag.DATABASE)))
+				return db
+			},
+			Table: &schema.Table{
+				Name:         "simple",
+				AlwaysDelete: true,
+				DeleteFilter: func(meta schema.ClientMeta, parent *schema.Resource) []interface{} {
+					return []interface{}{}
+				},
+				Resolver: doNothingResolver,
+				Columns:  commonColumns,
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "failed delete",
+					Resource: "always_delete_fail",
+					Severity: diag.ERROR,
+					Type:     diag.DATABASE,
+				},
+			},
+		},
+		{
+			Name: "cleanup_stale_data_fail",
+			SetupStorage: func(t *testing.T) Storage {
+				db := new(DatabaseMock)
+				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(FromError(errors.New("failed delete"), WithResource("cleanup_stale_data_fail"), WithType(diag.DATABASE)))
+				return db
+			},
+			Table: &schema.Table{
+				Name: "cleanup_delete",
+				DeleteFilter: func(meta schema.ClientMeta, parent *schema.Resource) []interface{} {
+					return []interface{}{}
+				},
+				Resolver: doNothingResolver,
+				Columns:  commonColumns,
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "failed delete",
+					Resource: "cleanup_stale_data_fail",
+					Severity: diag.ERROR,
+					Type:     diag.DATABASE,
+				},
+			},
+		},
+		{
+			Name: "post_resource_resolver",
+			SetupStorage: func(t *testing.T) Storage {
+				db := new(DatabaseMock)
+				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				db.On("Dialect").Return(doNothingDialect{})
+				db.On("CopyFrom", mock.Anything, mock.Anything, true, map[string]interface{}(nil)).Return(nil)
+				return db
+			},
+			Table: &schema.Table{
+				Name:                 "simple",
+				Resolver:             returnValueResolver,
+				Columns:              commonColumns,
+				PostResourceResolver: postResourceResolver,
+			},
+			ExpectedResourceCount: 1,
+		},
+		{
+			Name: "post_resource_resolver_fail",
+			SetupStorage: func(t *testing.T) Storage {
+				db := new(DatabaseMock)
+				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				db.On("Dialect").Return(doNothingDialect{})
+				db.On("CopyFrom", mock.Anything, mock.Anything, true, map[string]interface{}(nil)).Return(nil)
+				return db
+			},
+			Table: &schema.Table{
+				Name:                 "simple",
+				Resolver:             returnValueResolver,
+				Columns:              commonColumns,
+				PostResourceResolver: postResourceResolverError,
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diagFlat{
+				{
+					Err:      "some error",
+					Resource: "simple",
+					Severity: diag.ERROR,
+					Type:     diag.RESOLVING,
+					Summary:  "some error",
+				},
+				{
+					Err:      "some error 2",
+					Resource: "simple",
+					Severity: diag.ERROR,
+					Type:     diag.RESOLVING,
+					Summary:  "some error 2",
 				},
 			},
 		},
@@ -275,7 +409,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			if tc.SetupStorage != nil {
 				storage = tc.SetupStorage(t)
 			}
-			exec := CreateTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, tc.ExtraFields)
+			exec := CreateTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, tc.ExtraFields, nil)
 			count, diags := exec.Resolve(context.Background(), executionClient, nil)
 			assert.Equal(t, tc.ExpectedResourceCount, count)
 			if tc.ErrorExpected {
@@ -305,186 +439,6 @@ func flattenDiags(dd diag.Diagnostics) []diagFlat {
 	return df
 }
 
-//
-//import (
-//	"context"
-//	"errors"
-//	"fmt"
-//	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-//	"testing"
-//
-//	"github.com/cloudquery/cq-provider-sdk/logging"
-//	"github.com/creasty/defaults"
-//	"github.com/hashicorp/go-hclog"
-//	"github.com/stretchr/testify/assert"
-//	"github.com/stretchr/testify/mock"
-//)
-//
-//var alwaysDeleteTable = &schema.Table{
-//	Name:         "always_delete_test_table",
-//	AlwaysDelete: true,
-//	Columns:      []schema.Column{{Name: "name", Type: TypeString}},
-//}
-//
-//var testMultiplexTable = &schema.Table{
-//	Name: "test_multiplex_table",
-//	Multiplex: func(meta ClientMeta) []ClientMeta {
-//		return []ClientMeta{meta}
-//	},
-//	Resolver: func(ctx context.Context, meta ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
-//		return nil
-//	},
-//	Columns: []schema.Column{
-//		{
-//			Name: "name",
-//			Type: schema.TypeString,
-//		},
-//	},
-//	Relations: []*schema.Table{
-//		{
-//			Name: "test_relation_multiplex_table",
-//			Multiplex: func(meta ClientMeta) []ClientMeta {
-//				return []ClientMeta{meta}
-//			},
-//			Resolver: func(ctx context.Context, meta ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
-//				return nil
-//			},
-//			Columns: []schema.Column{
-//				{
-//					Name: "name",
-//					Type: schema.TypeString,
-//				},
-//			},
-//		},
-//	},
-//}
-//
-//var testTable = &schema.Table{
-//	Name: "test_table",
-//	Columns: []schema.Column{
-//		{
-//			Name: "name",
-//			Type: schema.TypeString,
-//		},
-//		{
-//			Name:     "name_no_prefix",
-//			Type:     schema.TypeString,
-//			Resolver: schema.PathResolver("Inner.NameNoPrefix"),
-//		},
-//		{
-//			Name:     "prefix_name",
-//			Type:     schema.TypeString,
-//			Resolver: schema.PathResolver("Prefix.Name"),
-//		},
-//	},
-//}
-//
-//type testTableStruct struct {
-//	Name  string `default:"test"`
-//	Inner struct {
-//		NameNoPrefix string `default:"name_no_prefix"`
-//	}
-//	Prefix struct {
-//		Name string `default:"prefix_name"`
-//	}
-//}
-//
-//var testDefaultsTable = &schema.Table{
-//	Name: "test_table",
-//	Columns: []schema.Column{
-//		{
-//			Name:    "name",
-//			Type:    schema.TypeString,
-//			Default: "defaultValue",
-//		},
-//	},
-//}
-//
-//type testDefaultsTableData struct {
-//	Name         *string
-//	DefaultValue string
-//}
-//
-//var testBadColumnResolverTable = &schema.Table{
-//	Name: "test_table",
-//	Columns: []schema.Column{
-//		{
-//			Name: "name",
-//			Type: schema.TypeString,
-//			Resolver: func(ctx context.Context, meta ClientMeta, resource *schema.Resource, c schema.Column) error {
-//				data := resource.Item.(testDefaultsTableData)
-//				if data.Name != nil && *data.Name == "noError" {
-//					return nil
-//				}
-//				return errors.New("ERROR")
-//			},
-//		},
-//	},
-//	Resolver: func(ctx context.Context, meta ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
-//		res <- testDefaultsTableData{Name: nil}
-//		return nil
-//	},
-//}
-//
-//var testIgnoreErrorColumnResolverTable = &schema.Table{
-//	Name: "test_table",
-//	Columns: []schema.Column{
-//		{
-//			Name:    "name",
-//			Type:    schema.TypeString,
-//			Default: "defaultName",
-//			IgnoreError: func(err error) bool {
-//				return true
-//			},
-//			Resolver: func(ctx context.Context, meta ClientMeta, resource *schema.Resource, c schema.Column) error {
-//				return errors.New("ERROR")
-//			},
-//		},
-//		{
-//			Name: "default_value",
-//			Type: schema.TypeString,
-//			IgnoreError: func(err error) bool {
-//				return true
-//			},
-//			Default: "TestValue",
-//			Resolver: func(ctx context.Context, meta ClientMeta, resource *schema.Resource, c schema.Column) error {
-//				return errors.New("ERROR")
-//			},
-//		},
-//	},
-//	Resolver: func(ctx context.Context, meta ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
-//		res <- testDefaultsTableData{Name: nil}
-//		return nil
-//	},
-//}
-//
-//func failingTableResolver(ctx context.Context, meta ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
-//	return fmt.Errorf("table resolve failed")
-//}
-//
-//func doNothingResolver(_ context.Context, _ ClientMeta, _ *schema.Resource, _ chan<- interface{}) error {
-//	return nil
-//}
-//
-//func dataReturningResolver(_ context.Context, _ ClientMeta, _ *schema.Resource, res chan<- interface{}) error {
-//	object := testTableStruct{}
-//	_ = defaults.Set(&object)
-//	res <- []testTableStruct{object, object, object}
-//	return nil
-//}
-//
-//func dataReturningSingleResolver(_ context.Context, _ ClientMeta, _ *schema.Resource, res chan<- interface{}) error {
-//	object := testTableStruct{}
-//	_ = defaults.Set(&object)
-//	res <- object
-//	return nil
-//}
-//
-//func passingNilResolver(_ context.Context, _ ClientMeta, _ *schema.Resource, res chan<- interface{}) error {
-//	res <- nil
-//	return nil
-//}
-//
 //func TestExecutionData_ResolveTable(t *testing.T) {
 //
 //	mockedClient := new(mockedClientMeta)
@@ -495,14 +449,6 @@ func flattenDiags(dd diag.Diagnostics) []diagFlat {
 //	})
 //	mockedClient.On("Logger", mock.Anything).Return(logger)
 //
-//	t.Run("failed table resolver", func(t *testing.T) {
-//		testTable.Resolver = failingTableResolver
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testTable, nil, false)
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		assert.Error(t, err)
-//	})
 //
 //	t.Run("failing table column resolver", func(t *testing.T) {
 //		mockDb := new(DatabaseMock)

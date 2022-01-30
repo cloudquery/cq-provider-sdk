@@ -18,6 +18,9 @@ func (n nativeError) Description() Description {
 		Detail:  "",
 	}
 }
+func (n nativeError) Err() error {
+	return n.err
+}
 
 func (n nativeError) Error() string {
 	return n.err.Error()

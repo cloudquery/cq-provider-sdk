@@ -1,6 +1,7 @@
 package diag
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/hashicorp/errwrap"
@@ -51,10 +52,10 @@ const (
 )
 
 type Diagnostic interface {
+	error
 	Severity() Severity
 	Type() DiagnosticType
 	Description() Description
-	error
 }
 
 type Description struct {
@@ -66,11 +67,39 @@ type Description struct {
 type Diagnostics []Diagnostic
 
 func (diags Diagnostics) Error() string {
-	panic("implement me")
+	switch {
+	case len(diags) == 0:
+		// should never happen, since we don't create this wrapper if
+		// there are no diagnostics in the list.
+		return "no errors"
+	case len(diags) == 1:
+		desc := diags[0].Description()
+		if desc.Detail == "" {
+			return desc.Summary
+		}
+		return fmt.Sprintf("%s: %s", desc.Summary, desc.Detail)
+	default:
+		var ret bytes.Buffer
+		fmt.Fprintf(&ret, "%d problems:\n", len(diags))
+		for _, diag := range diags {
+			desc := diag.Description()
+			if desc.Detail == "" {
+				fmt.Fprintf(&ret, "\n- %s", desc.Summary)
+			} else {
+				fmt.Fprintf(&ret, "\n- %s: %s", desc.Summary, desc.Detail)
+			}
+		}
+		return ret.String()
+	}
 }
 
 func (diags Diagnostics) HasErrors() bool {
-	return len(diags) > 0
+	for _, d := range diags {
+		if d.Severity() == ERROR {
+			return true
+		}
+	}
+	return false
 }
 
 func (diags Diagnostics) HasDiags() bool {

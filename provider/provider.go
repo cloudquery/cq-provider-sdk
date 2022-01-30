@@ -13,8 +13,6 @@ import (
 
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
-
 	"github.com/thoas/go-funk"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
@@ -54,7 +52,7 @@ type Provider struct {
 	// ErrorClassifier allows the provider to classify errors it produces during table execution, and return them as diagnostics to the user.
 	// Classifier function may return empty slice if it cannot meaningfully convert the error into diagnostics. In this case
 	// the error will be converted by the SDK into diagnostic at ERROR level and RESOLVING type.
-	ErrorClassifier func(meta schema.ClientMeta, resource string, err error) diag.Diagnostics
+	ErrorClassifier []execution.ErrorClassifier
 	// Database connection string
 	dbURL string
 	// meta is the provider's client created when configure is called
@@ -187,7 +185,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		tableExec := execution.CreateTableExecutor(resource, conn, p.Logger, table, p.extraFields)
+		tableExec := execution.CreateTableExecutor(resource, conn, p.Logger, table, p.extraFields, p.ErrorClassifier)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource
@@ -219,7 +217,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 					Summary: cqproto.ResourceFetchSummary{
 						Status:        status,
 						ResourceCount: resourceCount,
-						Diagnostics:   p.collectExecutionDiagnostics(p.meta, r, diags),
+						Diagnostics:   diags,
 					},
 				})
 			}
@@ -235,7 +233,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 				Summary: cqproto.ResourceFetchSummary{
 					Status:        status,
 					ResourceCount: resourceCount,
-					Diagnostics:   p.collectExecutionDiagnostics(p.meta, r, diags),
+					Diagnostics:   diags,
 				},
 			})
 			if err != nil {
@@ -246,30 +244,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		})
 	}
 	return g.Wait()
-}
-
-func (p *Provider) collectExecutionDiagnostics(client schema.ClientMeta, resourceName string, initialDiags diag.Diagnostics) diag.Diagnostics {
-	classifier := DefaultErrorClassifier
-	if p.ErrorClassifier != nil {
-		classifier = p.ErrorClassifier
-	}
-	p.Logger.Debug("collecting diagnostics for resource execution", "resource", resourceName)
-	allDiags := make(diag.Diagnostics, 0)
-	for _, d := range initialDiags {
-		// Schema/Database type diagnostics don't get past to the classifier
-		if d.Type() == diag.DATABASE || d.Type() == diag.SCHEMA || d.Severity() == diag.PANIC {
-			allDiags = append(allDiags, d)
-			continue
-		}
-		dd := classifier(client, resourceName, d)
-		if len(dd) > 0 {
-			allDiags = allDiags.Append(dd)
-			continue
-		}
-		// if error wasn't classified by provider add it
-		allDiags = allDiags.Append(d)
-	}
-	return allDiags
 }
 
 func (p *Provider) interpolateAllResources(requestedResources []string) ([]string, error) {
