@@ -119,7 +119,7 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	p.dbURL = request.Connection.DSN
 	providerConfig := p.Config()
 	if err := defaults.Set(providerConfig); err != nil {
-		return &cqproto.ConfigureProviderResponse{}, err
+		return &cqproto.ConfigureProviderResponse{Error: err.Error()}, nil
 	}
 	// if we received an empty config we notify in log and only use defaults.
 	if len(request.Config) == 0 {
@@ -131,19 +131,19 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 		// this part will be deprecated.
 		if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
 			p.Logger.Error("Failed to load configuration.", "error", err)
-			return &cqproto.ConfigureProviderResponse{}, fmt.Errorf("%s\nfailed to read config as json: %w", hclErr.Error(), err)
+			return &cqproto.ConfigureProviderResponse{Error: fmt.Errorf("%s; failed to read config as json: %w", hclErr.Error(), err).Error()}, nil
 		}
 	}
 
 	client, err := p.Configure(p.Logger, providerConfig)
 	if err != nil {
-		return &cqproto.ConfigureProviderResponse{}, err
+		return &cqproto.ConfigureProviderResponse{Error: err.Error()}, nil
 	}
 
 	tables := make(map[string]string)
 	for r, t := range p.ResourceMap {
 		if err := getTableDuplicates(r, t, tables); err != nil {
-			return &cqproto.ConfigureProviderResponse{}, err
+			return &cqproto.ConfigureProviderResponse{Error: err.Error()}, nil
 		}
 	}
 

@@ -129,7 +129,6 @@ func (g *GRPCServer) GetProviderConfig(ctx context.Context, _ *internal.GetProvi
 }
 
 func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.ConfigureProvider_Request) (*internal.ConfigureProvider_Response, error) {
-
 	var eFields = make(map[string]interface{})
 	if request.GetExtraFields() != nil {
 		if err := msgpack.Unmarshal(request.GetExtraFields(), &eFields); err != nil {
@@ -149,7 +148,6 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 		return nil, err
 	}
 	return &internal.ConfigureProvider_Response{Error: resp.Error}, nil
-
 }
 
 func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, server internal.Provider_FetchResourcesServer) error {
