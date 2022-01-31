@@ -8,6 +8,8 @@ import (
 
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
+
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/mock"
 	"github.com/golang/mock/gomock"
 
@@ -288,44 +290,6 @@ type FetchResourceTableTest struct {
 	ResourcesToFetch       []string
 }
 
-var fetchCases = []FetchResourceTableTest{
-	{
-		Name: "ignore error resource",
-		ExpectedFetchResponses: []*cqproto.FetchResourcesResponse{
-			{
-				ResourceName: "bad_resource_ignore_error",
-				Error:        "",
-			}},
-		ExpectedError: nil,
-		MockStorageFunc: func(ctrl *gomock.Controller) *mock.MockStorage {
-			mockDB := mock.NewMockStorage(ctrl)
-			mockDB.EXPECT().RemoveStaleData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-			//mockDB.EXPECT().Insert(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-			mockDB.EXPECT().Close()
-			return mockDB
-		},
-		PartialFetch:     true,
-		ResourcesToFetch: []string{"bad_resource_ignore_error"},
-	},
-	{
-		Name: "returning error resource",
-		ExpectedFetchResponses: []*cqproto.FetchResourcesResponse{
-			{
-				ResourceName: "bad_resource",
-				Error:        "bad error",
-			}},
-		ExpectedError: nil,
-		MockStorageFunc: func(ctrl *gomock.Controller) *mock.MockStorage {
-			mockDB := mock.NewMockStorage(ctrl)
-			//mockDB.EXPECT().Insert(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-			mockDB.EXPECT().Close()
-			return mockDB
-		},
-		PartialFetch:     false,
-		ResourcesToFetch: []string{"bad_resource"},
-	},
-}
-
 func TestProvider_FetchResources(t *testing.T) {
 	tp := testProviderCreatorFunc()
 	tp.Logger = hclog.Default()
@@ -341,6 +305,50 @@ func TestProvider_FetchResources(t *testing.T) {
 		ExtraFields: nil,
 	})
 	ctrl := gomock.NewController(t)
+	var fetchCases = []FetchResourceTableTest{
+		{
+			Name: "ignore error resource",
+			ExpectedFetchResponses: []*cqproto.FetchResourcesResponse{
+				{
+					ResourceName: "bad_resource_ignore_error",
+					Summary: cqproto.ResourceFetchSummary{
+						Status:        cqproto.ResourceFetchComplete,
+						ResourceCount: 0,
+						Diagnostics: diag.Diagnostics{diag.NewBaseError(errors.New("table[bad_resource_ignore_error] resolver ignored error. Error: bad error"),
+							diag.IGNORE, diag.RESOLVING, "bad_resource_ignore_error", "table[bad_resource_ignore_error] resolver ignored error. Error: bad error", "")},
+					},
+				}},
+			ExpectedError: nil,
+			MockStorageFunc: func(ctrl *gomock.Controller) *mock.MockStorage {
+				mockDB := mock.NewMockStorage(ctrl)
+				mockDB.EXPECT().Close()
+				return mockDB
+			},
+			PartialFetch:     true,
+			ResourcesToFetch: []string{"bad_resource_ignore_error"},
+		},
+		{
+			Name: "returning error resource",
+			ExpectedFetchResponses: []*cqproto.FetchResourcesResponse{
+				{
+					ResourceName: "bad_resource",
+					Summary: cqproto.ResourceFetchSummary{
+						Status:        cqproto.ResourceFetchPartial,
+						ResourceCount: 0,
+						Diagnostics:   diag.Diagnostics{diag.NewBaseError(errors.New("bad error"), diag.ERROR, diag.RESOLVING, "bad_resource", "failed to resolve resource bad_resource", "")},
+					},
+				},
+			},
+			MockStorageFunc: func(ctrl *gomock.Controller) *mock.MockStorage {
+				mockDB := mock.NewMockStorage(ctrl)
+				mockDB.EXPECT().Close()
+				return mockDB
+			},
+			PartialFetch:     false,
+			ResourcesToFetch: []string{"bad_resource"},
+		},
+	}
+
 	for _, tt := range fetchCases {
 		t.Run(tt.Name, func(t *testing.T) {
 			tp.storageCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (execution.Storage, error) {
@@ -373,6 +381,8 @@ func (f *testResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 			continue
 		}
 		assert.Equal(f.t, r.Error, e.Error)
+		assert.Equal(f.t, e.Summary.Status, r.Summary.Status)
+		assert.Equal(f.t, diag.FlattenDiags(e.Summary.Diagnostics), diag.FlattenDiags(r.Summary.Diagnostics))
 	}
 	return nil
 }

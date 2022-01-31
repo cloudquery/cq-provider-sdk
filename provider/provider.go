@@ -9,10 +9,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/execution"
-
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
+	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/thoas/go-funk"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
@@ -185,7 +184,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		tableExec := execution.CreateTableExecutor(resource, conn, p.Logger, table, p.extraFields, p.ErrorClassifier)
+		tableExec := execution.NewTableExecutor(resource, conn, p.Logger, table, p.extraFields, p.ErrorClassifier)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource
@@ -204,39 +203,22 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 			defer l.Unlock()
 			finishedResources[r] = true
 			atomic.AddUint64(&totalResourceCount, resourceCount)
-			if err != nil {
-				status := cqproto.ResourceFetchFailed
-				if err == context.Canceled {
-					status = cqproto.ResourceFetchCanceled
-				}
-				return sender.Send(&cqproto.FetchResourcesResponse{
-					ResourceName:      r,
-					FinishedResources: finishedResources,
-					ResourceCount:     resourceCount,
-					Error:             err.Error(),
-					Summary: cqproto.ResourceFetchSummary{
-						Status:        status,
-						ResourceCount: resourceCount,
-						Diagnostics:   diags,
-					},
-				})
-			}
 			status := cqproto.ResourceFetchComplete
-			if diags.HasErrors() {
+			if ctx.Err() == context.Canceled {
+				status = cqproto.ResourceFetchCanceled
+			} else if diags.HasErrors() {
 				status = cqproto.ResourceFetchPartial
 			}
-			err = sender.Send(&cqproto.FetchResourcesResponse{
+			if err := sender.Send(&cqproto.FetchResourcesResponse{
 				ResourceName:      r,
 				FinishedResources: finishedResources,
 				ResourceCount:     resourceCount,
-				Error:             "",
 				Summary: cqproto.ResourceFetchSummary{
 					Status:        status,
 					ResourceCount: resourceCount,
 					Diagnostics:   diags,
 				},
-			})
-			if err != nil {
+			}); err != nil {
 				return err
 			}
 			p.Logger.Debug("finished fetching table...", "provider", p.Name, "table", table.Name)

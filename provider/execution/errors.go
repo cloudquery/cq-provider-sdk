@@ -5,9 +5,25 @@ import (
 	"strings"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 )
 
-// Error is a generic error returned when execution is run, ExecutionError satisfies
+const (
+	// fdLimitMessage defines the message for when a client isn't able to fetch because the open fd limit is hit
+	fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
+)
+
+type ErrorClassifier func(meta schema.ClientMeta, resource string, err error) diag.Diagnostics
+
+func defaultErrorClassifier(meta schema.ClientMeta, resource string, err error) diag.Diagnostics {
+	if strings.Contains(err.Error(), ": socket: too many open files") {
+		// Return a Diagnostic error so that it can be properly propagated back to the user via the CLI
+		return FromError(err, WithResource(resource), WithSummary(fdLimitMessage), WithType(diag.THROTTLE), WithSeverity(diag.WARNING))
+	}
+	return nil
+}
+
+// Error is a generic error returned when execution is run, Error satisfies diagnostic interface
 type Error struct {
 	// Err is the underlying go error this diagnostic wraps
 	err error
@@ -27,6 +43,18 @@ type Error struct {
 
 	// DiagnosticType indicates the classification family of this diagnostic
 	diagnosticType diag.DiagnosticType
+}
+
+// NewError creates an execution Error
+func NewError(severity diag.Severity, dt diag.DiagnosticType, resource, summary string, args ...interface{}) *Error {
+	return &Error{
+		err:            fmt.Errorf(summary, args...),
+		severity:       severity,
+		resource:       resource,
+		summary:        fmt.Sprintf(summary, args...),
+		detail:         "",
+		diagnosticType: dt,
+	}
 }
 
 func (e Error) Err() error {
@@ -83,6 +111,12 @@ func WithResource(resource string) Option {
 	}
 }
 
+func WithDetails(detail string) Option {
+	return func(e *Error) {
+		e.detail = detail
+	}
+}
+
 func WithErrorClassifier(e *Error) {
 	if e.err != nil && strings.Contains(e.err.Error(), ": socket: too many open files") {
 		// Return a Diagnostic error so that it can be properly propagated back to the user via the CLI
@@ -108,17 +142,5 @@ func FromError(err error, opts ...Option) diag.Diagnostics {
 			o(e)
 		}
 		return diag.Diagnostics{e}
-	}
-}
-
-// NewError creates an ExecutionError from given error
-func NewError(severity diag.Severity, dt diag.DiagnosticType, resource, summary string, args ...interface{}) *Error {
-	return &Error{
-		err:            fmt.Errorf(summary, args...),
-		severity:       severity,
-		resource:       resource,
-		summary:        fmt.Sprintf(summary, args...),
-		detail:         "",
-		diagnosticType: dt,
 	}
 }

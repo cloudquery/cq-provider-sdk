@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,21 +25,6 @@ import (
 // faster than the <1s it won't be deleted by remove stale.
 const executionJitter = -1 * time.Minute
 
-const (
-	// fdLimitMessage defines the message for when a client isn't able to fetch because the open fd limit is hit
-	fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
-)
-
-type ErrorClassifier func(meta schema.ClientMeta, resource string, err error) diag.Diagnostics
-
-func defaultErrorClassifier(meta schema.ClientMeta, resource string, err error) diag.Diagnostics {
-	if strings.Contains(err.Error(), ": socket: too many open files") {
-		// Return a Diagnostic error so that it can be properly propagated back to the user via the CLI
-		return FromError(err, WithResource(resource), WithSummary(fdLimitMessage), WithType(diag.THROTTLE), WithSeverity(diag.WARNING))
-	}
-	return nil
-}
-
 // TableExecutor marks all the related execution info passed to TableResolver and ColumnResolver giving access to the Runner's meta
 type TableExecutor struct {
 	// ResourceName name of top-level resource associated with table
@@ -61,8 +45,8 @@ type TableExecutor struct {
 	parent *TableExecutor
 }
 
-// CreateTableExecutor creates a new TableExecutor for given schema.Table
-func CreateTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table,
+// NewTableExecutor creates a new TableExecutor for given schema.Table
+func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table,
 	extraFields map[string]interface{}, classifiers []ErrorClassifier) TableExecutor {
 	return TableExecutor{
 		ResourceName:   resourceName,
@@ -180,9 +164,10 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				client.Logger().Error("table resolver recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
+				stack := string(debug.Stack())
+				client.Logger().Error("table resolver recovered from panic", "table", e.Table.Name, "stack", stack)
 				resolverErr = FromError(fmt.Errorf("table resolver panic: %s", r), WithResource(e.ResourceName), WithSeverity(diag.PANIC),
-					WithType(diag.RESOLVING), WithSummary("panic on resource table %s fetch", e.Table.Name))
+					WithType(diag.RESOLVING), WithSummary("panic on resource table %s fetch", e.Table.Name), WithDetails(stack))
 			}
 			close(res)
 		}()
@@ -271,7 +256,6 @@ func (e *TableExecutor) copyDataIntoDB(ctx context.Context, resources schema.Res
 		return resources, nil
 	}
 	e.Logger.Error("failed insert to db", "error", err, "table", e.Table.Name)
-
 	// Setup diags, adding first diagnostic that bulk insert failed
 	diags := diag.Diagnostics{}.Append(FromError(err, WithType(diag.DATABASE), WithSummary("failed bulk insert on table %s", e.Table.Name)))
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
@@ -291,9 +275,10 @@ func (e *TableExecutor) copyDataIntoDB(ctx context.Context, resources schema.Res
 func (e *TableExecutor) resolveResourceValues(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			e.Logger.Error("resolve resource recovered from panic", "table", e.Table.Name, "stack", string(debug.Stack()))
+			stack := string(debug.Stack())
+			e.Logger.Error("resolve resource recovered from panic", "table", e.Table.Name, "stack", stack)
 			err = FromError(fmt.Errorf("column resolve panic: %s", r), WithResource(e.ResourceName), WithSeverity(diag.PANIC),
-				WithType(diag.RESOLVING), WithSummary("resolve resource %s recovered from panic.", e.Table.Name))
+				WithType(diag.RESOLVING), WithSummary("resolve resource %s recovered from panic.", e.Table.Name), WithDetails(stack))
 		}
 	}()
 	// TODO: do this once per table

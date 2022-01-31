@@ -111,7 +111,6 @@ func (diags Diagnostics) Append(new ...interface{}) Diagnostics {
 		if item == nil {
 			continue
 		}
-
 		switch ti := item.(type) {
 		case Diagnostic:
 			diags = append(diags, ti)

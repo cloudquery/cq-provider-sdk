@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/creasty/defaults"
+
 	"github.com/stretchr/testify/mock"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
@@ -27,7 +29,7 @@ type ExecutionTestCase struct {
 	SetupStorage          func(t *testing.T) Storage
 	ExpectedResourceCount uint64
 	ErrorExpected         bool
-	ExpectedDiags         []diagFlat
+	ExpectedDiags         []diag.FlatDiag
 }
 
 type executionClient struct {
@@ -68,14 +70,6 @@ var (
 	}
 )
 
-type diagFlat struct {
-	Err      string
-	Resource string
-	Type     diag.DiagnosticType
-	Severity diag.Severity
-	Summary  string
-}
-
 func TestTableExecutor_Resolve(t *testing.T) {
 	testCases := []ExecutionTestCase{
 		{
@@ -113,7 +107,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			},
 			ExpectedResourceCount: 2,
 			ErrorExpected:         true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
 					Resource: "multiplex_relation",
@@ -139,7 +133,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns: commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "table no-resolver missing resolver, make sure table implements the resolver",
 					Resource: "missing_table_resolver",
@@ -165,7 +159,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			},
 			ExpectedResourceCount: 1,
 			ErrorExpected:         true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "table relation-no-resolver missing resolver, make sure table implements the resolver",
 					Resource: "missing_table_relation_resolver",
@@ -183,7 +177,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "table resolver panic: resolver panic",
 					Resource: "panic_resolver",
@@ -209,7 +203,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			},
 			ExpectedResourceCount: 1,
 			ErrorExpected:         true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "table resolver panic: resolver panic",
 					Resource: "panic_relation_resolver",
@@ -227,7 +221,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "some error",
 					Resource: "error_returning",
@@ -248,7 +242,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "some error",
 					Resource: "error_returning_ignore_fail",
@@ -269,7 +263,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "table[simple] resolver ignored error. Error: some error",
 					Resource: "error_returning_ignore",
@@ -315,7 +309,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "failed delete",
 					Resource: "always_delete_fail",
@@ -341,7 +335,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "failed delete",
 					Resource: "cleanup_stale_data_fail",
@@ -355,7 +349,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			SetupStorage: func(t *testing.T) Storage {
 				db := new(DatabaseMock)
 				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-				db.On("Dialect").Return(doNothingDialect{})
+				db.On("Dialect").Return(noopDialect{})
 				db.On("CopyFrom", mock.Anything, mock.Anything, true, map[string]interface{}(nil)).Return(nil)
 				return db
 			},
@@ -372,7 +366,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			SetupStorage: func(t *testing.T) Storage {
 				db := new(DatabaseMock)
 				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-				db.On("Dialect").Return(doNothingDialect{})
+				db.On("Dialect").Return(noopDialect{})
 				db.On("CopyFrom", mock.Anything, mock.Anything, true, map[string]interface{}(nil)).Return(nil)
 				return db
 			},
@@ -383,7 +377,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				PostResourceResolver: postResourceResolverError,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diagFlat{
+			ExpectedDiags: []diag.FlatDiag{
 				{
 					Err:      "some error",
 					Resource: "simple",
@@ -400,22 +394,63 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "failing_column",
+			SetupStorage: func(t *testing.T) Storage {
+				db := new(DatabaseMock)
+				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				db.On("Dialect").Return(noopDialect{})
+				db.On("CopyFrom", mock.Anything, mock.Anything, true, map[string]interface{}(nil)).Return(nil)
+				return db
+			},
+			Table: &schema.Table{
+				Name:     "column",
+				Resolver: returnValueResolver,
+				Columns: schema.ColumnList{
+					{
+						Name: "name",
+						Resolver: func(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, c schema.Column) error {
+							return fmt.Errorf("failed column")
+						},
+					},
+				},
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diag.FlatDiag{
+				{
+					Err:      "failed column",
+					Resource: "failing_column",
+					Severity: diag.ERROR,
+					Type:     diag.RESOLVING,
+					Summary:  "failed to resolve resource failing_column",
+				},
+			},
+		},
+		{
+			Name: "internal_column",
+			Table: &schema.Table{
+				Name:     "column",
+				Resolver: returnValueResolver,
+				Columns:  commonColumns,
+			},
+			ExpectedResourceCount: 1,
+		},
 	}
 
 	executionClient := executionClient{testlog.New(t)}
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			var storage Storage = doNothingStorage{}
+			var storage Storage = noopStorage{}
 			if tc.SetupStorage != nil {
 				storage = tc.SetupStorage(t)
 			}
-			exec := CreateTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, tc.ExtraFields, nil)
+			exec := NewTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, tc.ExtraFields, nil)
 			count, diags := exec.Resolve(context.Background(), executionClient, nil)
 			assert.Equal(t, tc.ExpectedResourceCount, count)
 			if tc.ErrorExpected {
 				require.True(t, diags.HasDiags())
 				if tc.ExpectedDiags != nil {
-					assert.Equal(t, tc.ExpectedDiags, flattenDiags(diags))
+					assert.Equal(t, tc.ExpectedDiags, diag.FlattenDiags(diags))
 				}
 			} else {
 				require.Nil(t, diags)
@@ -424,399 +459,69 @@ func TestTableExecutor_Resolve(t *testing.T) {
 	}
 }
 
-func flattenDiags(dd diag.Diagnostics) []diagFlat {
-	df := make([]diagFlat, len(dd))
-	for i, d := range dd {
-
-		df[i] = diagFlat{
-			Err:      d.Error(),
-			Resource: d.Description().Resource,
-			Type:     d.Type(),
-			Severity: d.Severity(),
-			Summary:  d.Description().Summary,
-		}
-	}
-	return df
+var testZeroTable = &schema.Table{
+	Name: "test_zero_table",
+	Columns: []schema.Column{
+		{
+			Name: "zero_bool",
+			Type: schema.TypeBool,
+		},
+		{
+			Name: "zero_int",
+			Type: schema.TypeBigInt,
+		},
+		{
+			Name: "not_zero_bool",
+			Type: schema.TypeBool,
+		},
+		{
+			Name: "not_zero_int",
+			Type: schema.TypeBigInt,
+		},
+		{
+			Name: "zero_int_ptr",
+			Type: schema.TypeBigInt,
+		},
+		{
+			Name: "not_zero_int_ptr",
+			Type: schema.TypeBigInt,
+		},
+		{
+			Name: "zero_string",
+			Type: schema.TypeString,
+		},
+	},
 }
 
-//func TestExecutionData_ResolveTable(t *testing.T) {
-//
-//	mockedClient := new(mockedClientMeta)
-//	logger := logging.New(&hclog.LoggerOptions{
-//		Name:   "test_log",
-//		Level:  hclog.Error,
-//		Output: nil,
-//	})
-//	mockedClient.On("Logger", mock.Anything).Return(logger)
-//
-//
-//	t.Run("failing table column resolver", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		execFailing := NewExecutionData(mockDb, logger, testBadColumnResolverTable, nil, false)
-//		_, err := execFailing.Resolve(context.Background(), mockedClient, nil)
-//		assert.Error(t, err)
-//	})
-//
-//	t.Run("ignore error table column resolver w/partialFetch", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testIgnoreErrorColumnResolverTable, nil, true)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testIgnoreErrorColumnResolverTable, exec.executionStart, mock.Anything).Return(nil)
-//		var expectedResource *Resource
-//		testIgnoreErrorColumnResolverTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
-//			expectedResource = parent
-//			return nil
-//		}
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//		assert.Len(t, exec.PartialFetchFailureResult, 0)
-//		assert.Equal(t, "TestValue", expectedResource.Get("default_value"))
-//		assert.Equal(t, "defaultName", expectedResource.Get("name"))
-//	})
-//
-//	t.Run("error table column resolver w/partialFetch", func(t *testing.T) {
-//		testBadColumnResolverTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *Resource, res chan<- interface{}) error {
-//			someString := "noError"
-//			res <- []testDefaultsTableData{{Name: &someString}, {Name: nil}, {Name: &someString}}
-//			return nil
-//		}
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testBadColumnResolverTable, nil, true)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testBadColumnResolverTable, exec.executionStart, mock.Anything).Return(nil)
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//		assert.Len(t, exec.PartialFetchFailureResult, 1)
-//	})
-//
-//	t.Run("doing nothing resolver", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testTable, nil, false)
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-//		testTable.Resolver = doNothingResolver
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//	})
-//
-//	t.Run("simple returning resources insert", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testTable, nil, false)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-//		testTable.Resolver = dataReturningResolver
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
-//		assert.Nil(t, err)
-//	})
-//	t.Run("simple returning single resources insert", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testTable, nil, false)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-//		testTable.Resolver = dataReturningSingleResolver
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//	})
-//	t.Run("simple returning nil resources insert", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testTable, nil, false)
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-//		testTable.Resolver = passingNilResolver
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//		mockDb.AssertNumberOfCalls(t, "CopyFrom", 0)
-//	})
-//	t.Run("check post row resolver", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testTable, nil, false)
-//		testTable.Resolver = dataReturningSingleResolver
-//		var expectedResource *Resource
-//		testTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
-//			err := parent.Set("name", "other")
-//			assert.Nil(t, err)
-//			expectedResource = parent
-//			return nil
-//		}
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		assert.Equal(t, expectedResource.data["name"], "other")
-//		assert.Nil(t, err)
-//		testTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
-//			return errors.New("error")
-//		}
-//		_, err = exec.Resolve(context.Background(), mockedClient, nil)
-//		assert.Error(t, err)
-//	})
-//
-//	t.Run("test resolving with default column values", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testDefaultsTable, nil, false)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testDefaultsTable, exec.executionStart, mock.Anything).Return(nil)
-//		testDefaultsTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *Resource, res chan<- interface{}) error {
-//			res <- testDefaultsTableData{Name: nil}
-//			return nil
-//		}
-//		var expectedResource *Resource
-//		testDefaultsTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
-//			expectedResource = parent
-//			return nil
-//		}
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//		assert.Equal(t, expectedResource.data["name"], "defaultValue")
-//	})
-//
-//	t.Run("disable delete", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testTable, nil, false)
-//		testTable.Resolver = dataReturningSingleResolver
-//		testTable.DeleteFilter = func(meta ClientMeta, r *Resource) []interface{} {
-//			return nil
-//		}
-//		var expectedResource *Resource
-//		testTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
-//			err := parent.Set("name", "other")
-//			assert.Nil(t, err)
-//			expectedResource = parent
-//			return nil
-//		}
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
-//		assert.Equal(t, expectedResource.data["name"], "other")
-//		assert.Nil(t, err)
-//
-//		// new mockDb, new call counts
-//		mockDb = new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		exec = NewExecutionData(mockDb, logger, testTable, nil, false)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-//		_, err = exec.Resolve(context.Background(), mockedClient, nil)
-//		mockDb.AssertNumberOfCalls(t, "RemoveStaleData", 1)
-//		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
-//		assert.Nil(t, err)
-//	})
-//	t.Run("disable delete w/deleteFilter", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(schema.PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testTable, map[string]interface{}{"test": 1}, false)
-//		testTable.Resolver = dataReturningSingleResolver
-//		testTable.DeleteFilter = func(meta ClientMeta, r *schema.Resource) []interface{} {
-//			return []interface{}{"a", 2}
-//		}
-//		var expectedResource *schema.Resource
-//		testTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *schema.Resource) error {
-//			err := parent.Set("name", "other")
-//			assert.Nil(t, err)
-//			expectedResource = parent
-//			return nil
-//		}
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, []interface{}{"test", 1, "a", 2}).Return(nil)
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
-//		assert.Equal(t, expectedResource.Get("name"), "other")
-//		assert.Nil(t, err)
-//
-//		// new mockDb, new call counts
-//		mockDb = new(DatabaseMock)
-//		mockDb.On("Dialect").Return(schema.PostgresDialect{})
-//		exec = NewExecutionData(mockDb, logger, testTable, nil, false)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-//		_, err = exec.Resolve(context.Background(), mockedClient, nil)
-//		mockDb.AssertNumberOfCalls(t, "RemoveStaleData", 1)
-//		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
-//		assert.Nil(t, err)
-//	})
-//
-//	t.Run("disable delete failed copy from", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(schema.PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, testTable, nil, false)
-//		testTable.Resolver = dataReturningSingleResolver
-//		testTable.DeleteFilter = func(meta ClientMeta, r *schema.Resource) []interface{} {
-//			return nil
-//		}
-//		var expectedResource *schema.Resource
-//		testTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *schema.Resource) error {
-//			err := parent.Set("name", "other")
-//			assert.Nil(t, err)
-//			expectedResource = parent
-//			return nil
-//		}
-//		mockDb.On("RemoveStaleData", mock.Anything, testTable, exec.executionStart, mock.Anything).Return(nil)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(fmt.Errorf("some error"))
-//		mockDb.On("Insert", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		mockDb.AssertNumberOfCalls(t, "CopyFrom", 1)
-//		mockDb.AssertNumberOfCalls(t, "Insert", 1)
-//		assert.Equal(t, expectedResource.Get("name"), "other")
-//		assert.Nil(t, err)
-//	})
-//
-//	t.Run("always delete with disable delete", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(schema.PostgresDialect{})
-//		exec := NewExecutionData(mockDb, logger, alwaysDeleteTable, nil, false)
-//		alwaysDeleteTable.Resolver = dataReturningSingleResolver
-//		alwaysDeleteTable.DeleteFilter = func(meta ClientMeta, r *schema.Resource) []interface{} {
-//			return nil
-//		}
-//		var expectedResource *schema.Resource
-//		alwaysDeleteTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *schema.Resource) error {
-//			err := parent.Set("name", "other")
-//			assert.Nil(t, err)
-//			expectedResource = parent
-//			return nil
-//		}
-//		mockDb.On("RemoveStaleData", mock.Anything, alwaysDeleteTable, exec.executionStart, mock.Anything).Return(nil)
-//		mockDb.On("Delete", mock.Anything, alwaysDeleteTable, mock.Anything).Return(nil)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.AssertNumberOfCalls(t, "Delete", 0)
-//		_, err := exec.Resolve(context.Background(), mockedClient, nil)
-//		mockDb.AssertNumberOfCalls(t, "Delete", 1)
-//		assert.Equal(t, expectedResource.Get("name"), "other")
-//		assert.Nil(t, err)
-//	})
-//
-//	t.Run("test partial fetch post resource resolver", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(schema.PostgresDialect{})
-//		execDefault := NewExecutionData(mockDb, logger, testDefaultsTable, nil, true)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testDefaultsTable, execDefault.executionStart, mock.Anything).Return(nil)
-//		testDefaultsTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
-//			res <- testDefaultsTableData{Name: nil}
-//			return nil
-//		}
-//		var expectedResource *schema.Resource
-//		testDefaultsTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *schema.Resource) error {
-//			expectedResource = parent
-//			return fmt.Errorf("random failure")
-//		}
-//		_, err := execDefault.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//		assert.Equal(t, expectedResource.Get("name"), "defaultValue")
-//	})
-//
-//	t.Run("test partial fetch resolver", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		execDefault := NewExecutionData(mockDb, logger, testDefaultsTable, nil, true)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testDefaultsTable, execDefault.executionStart, mock.Anything).Return(nil)
-//		testDefaultsTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *Resource, res chan<- interface{}) error {
-//			res <- testDefaultsTableData{Name: nil}
-//			return fmt.Errorf("random failure")
-//		}
-//		var expectedResource *Resource
-//		testDefaultsTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *Resource) error {
-//			expectedResource = parent
-//			return nil
-//		}
-//		_, err := execDefault.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//		assert.Equal(t, expectedResource.data["name"], "defaultValue")
-//		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
-//		assert.Equal(t, "table resolve error: random failure", execDefault.PartialFetchFailureResult[0].Error())
-//	})
-//
-//	t.Run("test partial fetch resolver panic", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(PostgresDialect{})
-//		execDefault := NewExecutionData(mockDb, logger, testDefaultsTable, nil, true)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		testDefaultsTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
-//			res <- testDefaultsTableData{Name: nil}
-//			panic("test panic")
-//		}
-//		var expectedResource *schema.Resource
-//		testDefaultsTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *schema.Resource) error {
-//			expectedResource = parent
-//			return nil
-//		}
-//		_, err := execDefault.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//		assert.Equal(t, expectedResource.data["name"], "defaultValue")
-//		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
-//		assert.Equal(t, "table resolve error: failed table test_table fetch. Error: test panic", execDefault.PartialFetchFailureResult[0].Error())
-//	})
-//
-//	t.Run("test partial fetch post resource resolver panic", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(schema.PostgresDialect{})
-//		execDefault := NewExecutionData(mockDb, logger, testDefaultsTable, nil, true)
-//		mockDb.On("CopyFrom", mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
-//		mockDb.On("RemoveStaleData", mock.Anything, testDefaultsTable, execDefault.executionStart, mock.Anything).Return(nil)
-//		testDefaultsTable.Resolver = func(ctx context.Context, meta ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
-//			res <- testDefaultsTableData{Name: nil}
-//			return nil
-//		}
-//		var expectedResource *schema.Resource
-//		testDefaultsTable.PostResourceResolver = func(ctx context.Context, meta ClientMeta, parent *schema.Resource) error {
-//			expectedResource = parent
-//			panic("test panic")
-//		}
-//		_, err := execDefault.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//		assert.Equal(t, expectedResource.Get("name"), "defaultValue")
-//		assert.Len(t, execDefault.PartialFetchFailureResult, 1)
-//		assert.Equal(t, "failed to resolve resource: recovered from panic: test panic", execDefault.PartialFetchFailureResult[0].Error())
-//	})
-//
-//	t.Run("test table with multiplex", func(t *testing.T) {
-//		mockDb := new(DatabaseMock)
-//		mockDb.On("Dialect").Return(schema.PostgresDialect{})
-//		execDefault := NewExecutionData(mockDb, logger, testMultiplexTable, nil, true)
-//		mockDb.On("RemoveStaleData", mock.Anything, testMultiplexTable, execDefault.executionStart, mock.Anything).Return(nil)
-//		var parentMultiplexCalled, relationMultiplexCalled = false, false
-//		testMultiplexTable.Multiplex = func(meta ClientMeta) []ClientMeta {
-//			parentMultiplexCalled = true
-//			return []ClientMeta{meta}
-//		}
-//		testMultiplexTable.Relations[0].Multiplex = func(meta ClientMeta) []ClientMeta {
-//			relationMultiplexCalled = true
-//			return []ClientMeta{meta}
-//		}
-//		_, err := execDefault.Resolve(context.Background(), mockedClient, nil)
-//		assert.Nil(t, err)
-//		assert.True(t, parentMultiplexCalled)
-//		assert.False(t, relationMultiplexCalled)
-//	})
-//}
-//
-//// ClientMeta is an autogenerated mock type for the ClientMeta type
-//type mockedClientMeta struct {
-//	mock.Mock
-//}
-//
-//// Logger provides a mock function with given fields:
-//func (_m *mockedClientMeta) Logger() hclog.Logger {
-//	ret := _m.Called()
-//
-//	var r0 hclog.Logger
-//	if rf, ok := ret.Get(0).(func() hclog.Logger); ok {
-//		r0 = rf()
-//	} else {
-//		if ret.Get(0) != nil {
-//			r0 = ret.Get(0).(hclog.Logger)
-//		}
-//	}
-//
-//	return r0
-//}
+type zeroValuedStruct struct {
+	ZeroBool      bool   `default:"false"`
+	ZeroInt       int    `default:"0"`
+	NotZeroInt    int    `default:"5"`
+	NotZeroBool   bool   `default:"true"`
+	ZeroIntPtr    *int   `default:"0"`
+	NotZeroIntPtr *int   `default:"5"`
+	ZeroString    string `default:""`
+}
+
+func TestTableExecutor_resolveColumns(t *testing.T) {
+	object := zeroValuedStruct{}
+	_ = defaults.Set(&object)
+	var storage Storage = noopStorage{}
+	exec := NewTableExecutor(testZeroTable.Name, storage, testlog.New(t), testZeroTable, nil, nil)
+	r := schema.NewResourceData(noopDialect{}, testZeroTable, nil, object, nil, exec.executionStart)
+	// columns should be resolved from ColumnResolver functions or default functions
+	err := exec.resolveColumns(context.TODO(), executionClient{testlog.New(t)}, r, testZeroTable.Columns)
+	assert.Nil(t, err)
+	v, err := r.Values()
+	assert.Nil(t, err)
+	assert.Equal(t, []interface{}{false, 0, true}, v[0:3])
+	assert.Equal(t, 0, *v[4].(*int))
+	assert.Equal(t, 5, *v[5].(*int))
+	object.ZeroIntPtr = nil
+	r = schema.NewResourceData(noopDialect{}, testZeroTable, nil, object, nil, exec.executionStart)
+	// columns should be resolved from ColumnResolver functions or default functions
+	err = exec.resolveColumns(context.TODO(), executionClient{testlog.New(t)}, r, testZeroTable.Columns)
+	assert.Nil(t, err)
+	v, _ = r.Values()
+	assert.Equal(t, nil, v[4])
+}

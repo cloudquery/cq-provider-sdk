@@ -8,62 +8,63 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-type doNothingStorage struct {
-}
+type noopStorage struct{}
 
-func (f doNothingStorage) Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error) {
+func (f noopStorage) Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error) {
 	return nil, nil
 }
 
-func (f doNothingStorage) Exec(ctx context.Context, query string, args ...interface{}) error {
+func (f noopStorage) Exec(ctx context.Context, query string, args ...interface{}) error {
 	return nil
 }
 
-func (f doNothingStorage) Insert(ctx context.Context, t *schema.Table, instance schema.Resources) error {
+func (f noopStorage) Insert(ctx context.Context, t *schema.Table, instance schema.Resources) error {
 	return nil
 }
 
-func (f doNothingStorage) Delete(ctx context.Context, t *schema.Table, kvFilters []interface{}) error {
+func (f noopStorage) Delete(ctx context.Context, t *schema.Table, kvFilters []interface{}) error {
 	return nil
 }
 
-func (f doNothingStorage) RemoveStaleData(ctx context.Context, t *schema.Table, executionStart time.Time, kvFilters []interface{}) error {
+func (f noopStorage) RemoveStaleData(ctx context.Context, t *schema.Table, executionStart time.Time, kvFilters []interface{}) error {
 	return nil
 }
 
-func (f doNothingStorage) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error {
+func (f noopStorage) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error {
 	return nil
 }
 
-func (f doNothingStorage) Close() {}
+func (f noopStorage) Close() {}
 
-func (f doNothingStorage) Dialect() schema.Dialect {
-	return doNothingDialect{}
+func (f noopStorage) Dialect() schema.Dialect {
+	return noopDialect{}
 }
 
-type doNothingDialect struct {
+type noopDialect struct {
 }
 
-func (d doNothingDialect) PrimaryKeys(t *schema.Table) []string {
+func (d noopDialect) PrimaryKeys(t *schema.Table) []string {
 	return t.Options.PrimaryKeys
 }
 
-func (d doNothingDialect) Columns(t *schema.Table) schema.ColumnList {
+func (d noopDialect) Columns(t *schema.Table) schema.ColumnList {
 	return t.Columns
 }
 
-func (d doNothingDialect) Constraints(t, parent *schema.Table) []string {
+func (d noopDialect) Constraints(t, parent *schema.Table) []string {
 	return []string{}
 }
 
-func (d doNothingDialect) Extra(t, parent *schema.Table) []string {
+func (d noopDialect) Extra(t, parent *schema.Table) []string {
 	return []string{}
 }
 
-func (d doNothingDialect) DBTypeFromType(v schema.ValueType) string {
+func (d noopDialect) DBTypeFromType(v schema.ValueType) string {
 	return v.String()
 }
 
-func (d doNothingDialect) GetResourceValues(r *schema.Resource) ([]interface{}, error) {
+func (d noopDialect) GetResourceValues(r *schema.Resource) ([]interface{}, error) {
 	return r.Values()
 }
+
+var _ Storage = (*noopStorage)(nil)
