@@ -120,10 +120,8 @@ type FetchResourcesResponse struct {
 type ResourceFetchStatus int
 
 const (
-	// ResourceFetchUnknown execution wasn't set
-	ResourceFetchUnknown ResourceFetchStatus = iota
 	// ResourceFetchComplete execution was completed successfully without any errors/diagnostics
-	ResourceFetchComplete
+	ResourceFetchComplete ResourceFetchStatus = iota
 	// ResourceFetchFailed execution failed and wasn't able to fetch any resource
 	ResourceFetchFailed
 	// ResourceFetchPartial execution was partial, one or more resources failed to resolve/fetch
@@ -132,19 +130,15 @@ const (
 	ResourceFetchCanceled
 )
 
+var resourceFetchStatusName = map[ResourceFetchStatus]string{
+	ResourceFetchComplete: "COMPLETE",
+	ResourceFetchFailed:   "FAILED",
+	ResourceFetchPartial:  "PARTIAL",
+	ResourceFetchCanceled: "CANCELED",
+}
+
 func (s ResourceFetchStatus) String() string {
-	switch s {
-	case ResourceFetchComplete:
-		return "COMPLETE"
-	case ResourceFetchFailed:
-		return "FAILED"
-	case ResourceFetchPartial:
-		return "PARTIAL"
-	case ResourceFetchCanceled:
-		return "CANCELED"
-	default:
-		return "UNKNOWN"
-	}
+	return resourceFetchStatusName[s]
 }
 
 // ResourceFetchSummary includes a summarized report of a fetched resource, such as total amount of resources collected,
