@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudquery/cq-provider-sdk/cqproto/internal"
+
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 )
@@ -131,18 +133,11 @@ const (
 )
 
 func (s ResourceFetchStatus) String() string {
-	switch s {
-	case ResourceFetchComplete:
-		return "COMPLETE"
-	case ResourceFetchFailed:
-		return "FAILED"
-	case ResourceFetchPartial:
-		return "PARTIAL"
-	case ResourceFetchCanceled:
-		return "CANCELED"
-	default:
+	name, ok := internal.ResourceFetchSummary_Status_name[int32(s)]
+	if !ok {
 		return "UNKNOWN"
 	}
+	return name
 }
 
 // ResourceFetchSummary includes a summarized report of a fetched resource, such as total amount of resources collected,
