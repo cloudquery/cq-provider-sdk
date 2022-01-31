@@ -130,15 +130,19 @@ const (
 	ResourceFetchCanceled
 )
 
-var resourceFetchStatusName = map[ResourceFetchStatus]string{
-	ResourceFetchComplete: "COMPLETE",
-	ResourceFetchFailed:   "FAILED",
-	ResourceFetchPartial:  "PARTIAL",
-	ResourceFetchCanceled: "CANCELED",
-}
-
 func (s ResourceFetchStatus) String() string {
-	return resourceFetchStatusName[s]
+	switch s {
+	case ResourceFetchComplete:
+		return "COMPLETE"
+	case ResourceFetchFailed:
+		return "FAILED"
+	case ResourceFetchPartial:
+		return "PARTIAL"
+	case ResourceFetchCanceled:
+		return "CANCELED"
+	default:
+		return "UNKNOWN"
+	}
 }
 
 // ResourceFetchSummary includes a summarized report of a fetched resource, such as total amount of resources collected,
