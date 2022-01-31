@@ -273,8 +273,8 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		Config:      nil,
 		ExtraFields: nil,
 	})
-	assert.Equal(t, "", resp.Error)
-	assert.Error(t, err)
+	assert.Equal(t, "test error", resp.Error)
+	assert.Nil(t, err)
 }
 
 type FetchResourceTableTest struct {
