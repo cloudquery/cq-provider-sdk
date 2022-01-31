@@ -3,9 +3,8 @@ package database
 import (
 	"context"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/execution"
-
 	"github.com/cloudquery/cq-provider-sdk/database/postgres"
+	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/hashicorp/go-hclog"
 )

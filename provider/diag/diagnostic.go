@@ -106,7 +106,7 @@ func (diags Diagnostics) HasDiags() bool {
 	return len(diags) > 0
 }
 
-func (diags Diagnostics) Append(new ...interface{}) Diagnostics {
+func (diags Diagnostics) Add(new ...interface{}) Diagnostics {
 	for _, item := range new {
 		if item == nil {
 			continue
@@ -122,10 +122,10 @@ func (diags Diagnostics) Append(new ...interface{}) Diagnostics {
 				// If we have an errwrap wrapper with a Diagnostics hiding
 				// inside then we'll unpick it here to get access to the
 				// individual diagnostics.
-				diags = diags.Append(errwrap.GetType(ti, Diagnostics(nil)))
+				diags = diags.Add(errwrap.GetType(ti, Diagnostics(nil)))
 			case errwrap.ContainsType(ti, hcl.Diagnostics(nil)):
 				// Likewise, if we have HCL diagnostics we'll unpick that too.
-				diags = diags.Append(errwrap.GetType(ti, hcl.Diagnostics(nil)))
+				diags = diags.Add(errwrap.GetType(ti, hcl.Diagnostics(nil)))
 			default:
 				diags = append(diags, nativeError{ti})
 			}

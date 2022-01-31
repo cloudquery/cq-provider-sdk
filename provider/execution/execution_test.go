@@ -66,7 +66,9 @@ var (
 		return resource.Set("name", "data")
 	}
 	postResourceResolverError = func(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) error {
-		return diag.Diagnostics{NewError(diag.ERROR, diag.RESOLVING, resource.TableName(), "some error"), NewError(diag.ERROR, diag.RESOLVING, resource.TableName(), "some error 2")}
+		return diag.Diagnostics{
+			NewError(diag.ERROR, diag.RESOLVING, resource.TableName(), "some error"),
+			NewError(diag.ERROR, diag.RESOLVING, resource.TableName(), "some error 2")}
 	}
 )
 

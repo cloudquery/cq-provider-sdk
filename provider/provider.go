@@ -51,7 +51,7 @@ type Provider struct {
 	// ErrorClassifier allows the provider to classify errors it produces during table execution, and return them as diagnostics to the user.
 	// Classifier function may return empty slice if it cannot meaningfully convert the error into diagnostics. In this case
 	// the error will be converted by the SDK into diagnostic at ERROR level and RESOLVING type.
-	ErrorClassifier []execution.ErrorClassifier
+	ErrorClassifier execution.ErrorClassifier
 	// Database connection string
 	dbURL string
 	// meta is the provider's client created when configure is called
@@ -169,7 +169,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 
 	defer conn.Close()
 
-	// limiter used to limit the amount of resources fetched concurently
+	// limiter used to limit the amount of resources fetched concurrently
 	var limiter *semaphore.Weighted
 	if request.ParallelFetchingLimit > 0 {
 		limiter = semaphore.NewWeighted(int64(request.ParallelFetchingLimit))

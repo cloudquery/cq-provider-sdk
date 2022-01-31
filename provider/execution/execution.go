@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -41,25 +40,28 @@ type TableExecutor struct {
 	extraFields map[string]interface{}
 	// When the execution started
 	executionStart time.Time
-	// parent is the parent TableExecutor
-	parent *TableExecutor
 }
 
 // NewTableExecutor creates a new TableExecutor for given schema.Table
-func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table,
-	extraFields map[string]interface{}, classifiers []ErrorClassifier) TableExecutor {
+func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields map[string]interface{}, classifier ErrorClassifier) TableExecutor {
+
+	var classifiers = []ErrorClassifier{defaultErrorClassifier}
+	if classifier != nil {
+		classifiers = append([]ErrorClassifier{classifier}, classifiers...)
+	}
 	return TableExecutor{
 		ResourceName:   resourceName,
 		Table:          table,
 		Db:             db,
 		Logger:         logger,
 		extraFields:    extraFields,
-		classifiers:    append(classifiers, defaultErrorClassifier),
+		classifiers:    classifiers,
 		executionStart: time.Now().Add(executionJitter),
 	}
 }
 
-func (e *TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
+// Resolve is the root function of table executor which starts an execution of a Table resolving it, and it's relations.
+func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
 	// if table doesn't define multiplex call normal table resolve
 	if e.Table.Multiplex == nil {
 		return e.callTableResolve(ctx, meta, parent)
@@ -71,19 +73,19 @@ func (e *TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta, par
 	// add diagnostic that multiplexing isn't allowed for relational tables and call normal table resolve.
 	var diags diag.Diagnostics
 	meta.Logger().Warn("relation client multiplexing is not allowed, skipping multiplex", "table", e.Table.Name)
-	diags = diags.Append(NewError(diag.WARNING, diag.SCHEMA, e.ResourceName, "multiplex on relation table %s is not allowed, skipping multiplex", e.Table.Name))
+	diags = diags.Add(NewError(diag.WARNING, diag.SCHEMA, e.ResourceName, "multiplex on relation table %s is not allowed, skipping multiplex", e.Table.Name))
 	count, resolveDiags := e.callTableResolve(ctx, meta, parent)
-	return count, diags.Append(resolveDiags)
+	return count, diags.Add(resolveDiags)
 }
 
-func (e *TableExecutor) WithTable(t *schema.Table) *TableExecutor {
+// withTable allows to create a new TableExecutor for received *schema.Table
+func (e TableExecutor) withTable(t *schema.Table) *TableExecutor {
 	return &TableExecutor{
 		Table:        t,
 		ResourceName: e.ResourceName,
 		Db:           e.Db,
 		Logger:       e.Logger,
 		extraFields:  e.extraFields,
-		parent:       e,
 	}
 }
 
@@ -92,12 +94,10 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, meta schema.Clien
 		clients        []schema.ClientMeta
 		diagsChan      = make(chan diag.Diagnostics)
 		totalResources uint64
-		wg             sync.WaitGroup
 	)
 	clients = e.Table.Multiplex(meta)
 	meta.Logger().Debug("multiplexing client", "count", len(clients), "table", e.Table.Name)
 	defer close(diagsChan)
-	wg.Add(len(clients))
 	for _, client := range clients {
 		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics) {
 			count, resolveDiags := e.callTableResolve(ctx, c, parent)
@@ -105,14 +105,19 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, meta schema.Clien
 			diagsChan <- resolveDiags
 		}(client, diagsChan)
 	}
-	var allDiags diag.Diagnostics
-	go func() {
-		for dd := range diagsChan {
-			allDiags = allDiags.Append(dd)
-			wg.Done()
+	var (
+		allDiags    diag.Diagnostics
+		doneClients = 0
+	)
+	for dd := range diagsChan {
+		allDiags = allDiags.Add(dd)
+		doneClients++
+		meta.Logger().Debug("multiplexed client finished", "done", doneClients, "total", len(clients), "table", e.Table.Name)
+		if doneClients >= len(clients) {
+			break
 		}
-	}()
-	wg.Wait()
+	}
+	meta.Logger().Debug("table multiplex resolve completed", "table", e.Table.Name)
 	return totalResources, allDiags
 }
 
@@ -152,11 +157,11 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 	var diags diag.Diagnostics
 
 	if e.Table.Resolver == nil {
-		return 0, diags.Append(NewError(diag.ERROR, diag.SCHEMA, e.ResourceName, "table %s missing resolver, make sure table implements the resolver", e.Table.Name))
+		return 0, diags.Add(NewError(diag.ERROR, diag.SCHEMA, e.ResourceName, "table %s missing resolver, make sure table implements the resolver", e.Table.Name))
 
 	}
 	if err := e.truncateTable(ctx, client, parent); err != nil {
-		return 0, diags.Append(FromError(err, WithResource(e.ResourceName), WithErrorClassifier))
+		return 0, diags.Add(FromError(err, WithResource(e.ResourceName), WithErrorClassifier))
 	}
 
 	res := make(chan interface{})
@@ -189,25 +194,25 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		}
 		resolvedCount, dd := e.resolveResources(ctx, client, parent, objects)
 		// append any diags from resolve resources
-		diags = diags.Append(dd)
+		diags = diags.Add(dd)
 		nc += resolvedCount
 	}
 	// check if channel iteration stopped because of resolver failure
 	if resolverErr != nil {
 		client.Logger().Error("received resolve resources error", "table", e.Table.Name, "error", resolverErr)
-		return 0, diags.Append(resolverErr)
+		return 0, diags.Add(resolverErr)
 	}
 	// Print only parent resources
 	if parent == nil {
 		client.Logger().Info("fetched successfully", "table", e.Table.Name, "count", nc)
 	}
 	if err := e.cleanupStaleData(ctx, client, parent); err != nil {
-		return nc, diags.Append(FromError(err, WithType(diag.DATABASE), WithSummary("failed to cleanup stale data on table %s", e.Table.Name)))
+		return nc, diags.Add(FromError(err, WithType(diag.DATABASE), WithSummary("failed to cleanup stale data on table %s", e.Table.Name)))
 	}
 	return nc, diags
 }
 
-func (e *TableExecutor) resolveResources(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, objects []interface{}) (uint64, diag.Diagnostics) {
+func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, objects []interface{}) (uint64, diag.Diagnostics) {
 	var (
 		resources = make(schema.Resources, 0, len(objects))
 		diags     diag.Diagnostics
@@ -218,7 +223,7 @@ func (e *TableExecutor) resolveResources(ctx context.Context, meta schema.Client
 		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resource); err != nil {
 			e.Logger.Warn("skipping failed resolved resource", "reason", err.Error())
-			diags = diags.Append(err)
+			diags = diags.Add(err)
 			continue
 		}
 		resources = append(resources, resource)
@@ -227,7 +232,7 @@ func (e *TableExecutor) resolveResources(ctx context.Context, meta schema.Client
 	// only top level tables should cascade
 	shouldCascade := parent == nil
 	resources, dbDiags := e.copyDataIntoDB(ctx, resources, shouldCascade)
-	diags = diags.Append(dbDiags)
+	diags = diags.Add(dbDiags)
 	totalCount := uint64(len(resources))
 
 	// Finally, resolve relations of each resource
@@ -235,15 +240,15 @@ func (e *TableExecutor) resolveResources(ctx context.Context, meta schema.Client
 		meta.Logger().Debug("resolving table relation", "table", e.Table.Name, "relation", rel.Name)
 		for _, r := range resources {
 			// ignore relation resource count
-			if _, innerDiags := e.WithTable(rel).Resolve(ctx, meta, r); innerDiags.HasDiags() {
-				diags = diags.Append(innerDiags)
+			if _, innerDiags := e.withTable(rel).Resolve(ctx, meta, r); innerDiags.HasDiags() {
+				diags = diags.Add(innerDiags)
 			}
 		}
 	}
 	return totalCount, diags
 }
 
-func (e *TableExecutor) copyDataIntoDB(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
+func (e TableExecutor) copyDataIntoDB(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
 	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
 	if err == nil {
 		return resources, nil
@@ -257,13 +262,13 @@ func (e *TableExecutor) copyDataIntoDB(ctx context.Context, resources schema.Res
 	}
 	e.Logger.Error("failed insert to db", "error", err, "table", e.Table.Name)
 	// Setup diags, adding first diagnostic that bulk insert failed
-	diags := diag.Diagnostics{}.Append(FromError(err, WithType(diag.DATABASE), WithSummary("failed bulk insert on table %s", e.Table.Name)))
+	diags := diag.Diagnostics{}.Add(FromError(err, WithType(diag.DATABASE), WithSummary("failed bulk insert on table %s", e.Table.Name)))
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
 	partialFetchResources := make(schema.Resources, 0)
 	for id := range resources {
 		if err := e.Db.Insert(ctx, e.Table, schema.Resources{resources[id]}); err != nil {
 			e.Logger.Error("failed to insert resource into db", "error", err, "resource_keys", resources[id].PrimaryKeyValues(), "table", e.Table.Name)
-			diags = diags.Append(FromError(err, WithType(diag.DATABASE), WithErrorClassifier))
+			diags = diags.Add(FromError(err, WithType(diag.DATABASE), WithErrorClassifier))
 			continue
 		}
 		// If there is no error we add the resource to the final result
@@ -272,7 +277,7 @@ func (e *TableExecutor) copyDataIntoDB(ctx context.Context, resources schema.Res
 	return partialFetchResources, diags
 }
 
-func (e *TableExecutor) resolveResourceValues(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) (err error) {
+func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			stack := string(debug.Stack())
@@ -302,7 +307,7 @@ func (e *TableExecutor) resolveResourceValues(ctx context.Context, meta schema.C
 	return err
 }
 
-func (e *TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) error {
+func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) error {
 	for _, c := range cols {
 		if c.Resolver != nil {
 			meta.Logger().Trace("using custom column resolver", "column", c.Name, "table", e.Table.Name)
