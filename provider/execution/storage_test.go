@@ -8,7 +8,9 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-type noopStorage struct{}
+type noopStorage struct {
+	D schema.Dialect
+}
 
 func (f noopStorage) Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error) {
 	return nil, nil
@@ -37,6 +39,9 @@ func (f noopStorage) CopyFrom(ctx context.Context, resources schema.Resources, s
 func (f noopStorage) Close() {}
 
 func (f noopStorage) Dialect() schema.Dialect {
+	if f.D != nil {
+		return f.D
+	}
 	return noopDialect{}
 }
 

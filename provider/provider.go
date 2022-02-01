@@ -204,7 +204,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 			finishedResources[r] = true
 			atomic.AddUint64(&totalResourceCount, resourceCount)
 			status := cqproto.ResourceFetchComplete
-			if ctx.Err() == context.Canceled {
+			if isCancelled(ctx) {
 				status = cqproto.ResourceFetchCanceled
 			} else if diags.HasErrors() {
 				status = cqproto.ResourceFetchPartial
@@ -249,6 +249,15 @@ func (p *Provider) interpolateAllResources(requestedResources []string) ([]strin
 func IsDebug() bool {
 	b, _ := strconv.ParseBool(os.Getenv("CQ_PROVIDER_DEBUG"))
 	return b
+}
+
+func isCancelled(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
 }
 
 func getTableDuplicates(resource string, table *schema.Table, tableNames map[string]string) error {

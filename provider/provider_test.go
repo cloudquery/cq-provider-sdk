@@ -120,6 +120,17 @@ var (
 						return errors.New("bad error")
 					},
 				},
+				"very_slow_resource": {
+					Name: "very_slow_resource",
+					Resolver: func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
+						select {
+						case <-time.After(10 * time.Second):
+							return nil
+						case <-ctx.Done():
+							return errors.New("context canceled")
+						}
+					},
+				},
 			},
 		}
 	}
@@ -288,6 +299,7 @@ type FetchResourceTableTest struct {
 	MockStorageFunc        func(ctrl *gomock.Controller) *mock.MockStorage
 	PartialFetch           bool
 	ResourcesToFetch       []string
+	Context                func() context.Context
 }
 
 func TestProvider_FetchResources(t *testing.T) {
@@ -347,6 +359,31 @@ func TestProvider_FetchResources(t *testing.T) {
 			PartialFetch:     false,
 			ResourcesToFetch: []string{"bad_resource"},
 		},
+		{
+			Name: "context canceled execution",
+			ExpectedFetchResponses: []*cqproto.FetchResourcesResponse{
+				{
+					ResourceName: "very_slow_resource",
+					Summary: cqproto.ResourceFetchSummary{
+						Status:        cqproto.ResourceFetchCanceled,
+						ResourceCount: 0,
+						Diagnostics: diag.Diagnostics{diag.NewBaseError(errors.New("context canceled"),
+							diag.ERROR, diag.RESOLVING, "very_slow_resource", "failed to resolve resource very_slow_resource", "")},
+					},
+				}},
+			ExpectedError: nil,
+			MockStorageFunc: func(ctrl *gomock.Controller) *mock.MockStorage {
+				mockDB := mock.NewMockStorage(ctrl)
+				mockDB.EXPECT().Close()
+				return mockDB
+			},
+			Context: func() context.Context {
+				ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
+				return ctx
+			},
+
+			ResourcesToFetch: []string{"very_slow_resource"},
+		},
 	}
 
 	for _, tt := range fetchCases {
@@ -354,9 +391,13 @@ func TestProvider_FetchResources(t *testing.T) {
 			tp.storageCreator = func(ctx context.Context, logger hclog.Logger, dbURL string) (execution.Storage, error) {
 				return tt.MockStorageFunc(ctrl), nil
 			}
-			err = tp.FetchResources(context.Background(), &cqproto.FetchResourcesRequest{
-				Resources:              tt.ResourcesToFetch,
-				PartialFetchingEnabled: tt.PartialFetch,
+			ctx := context.Background()
+			if tt.Context != nil {
+				ctx = tt.Context()
+			}
+
+			err = tp.FetchResources(ctx, &cqproto.FetchResourcesRequest{
+				Resources: tt.ResourcesToFetch,
 			}, &testResourceSender{
 				t,
 				tt.ExpectedFetchResponses,

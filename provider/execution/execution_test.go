@@ -6,23 +6,20 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/creasty/defaults"
-
-	"github.com/stretchr/testify/mock"
-
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
-
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/testlog"
+
+	"github.com/aws/smithy-go/ptr"
+	"github.com/creasty/defaults"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 type ExecutionTestCase struct {
 	Name        string
-	Description string
-
 	Table       *schema.Table
 	ExtraFields map[string]interface{}
 
@@ -128,8 +125,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 		},
 		{
 			// if tables don't define a resolver, an execution error by execution
-			Name:        "missing_table_resolver",
-			Description: "if tables don't define a resolver, an execution error by execution",
+			Name: "missing_table_resolver",
 			Table: &schema.Table{
 				Name:    "no-resolver",
 				Columns: commonColumns,
@@ -505,25 +501,86 @@ type zeroValuedStruct struct {
 	ZeroString    string `default:""`
 }
 
-func TestTableExecutor_resolveColumns(t *testing.T) {
-	object := zeroValuedStruct{}
-	_ = defaults.Set(&object)
-	var storage Storage = noopStorage{}
-	exec := NewTableExecutor(testZeroTable.Name, storage, testlog.New(t), testZeroTable, nil, nil)
-	r := schema.NewResourceData(noopDialect{}, testZeroTable, nil, object, nil, exec.executionStart)
-	// columns should be resolved from ColumnResolver functions or default functions
-	err := exec.resolveColumns(context.TODO(), executionClient{testlog.New(t)}, r, testZeroTable.Columns)
-	assert.Nil(t, err)
-	v, err := r.Values()
-	assert.Nil(t, err)
-	assert.Equal(t, []interface{}{false, 0, true}, v[0:3])
-	assert.Equal(t, 0, *v[4].(*int))
-	assert.Equal(t, 5, *v[5].(*int))
-	object.ZeroIntPtr = nil
-	r = schema.NewResourceData(noopDialect{}, testZeroTable, nil, object, nil, exec.executionStart)
-	// columns should be resolved from ColumnResolver functions or default functions
-	err = exec.resolveColumns(context.TODO(), executionClient{testlog.New(t)}, r, testZeroTable.Columns)
-	assert.Nil(t, err)
-	v, _ = r.Values()
-	assert.Equal(t, nil, v[4])
+type resolveColumnsTestCase struct {
+	Name         string
+	Table        *schema.Table
+	ResourceData interface{}
+	MetaData     map[string]interface{}
+
+	SetupStorage   func(t *testing.T) Storage
+	CompareValues  func(t *testing.T, r *schema.Resource, want []interface{})
+	ExpectedValues []interface{}
+	ExpectedDiags  []diag.FlatDiag
+}
+
+func TestTableExecutor_resolveResourceValues(t *testing.T) {
+
+	testCases := []resolveColumnsTestCase{
+		{
+			Name:  "resolve all zeroed columns",
+			Table: testZeroTable,
+			ResourceData: func() interface{} {
+				object := zeroValuedStruct{}
+				_ = defaults.Set(&object)
+				return object
+			}(),
+			MetaData:       nil,
+			SetupStorage:   nil,
+			ExpectedValues: []interface{}{false, 0, true, 5, ptr.Int(0), ptr.Int(5), ""},
+			ExpectedDiags:  nil,
+		},
+		{
+			Name:  "resolve_columns with dialect",
+			Table: testZeroTable,
+			ResourceData: func() interface{} {
+				object := zeroValuedStruct{}
+				_ = defaults.Set(&object)
+				return object
+			}(),
+			MetaData: nil,
+			SetupStorage: func(t *testing.T) Storage {
+				return &noopStorage{schema.PostgresDialect{}}
+			},
+			ExpectedValues: []interface{}{nil, nil, false, 0, true, 5, ptr.Int(0), ptr.Int(5), ""},
+			CompareValues: func(t *testing.T, r *schema.Resource, want []interface{}) {
+				v, err := r.Values()
+				// skip cq_id, cq_meta
+				assert.Equal(t, want[2:], v[2:])
+				assert.NotNil(t, v[0])
+				assert.NotNil(t, v[1])
+				assert.Nil(t, err)
+			},
+			ExpectedDiags: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			var storage Storage = noopStorage{}
+			if tc.SetupStorage != nil {
+				storage = tc.SetupStorage(t)
+			}
+			exec := NewTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, nil, nil)
+
+			r := schema.NewResourceData(storage.Dialect(), tc.Table, nil, tc.ResourceData, tc.MetaData, exec.executionStart)
+			// columns should be resolved from ColumnResolver functions or default functions
+			diags := exec.resolveResourceValues(context.Background(), executionClient{testlog.New(t)}, r)
+			if tc.ExpectedDiags != nil {
+				require.True(t, diags.HasDiags())
+				if tc.ExpectedDiags != nil {
+					assert.Equal(t, tc.ExpectedDiags, diag.FlattenDiags(diags))
+				}
+			} else {
+				require.Nil(t, diags)
+			}
+			if tc.CompareValues != nil {
+				tc.CompareValues(t, r, tc.ExpectedValues)
+			} else {
+				v, err := r.Values()
+				assert.Equal(t, tc.ExpectedValues, v)
+				assert.Nil(t, err)
+			}
+
+		})
+	}
 }

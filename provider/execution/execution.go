@@ -231,7 +231,7 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 
 	// only top level tables should cascade
 	shouldCascade := parent == nil
-	resources, dbDiags := e.copyDataIntoDB(ctx, resources, shouldCascade)
+	resources, dbDiags := e.copyToStorage(ctx, resources, shouldCascade)
 	diags = diags.Add(dbDiags)
 	totalCount := uint64(len(resources))
 
@@ -248,7 +248,7 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 	return totalCount, diags
 }
 
-func (e TableExecutor) copyDataIntoDB(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
+func (e TableExecutor) copyToStorage(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
 	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
 	if err == nil {
 		return resources, nil
@@ -277,37 +277,37 @@ func (e TableExecutor) copyDataIntoDB(ctx context.Context, resources schema.Reso
 	return partialFetchResources, diags
 }
 
-func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) (err error) {
+func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) (diags diag.Diagnostics) {
 	defer func() {
 		if r := recover(); r != nil {
 			stack := string(debug.Stack())
 			e.Logger.Error("resolve resource recovered from panic", "table", e.Table.Name, "stack", stack)
-			err = FromError(fmt.Errorf("column resolve panic: %s", r), WithResource(e.ResourceName), WithSeverity(diag.PANIC),
+			diags = FromError(fmt.Errorf("column resolve panic: %s", r), WithResource(e.ResourceName), WithSeverity(diag.PANIC),
 				WithType(diag.RESOLVING), WithSummary("resolve resource %s recovered from panic.", e.Table.Name), WithDetails(stack))
 		}
 	}()
 	// TODO: do this once per table
 	providerCols, internalCols := e.Db.Dialect().Columns(e.Table).Sift()
 
-	if err = e.resolveColumns(ctx, meta, resource, providerCols); err != nil {
+	if err := e.resolveColumns(ctx, meta, resource, providerCols); err != nil {
 		return err
 	}
 	// call PostRowResolver if defined after columns have been resolved
 	if e.Table.PostResourceResolver != nil {
-		if err = e.Table.PostResourceResolver(ctx, meta, resource); err != nil {
+		if err := e.Table.PostResourceResolver(ctx, meta, resource); err != nil {
 			return e.handleResolveError(meta, err)
 		}
 	}
 	// Finally, resolve columns internal to the SDK
 	for _, c := range internalCols {
-		if err = c.Resolver(ctx, meta, resource, c); err != nil {
+		if err := c.Resolver(ctx, meta, resource, c); err != nil {
 			return FromError(err, WithResource(e.ResourceName), WithType(diag.INTERNAL), WithSummary("default column %s resolver execution", c.Name))
 		}
 	}
-	return err
+	return diags
 }
 
-func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) error {
+func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) diag.Diagnostics {
 	for _, c := range cols {
 		if c.Resolver != nil {
 			meta.Logger().Trace("using custom column resolver", "column", c.Name, "table", e.Table.Name)
