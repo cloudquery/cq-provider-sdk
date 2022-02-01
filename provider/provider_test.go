@@ -378,6 +378,7 @@ func TestProvider_FetchResources(t *testing.T) {
 				return mockDB
 			},
 			Context: func() context.Context {
+				//nolint:govet
 				ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
 				return ctx
 			},

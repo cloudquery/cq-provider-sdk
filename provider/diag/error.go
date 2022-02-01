@@ -1,6 +1,6 @@
 package diag
 
-// BaseError is a generic error returned when execution is run, ExecutionError satisfies
+// BaseError is a generic error returned when execution is run, ExecutionError satisfies Diagnostic interface
 type BaseError struct {
 	// Err is the underlying go error this diagnostic wraps
 	Err error
@@ -20,6 +20,18 @@ type BaseError struct {
 
 	// DiagnosticType indicates the classification family of this diagnostic
 	diagnosticType DiagnosticType
+}
+
+// NewBaseError creates an BaseError from given error
+func NewBaseError(err error, severity Severity, dt DiagnosticType, resource, summary, details string) *BaseError {
+	return &BaseError{
+		Err:            err,
+		severity:       severity,
+		resource:       resource,
+		summary:        summary,
+		detail:         details,
+		diagnosticType: dt,
+	}
 }
 
 func (e BaseError) Severity() Severity {
@@ -44,16 +56,4 @@ func (e BaseError) Error() string {
 		return e.Err.Error()
 	}
 	return e.summary
-}
-
-// NewBaseError creates an ExecutionError from given error
-func NewBaseError(err error, severity Severity, dt DiagnosticType, resource, summary, details string) *BaseError {
-	return &BaseError{
-		Err:            err,
-		severity:       severity,
-		resource:       resource,
-		summary:        summary,
-		detail:         details,
-		diagnosticType: dt,
-	}
 }
