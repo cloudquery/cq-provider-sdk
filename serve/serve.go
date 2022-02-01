@@ -6,13 +6,12 @@ import (
 	"log"
 	"os"
 
-	"github.com/cloudquery/cq-provider-sdk/provider"
-
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
-	"google.golang.org/grpc"
+	"github.com/cloudquery/cq-provider-sdk/provider"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
+	"google.golang.org/grpc"
 )
 
 var Handshake = plugin.HandshakeConfig{
@@ -26,7 +25,7 @@ Set CQ_PROVIDER_DEBUG=1 to run plugin in debug mode, for additional info see htt
 `
 
 type Options struct {
-	// Required: Name of provider.
+	// Required: Name of provider
 	Name string
 
 	// Required: Provider is the actual provider that will be served.
@@ -78,7 +77,7 @@ func Serve(opts *Options) {
 
 	// Check of CQ_PROVIDER_DEBUG is turned on. In case it's true the plugin is executed in debug mode, allowing for
 	// the CloudQuery main command to connect to this plugin via the .cq_reattach and the CQ_REATTACH_PROVIDERS env var
-	if os.Getenv("CQ_PROVIDER_DEBUG") == "1" {
+	if provider.IsDebug() {
 		// If this flag is turned on the provider will print trace log, the trace log prints values inserted etc', turn this
 		// flag only if you are debugging locally and need more info on the provider while running it.
 		if os.Getenv("CQ_PROVIDER_DEBUG_TRACE_LOG") == "1" {
@@ -117,7 +116,7 @@ func serve(opts *Options) {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
 		VersionedPlugins: map[int]plugin.PluginSet{
-			2: {
+			cqproto.V4: {
 				"provider": &cqproto.CQPlugin{Impl: opts.Provider},
 			}},
 		GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {

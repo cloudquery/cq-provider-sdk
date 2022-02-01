@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
 )
 
 type CQProvider interface {
@@ -53,8 +53,8 @@ type GetProviderSchemaResponse struct {
 	Version string
 	// ResourceTables is a map of tables this provider creates
 	ResourceTables map[string]*schema.Table
-	// Migrations scripts available for the provider
-	Migrations map[string][]byte
+	// Migrations scripts available for the provider, for all dialects
+	Migrations map[string]map[string][]byte
 }
 
 // GetProviderConfigRequest represents a CloudQuery RPC request for provider's config
@@ -71,8 +71,6 @@ type ConfigureProviderRequest struct {
 	Connection ConnectionDetails
 	// Config is the configuration the user supplied for the provider
 	Config []byte
-	// DisableDelete configures providers to skip deletion of data before resource fetch
-	DisableDelete bool
 	// Fields to inject to every resource on insert
 	ExtraFields map[string]interface{}
 }

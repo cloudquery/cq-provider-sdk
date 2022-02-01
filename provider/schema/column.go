@@ -141,8 +141,8 @@ type ColumnResolver func(ctx context.Context, meta ClientMeta, resource *Resourc
 
 // ColumnCreationOptions allow modification of how column is defined when table is created
 type ColumnCreationOptions struct {
-	Nullable bool
-	Unique   bool
+	Unique  bool
+	NotNull bool
 }
 
 // Column definition for Table
@@ -165,8 +165,14 @@ type Column struct {
 	// to create a reproducible test environment with this column being non nill. For example various error columns and so on
 	IgnoreInTests bool
 
+	// internal is true if this column is managed by the SDK
+	internal bool
 	// meta holds serializable information about the column's resolvers and functions
 	meta *ColumnMeta
+}
+
+func (c Column) Internal() bool {
+	return c.internal
 }
 
 func (c Column) ValidateType(v interface{}) error {
@@ -320,4 +326,48 @@ type ColumnMeta struct {
 func SetColumnMeta(c Column, m *ColumnMeta) Column {
 	c.meta = m
 	return c
+}
+
+type ColumnList []Column
+
+// Sift gets a column list and returns a list of provider columns, and another list of internal columns, cqId column being the very last one
+func (c ColumnList) Sift() (ColumnList, ColumnList) {
+
+	providerCols, internalCols := make(ColumnList, 0, len(c)), make(ColumnList, 0, len(c))
+
+	cqIdColIndex := -1
+	for i := range c {
+		if c[i].internal {
+			if c[i].Name == cqIdColumn.Name {
+				cqIdColIndex = len(internalCols)
+			}
+
+			internalCols = append(internalCols, c[i])
+		} else {
+			providerCols = append(providerCols, c[i])
+		}
+	}
+
+	// resolve cqId last, as it would need other PKs to be resolved, some might be internal (cq_fetch_date)
+	if lastIndex := len(internalCols) - 1; cqIdColIndex > -1 && cqIdColIndex != lastIndex {
+		internalCols[cqIdColIndex], internalCols[lastIndex] = internalCols[lastIndex], internalCols[cqIdColIndex]
+	}
+	return providerCols, internalCols
+}
+
+func (c ColumnList) Names() []string {
+	ret := make([]string, len(c))
+	for i := range c {
+		ret[i] = c[i].Name
+	}
+	return ret
+}
+
+func (c ColumnList) Get(name string) *Column {
+	for i := range c {
+		if c[i].Name == name {
+			return &c[i]
+		}
+	}
+	return nil
 }

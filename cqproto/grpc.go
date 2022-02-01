@@ -3,7 +3,7 @@ package cqproto
 import (
 	"context"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/schema/diag"
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 
 	"github.com/vmihailenco/msgpack/v5"
 
@@ -26,7 +26,7 @@ func (g GRPCClient) GetProviderSchema(ctx context.Context, _ *GetProviderSchemaR
 		Name:           res.GetName(),
 		Version:        res.GetVersion(),
 		ResourceTables: tablesFromProto(res.GetResourceTables()),
-		Migrations:     res.Migrations,
+		Migrations:     migrationsFromProto(res.GetMigrations()),
 	}
 
 	return resp, nil
@@ -53,9 +53,8 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 			Type: internal.ConnectionType_POSTGRES,
 			Dsn:  request.Connection.DSN,
 		},
-		Config:        request.Config,
-		DisableDelete: request.DisableDelete,
-		ExtraFields:   fieldsData,
+		Config:      request.Config,
+		ExtraFields: fieldsData,
 	})
 	if err != nil {
 		return nil, err
@@ -116,7 +115,7 @@ func (g *GRPCServer) GetProviderSchema(ctx context.Context, _ *internal.GetProvi
 		Name:           resp.Name,
 		Version:        resp.Version,
 		ResourceTables: tablesToProto(resp.ResourceTables),
-		Migrations:     resp.Migrations,
+		Migrations:     migrationsToProto(resp.Migrations),
 	}, nil
 
 }
@@ -143,9 +142,8 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 			Type: string(request.Connection.GetType()),
 			DSN:  request.Connection.GetDsn(),
 		},
-		Config:        request.Config,
-		DisableDelete: request.DisableDelete,
-		ExtraFields:   eFields,
+		Config:      request.Config,
+		ExtraFields: eFields,
 	})
 	if err != nil {
 		return nil, err
@@ -353,19 +351,20 @@ func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.D
 	return diagnostics
 }
 
-// PartialFetchToCQProto converts schema partial fetch failed resources to cq-proto partial fetch resources
-func PartialFetchToCQProto(in []schema.ResourceFetchError) []*FailedResourceFetch {
-	if len(in) == 0 {
-		return nil
+func migrationsFromProto(in map[string]*internal.DialectMigration) map[string]map[string][]byte {
+	ret := make(map[string]map[string][]byte, len(in))
+	for k := range in {
+		ret[k] = in[k].Migrations
 	}
-	failedResources := make([]*FailedResourceFetch, len(in))
-	for i, p := range in {
-		failedResources[i] = &FailedResourceFetch{
-			TableName:            p.TableName,
-			RootTableName:        p.RootTableName,
-			RootPrimaryKeyValues: p.RootPrimaryKeyValues,
-			Error:                p.Err.Error(),
+	return ret
+}
+
+func migrationsToProto(in map[string]map[string][]byte) map[string]*internal.DialectMigration {
+	ret := make(map[string]*internal.DialectMigration, len(in))
+	for k := range in {
+		ret[k] = &internal.DialectMigration{
+			Migrations: in[k],
 		}
 	}
-	return failedResources
+	return ret
 }

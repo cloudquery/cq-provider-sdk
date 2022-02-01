@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudquery/cq-provider-sdk/helpers"
+
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,7 +42,7 @@ func TestPathResolver(t *testing.T) {
 	r1 := PathResolver("Inner.Value")
 	r2 := PathResolver("Value")
 	r3 := PathResolver("unexported")
-	resource := NewResourceData(pathTestTable, nil, testStruct{Inner: innerStruct{Value: "bla"}, Value: 5, unexported: false}, nil)
+	resource := NewResourceData(PostgresDialect{}, pathTestTable, nil, testStruct{Inner: innerStruct{Value: "bla"}, Value: 5, unexported: false}, nil, time.Now())
 	err := r1(context.TODO(), nil, resource, Column{Name: "test"})
 
 	assert.Nil(t, err)
@@ -60,14 +62,14 @@ func TestInterfaceSlice(t *testing.T) {
 	var sType []interface{}
 	var names []string
 	names = append(names, "first", "second")
-	assert.IsTypef(t, sType, interfaceSlice(names), "")
-	assert.IsTypef(t, sType, interfaceSlice(&names), "")
-	assert.IsTypef(t, sType, interfaceSlice(1), "")
-	assert.IsTypef(t, sType, interfaceSlice(innerStruct{"asdsa"}), "")
-	assert.IsTypef(t, sType, interfaceSlice(&innerStruct{"asdsa"}), "")
+	assert.IsTypef(t, sType, helpers.InterfaceSlice(names), "")
+	assert.IsTypef(t, sType, helpers.InterfaceSlice(&names), "")
+	assert.IsTypef(t, sType, helpers.InterfaceSlice(1), "")
+	assert.IsTypef(t, sType, helpers.InterfaceSlice(innerStruct{"asdsa"}), "")
+	assert.IsTypef(t, sType, helpers.InterfaceSlice(&innerStruct{"asdsa"}), "")
 	pSlice := []*innerStruct{{"asdsa"}, {"asdsa"}, {"asdsa"}}
-	assert.IsTypef(t, sType, interfaceSlice(pSlice), "")
-	assert.IsTypef(t, sType, interfaceSlice(&pSlice), "")
+	assert.IsTypef(t, sType, helpers.InterfaceSlice(pSlice), "")
+	assert.IsTypef(t, sType, helpers.InterfaceSlice(&pSlice), "")
 
 }
 
@@ -86,7 +88,7 @@ type testDateStruct struct {
 
 func TestDateTimeResolver(t *testing.T) {
 	r1 := DateResolver("Date")
-	resource := NewResourceData(dateTestTable, nil, testDateStruct{Date: "2011-10-05T14:48:00.000Z"}, nil)
+	resource := NewResourceData(PostgresDialect{}, dateTestTable, nil, testDateStruct{Date: "2011-10-05T14:48:00.000Z"}, nil, time.Now())
 	err := r1(context.TODO(), nil, resource, Column{Name: "date"})
 
 	assert.Nil(t, err)
@@ -94,12 +96,12 @@ func TestDateTimeResolver(t *testing.T) {
 	assert.Equal(t, resource.Get("date"), &t1)
 
 	r2 := DateResolver("Date", time.RFC822)
-	resource = NewResourceData(dateTestTable, nil, testDateStruct{Date: "2011-10-05T14:48:00.000Z"}, nil)
+	resource = NewResourceData(PostgresDialect{}, dateTestTable, nil, testDateStruct{Date: "2011-10-05T14:48:00.000Z"}, nil, time.Now())
 	err = r2(context.TODO(), nil, resource, Column{Name: "date"})
 
 	assert.Error(t, err)
 
-	resource = NewResourceData(dateTestTable, nil, testDateStruct{Date: "03 Jan 06 15:04 EST"}, nil)
+	resource = NewResourceData(PostgresDialect{}, dateTestTable, nil, testDateStruct{Date: "03 Jan 06 15:04 EST"}, nil, time.Now())
 	err = r2(context.TODO(), nil, resource, Column{Name: "date"})
 	assert.Nil(t, err)
 
@@ -107,7 +109,7 @@ func TestDateTimeResolver(t *testing.T) {
 	assert.Equal(t, t2.Unix(), resource.Get("date").(*time.Time).UTC().Unix())
 
 	r3 := DateResolver("Date", time.RFC822, "2006-01-02")
-	resource = NewResourceData(dateTestTable, nil, testDateStruct{Date: "2011-10-05"}, nil)
+	resource = NewResourceData(PostgresDialect{}, dateTestTable, nil, testDateStruct{Date: "2011-10-05"}, nil, time.Now())
 	err = r3(context.TODO(), nil, resource, Column{Name: "date"})
 	assert.Nil(t, err)
 
@@ -159,7 +161,7 @@ func TestNetResolvers(t *testing.T) {
 	r3 := IPNetResolver("Net")
 	r4 := IPAddressesResolver("IPS")
 	for _, r := range netTests {
-		resource := NewResourceData(networkTestTable, nil, r, nil)
+		resource := NewResourceData(PostgresDialect{}, networkTestTable, nil, r, nil, time.Now())
 		err := r1(context.TODO(), nil, resource, Column{Name: "ip"})
 		assert.Nil(t, err)
 		err = r2(context.TODO(), nil, resource, Column{Name: "mac"})
@@ -170,7 +172,7 @@ func TestNetResolvers(t *testing.T) {
 		assert.Nil(t, err)
 	}
 	for _, r := range netTestsFails {
-		resource := NewResourceData(networkTestTable, nil, r, nil)
+		resource := NewResourceData(PostgresDialect{}, networkTestTable, nil, r, nil, time.Now())
 		err := r1(context.TODO(), nil, resource, Column{Name: "ip"})
 		assert.Error(t, err)
 		err = r2(context.TODO(), nil, resource, Column{Name: "mac"})
@@ -216,7 +218,7 @@ func TestTransformersResolvers(t *testing.T) {
 	r3 := IntResolver("String")
 	r4 := IntResolver("Float")
 	r5 := IntResolver("BadFloat")
-	resource := NewResourceData(TransformersTestTable, nil, testTransformersStruct{Int: 10, Float: 10.2, String: "123", BadFloat: "10,1"}, nil)
+	resource := NewResourceData(PostgresDialect{}, TransformersTestTable, nil, testTransformersStruct{Int: 10, Float: 10.2, String: "123", BadFloat: "10,1"}, nil, time.Now())
 	err := r1(context.TODO(), nil, resource, Column{Name: "int_to_string"})
 	assert.Nil(t, err)
 	assert.Equal(t, resource.Get("int_to_string"), "10")
@@ -254,7 +256,7 @@ type testUUIDStruct struct {
 func TestUUIDResolver(t *testing.T) {
 	r1 := UUIDResolver("UUID")
 	r2 := UUIDResolver("BadUUID")
-	resource := NewResourceData(UUIDTestTable, nil, testUUIDStruct{UUID: "123e4567-e89b-12d3-a456-426614174000", BadUUID: "123e4567-e89b-12d3-a456-4266141740001"}, nil)
+	resource := NewResourceData(PostgresDialect{}, UUIDTestTable, nil, testUUIDStruct{UUID: "123e4567-e89b-12d3-a456-426614174000", BadUUID: "123e4567-e89b-12d3-a456-4266141740001"}, nil, time.Now())
 
 	err := r1(context.TODO(), nil, resource, Column{Name: "uuid"})
 	assert.Nil(t, err)
