@@ -2,6 +2,7 @@ package helpers
 
 import "reflect"
 
+// InterfaceSlice converts any interface{} into a []interface{} slice
 func InterfaceSlice(slice interface{}) []interface{} {
 	// if value is nil return nil
 	if slice == nil {

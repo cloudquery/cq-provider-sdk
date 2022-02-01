@@ -198,7 +198,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 				}
 				defer limiter.Release(1)
 			}
-			resourceCount, diags := tableExec.Resolve(gctx, p.meta, nil)
+			resourceCount, diags := tableExec.Resolve(gctx, p.meta)
 			l.Lock()
 			defer l.Unlock()
 			finishedResources[r] = true

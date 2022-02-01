@@ -8,15 +8,12 @@ import (
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/helpers"
-	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
-	"github.com/modern-go/reflect2"
-
-	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
+	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
+	"github.com/modern-go/reflect2"
 	"github.com/thoas/go-funk"
 )
 
@@ -61,21 +58,11 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 }
 
 // Resolve is the root function of table executor which starts an execution of a Table resolving it, and it's relations.
-func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
-	// if table doesn't define multiplex call normal table resolve
-	if e.Table.Multiplex == nil {
-		return e.callTableResolve(ctx, meta, parent)
+func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uint64, diag.Diagnostics) {
+	if e.Table.Multiplex != nil {
+		return e.doMultiplexResolve(ctx, meta, nil)
 	}
-	// we have multiplex defined, make sure this is a root table, if it is we are allowed to multiplex
-	if parent == nil {
-		return e.doMultiplexResolve(ctx, meta, parent)
-	}
-	// add diagnostic that multiplexing isn't allowed for relational tables and call normal table resolve.
-	var diags diag.Diagnostics
-	meta.Logger().Warn("relation client multiplexing is not allowed, skipping multiplex", "table", e.Table.Name)
-	diags = diags.Add(NewError(diag.WARNING, diag.SCHEMA, e.ResourceName, "multiplex on relation table %s is not allowed, skipping multiplex", e.Table.Name))
-	count, resolveDiags := e.callTableResolve(ctx, meta, parent)
-	return count, diags.Add(resolveDiags)
+	return e.callTableResolve(ctx, meta, nil)
 }
 
 // withTable allows to create a new TableExecutor for received *schema.Table
@@ -89,6 +76,7 @@ func (e TableExecutor) withTable(t *schema.Table) *TableExecutor {
 	}
 }
 
+// doMultiplexResolve resolves table with multiplexed clients appending all diagnostics returned from each multiplex.
 func (e TableExecutor) doMultiplexResolve(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
 	var (
 		clients        []schema.ClientMeta
@@ -121,6 +109,7 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, meta schema.Clien
 	return totalResources, allDiags
 }
 
+// truncateTable cleans up a table from all data based on it's DeleteFilter
 func (e TableExecutor) truncateTable(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
 	if e.Table.DeleteFilter == nil {
 		return nil
@@ -152,6 +141,7 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 	return e.Db.RemoveStaleData(ctx, e.Table, e.executionStart, filters)
 }
 
+// callTableResolve does the actual resolving of the table calling the root table's resolver and for each returned resource resolves its columns and relations.
 func (e TableExecutor) callTableResolve(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
 	// set up all diagnostics to collect from resolving table
 	var diags diag.Diagnostics
@@ -212,6 +202,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 	return nc, diags
 }
 
+// resolveResources resolves a list of resource objects inserting them into the database and resolving their relations based on the table.
 func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, objects []interface{}) (uint64, diag.Diagnostics) {
 	var (
 		resources = make(schema.Resources, 0, len(objects))
@@ -231,7 +222,7 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 
 	// only top level tables should cascade
 	shouldCascade := parent == nil
-	resources, dbDiags := e.copyToStorage(ctx, resources, shouldCascade)
+	resources, dbDiags := e.saveToStorage(ctx, resources, shouldCascade)
 	diags = diags.Add(dbDiags)
 	totalCount := uint64(len(resources))
 
@@ -240,7 +231,7 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 		meta.Logger().Debug("resolving table relation", "table", e.Table.Name, "relation", rel.Name)
 		for _, r := range resources {
 			// ignore relation resource count
-			if _, innerDiags := e.withTable(rel).Resolve(ctx, meta, r); innerDiags.HasDiags() {
+			if _, innerDiags := e.withTable(rel).callTableResolve(ctx, meta, r); innerDiags.HasDiags() {
 				diags = diags.Add(innerDiags)
 			}
 		}
@@ -248,7 +239,9 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 	return totalCount, diags
 }
 
-func (e TableExecutor) copyToStorage(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
+// saveToStorage copies resource data to source, it has ways of inserting, first it tries the most performant CopyFrom if that does work it bulk inserts,
+// finally it inserts each resource separately, appending errors for each failed resource, only successfully inserted resources are returned
+func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
 	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
 	if err == nil {
 		return resources, nil
@@ -277,6 +270,7 @@ func (e TableExecutor) copyToStorage(ctx context.Context, resources schema.Resou
 	return partialFetchResources, diags
 }
 
+// resolveResourceValues does the actual resolve of all the columns of table for said resource.
 func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) (diags diag.Diagnostics) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -307,6 +301,7 @@ func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.Cl
 	return diags
 }
 
+// resolveColumns resolves each column in the table and adds them to the resource.
 func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) diag.Diagnostics {
 	for _, c := range cols {
 		if c.Resolver != nil {
@@ -350,6 +345,7 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 	return nil
 }
 
+// handleResolveError handles errors returned by user defined functions, using the ErrorClassifiers if defined.
 func (e TableExecutor) handleResolveError(meta schema.ClientMeta, err error) diag.Diagnostics {
 	for _, c := range e.classifiers {
 		if diags := c(meta, e.ResourceName, err); diags != nil {

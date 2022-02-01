@@ -105,23 +105,6 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				},
 			},
 			ExpectedResourceCount: 2,
-			ErrorExpected:         true,
-			ExpectedDiags: []diag.FlatDiag{
-				{
-					Err:      "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
-					Resource: "multiplex_relation",
-					Severity: diag.WARNING,
-					Summary:  "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
-					Type:     diag.SCHEMA,
-				},
-				{
-					Err:      "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
-					Resource: "multiplex_relation",
-					Severity: diag.WARNING,
-					Summary:  "multiplex on relation table relation_with_multiplex is not allowed, skipping multiplex",
-					Type:     diag.SCHEMA,
-				},
-			},
 		},
 		{
 			// if tables don't define a resolver, an execution error by execution
@@ -443,12 +426,12 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				storage = tc.SetupStorage(t)
 			}
 			exec := NewTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, tc.ExtraFields, nil)
-			count, diags := exec.Resolve(context.Background(), executionClient, nil)
+			count, diags := exec.Resolve(context.Background(), executionClient)
 			assert.Equal(t, tc.ExpectedResourceCount, count)
 			if tc.ErrorExpected {
 				require.True(t, diags.HasDiags())
 				if tc.ExpectedDiags != nil {
-					assert.Equal(t, tc.ExpectedDiags, diag.FlattenDiags(diags))
+					assert.Equal(t, tc.ExpectedDiags, diag.FlattenDiags(diags, true))
 				}
 			} else {
 				require.Nil(t, diags)
@@ -568,7 +551,7 @@ func TestTableExecutor_resolveResourceValues(t *testing.T) {
 			if tc.ExpectedDiags != nil {
 				require.True(t, diags.HasDiags())
 				if tc.ExpectedDiags != nil {
-					assert.Equal(t, tc.ExpectedDiags, diag.FlattenDiags(diags))
+					assert.Equal(t, tc.ExpectedDiags, diag.FlattenDiags(diags, true))
 				}
 			} else {
 				require.Nil(t, diags)

@@ -424,7 +424,7 @@ func (f *testResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 		}
 		assert.Equal(f.t, r.Error, e.Error)
 		assert.Equal(f.t, e.Summary.Status, r.Summary.Status)
-		assert.Equal(f.t, diag.FlattenDiags(e.Summary.Diagnostics), diag.FlattenDiags(r.Summary.Diagnostics))
+		assert.Equal(f.t, diag.FlattenDiags(e.Summary.Diagnostics, true), diag.FlattenDiags(r.Summary.Diagnostics, true))
 	}
 	return nil
 }
