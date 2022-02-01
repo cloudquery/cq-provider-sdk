@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/cloudquery/cq-provider-sdk/migration/longestcommon"
+	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/hashicorp/go-hclog"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -37,7 +39,7 @@ func NewTableCreator(log hclog.Logger, dialect schema.Dialect) *TableCreator {
 }
 
 // CreateTable generates CREATE TABLE definitions for the given table and runs them on the given conn
-func (m TableCreator) CreateTable(ctx context.Context, conn schema.QueryExecer, t, p *schema.Table) error {
+func (m TableCreator) CreateTable(ctx context.Context, conn execution.QueryExecer, t, p *schema.Table) error {
 	ups, _, err := m.CreateTableDefinitions(ctx, t, p)
 	if err != nil {
 		return err
@@ -134,7 +136,9 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 		dbColTypes[existingColumns.Columns[i]] = strings.ToLower(existingColumns.Types[i])
 	}
 
-	columnsToAdd, columnsToRemove := funk.DifferenceString(m.dialect.Columns(t).Names(), existingColumns.Columns)
+	tableColsWithDialect := m.dialect.Columns(t)
+
+	columnsToAdd, columnsToRemove := funk.DifferenceString(tableColsWithDialect.Names(), existingColumns.Columns)
 	similars := getSimilars(m.dialect, t, columnsToAdd, columnsToRemove, dbColTypes)
 
 	capSize := len(columnsToAdd) + len(columnsToRemove) // relations not included...
@@ -143,9 +147,12 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 
 	for _, d := range columnsToAdd {
 		m.log.Debug("adding column", "column", d)
-		col := t.Column(d)
+		col := tableColsWithDialect.Get(d)
 		if col == nil {
 			m.log.Warn("column missing from table, not adding it", "table", t.Name, "column", d)
+			continue
+		}
+		if col.Internal() {
 			continue
 		}
 
@@ -166,7 +173,9 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 	for _, d := range columnsToRemove {
 		m.log.Debug("removing column", "column", d)
 		if col := t.Column(d); col != nil {
-			m.log.Warn("column still in table, not removing it", "table", t.Name, "column", d)
+			if !col.Internal() {
+				m.log.Warn("column still in table, not removing it", "table", t.Name, "column", d)
+			}
 			continue
 		}
 
