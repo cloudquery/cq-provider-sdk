@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
@@ -23,4 +24,6 @@ type Storage interface {
 type QueryExecer interface {
 	pgxscan.Querier
 	Exec(ctx context.Context, query string, args ...interface{}) error
+	RawCopyTo(ctx context.Context, w io.Writer, sql string) error
+	RawCopyFrom(ctx context.Context, r io.Reader, sql string) error
 }
