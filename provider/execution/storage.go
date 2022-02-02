@@ -9,7 +9,7 @@ import (
 	"github.com/georgysavva/scany/pgxscan"
 )
 
-//go:generate mockgen -package=mock -destination=./mock/mock_storage.go . Storage
+//go:generate mockgen -package=mock -destination=../schema/mock/mock_storage.go . Storage
 type Storage interface {
 	QueryExecer
 
