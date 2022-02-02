@@ -24,7 +24,6 @@ type Storage interface {
 type QueryExecer interface {
 	pgxscan.Querier
 	Exec(ctx context.Context, query string, args ...interface{}) error
-	Copier
 }
 
 type Copier interface {
