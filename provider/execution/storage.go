@@ -24,6 +24,10 @@ type Storage interface {
 type QueryExecer interface {
 	pgxscan.Querier
 	Exec(ctx context.Context, query string, args ...interface{}) error
+	Copier
+}
+
+type Copier interface {
 	RawCopyTo(ctx context.Context, w io.Writer, sql string) error
 	RawCopyFrom(ctx context.Context, r io.Reader, sql string) error
 }
