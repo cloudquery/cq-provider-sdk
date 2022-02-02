@@ -331,13 +331,14 @@ func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
 			Resource: p.Description().Resource,
 		}
 		if rd, ok := p.(diag.Redactable); ok {
-			r := rd.Redacted()
-			diagnostics[i].Redacted = &internal.Diagnostic{
-				Type:     internal.Diagnostic_Type(r.Type()),
-				Severity: internal.Diagnostic_Severity(r.Severity()),
-				Summary:  r.Description().Summary,
-				Detail:   r.Description().Detail,
-				Resource: r.Description().Resource,
+			if r := rd.Redacted(); r != nil {
+				diagnostics[i].Redacted = &internal.Diagnostic{
+					Type:     internal.Diagnostic_Type(r.Type()),
+					Severity: internal.Diagnostic_Severity(r.Severity()),
+					Summary:  r.Description().Summary,
+					Detail:   r.Description().Detail,
+					Resource: r.Description().Resource,
+				}
 			}
 		}
 	}
