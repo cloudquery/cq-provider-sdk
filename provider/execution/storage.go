@@ -12,7 +12,7 @@ import (
 //go:generate mockgen -package=mock -destination=../schema/mock/mock_storage.go . Storage
 type Storage interface {
 	QueryExecer
-
+	Copier
 	Insert(ctx context.Context, t *schema.Table, instance schema.Resources) error
 	Delete(ctx context.Context, t *schema.Table, kvFilters []interface{}) error
 	RemoveStaleData(ctx context.Context, t *schema.Table, executionStart time.Time, kvFilters []interface{}) error
