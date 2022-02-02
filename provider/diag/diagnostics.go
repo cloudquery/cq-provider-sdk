@@ -94,7 +94,7 @@ func (diags Diagnostics) Squash() Diagnostics {
 	for _, d := range diags {
 		key := fmt.Sprintf("%s_%s_%d_%d", d.Error(), d.Description().Resource, d.Severity(), d.Type())
 		if sd, ok := dd[key]; ok {
-			sd.Count += 1
+			sd.Count++
 			continue
 		}
 		nsd := &SquashedDiag{
