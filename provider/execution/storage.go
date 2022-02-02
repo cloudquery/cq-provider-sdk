@@ -30,8 +30,3 @@ type Copier interface {
 	RawCopyTo(ctx context.Context, w io.Writer, sql string) error
 	RawCopyFrom(ctx context.Context, r io.Reader, sql string) error
 }
-
-type LowLevelQueryExecer interface {
-	Copier
-	QueryExecer
-}
