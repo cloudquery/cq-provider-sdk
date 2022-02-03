@@ -50,7 +50,7 @@ func RunMigrationsTestWithNewDB(t *testing.T, dbDSN string, newDBName string, pr
 	newDSN := u.String()
 	t.Log(newDSN)
 
-	doMigrationsTest(t, context.Background(), newDSN, prov, additionalVersionsToTest)
+	doMigrationsTest(t, ctx, newDSN, prov, additionalVersionsToTest)
 }
 
 func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provider.Provider, additionalVersionsToTest []string) {
