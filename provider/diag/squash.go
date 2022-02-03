@@ -1,6 +1,9 @@
 package diag
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type SquashedDiag struct {
 	Diagnostic
@@ -9,13 +12,16 @@ type SquashedDiag struct {
 
 func (s SquashedDiag) Description() Description {
 	description := s.Diagnostic.Description()
-	if s.count == 1 {
-		return description
-	}
-	if description.Detail == "" {
+
+	switch {
+	case s.count == 1:
+		// no-op
+	case description.Detail == "":
 		description.Detail = fmt.Sprintf("Repeated[%d]", s.count)
-	} else {
-		description.Detail = fmt.Sprintf("Repeated[%d]: %s", s.count, description.Detail)
+	case strings.HasSuffix(description.Detail, "."):
+		description.Detail = fmt.Sprintf("%s [Repeated:%d]", description.Detail, s.count)
+	default:
+		description.Detail = fmt.Sprintf("%s. [Repeated:%d]", description.Detail, s.count)
 	}
 
 	return description
