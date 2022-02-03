@@ -36,7 +36,7 @@ func GenerateDiff(ctx context.Context, logger hclog.Logger, conn *pgxpool.Conn, 
 		return err
 	}
 
-	err = generateDiffForDialect(ctx, logger, afero.Afero{afero.OsFs{}}, conn, schemaName, dialect, p, filepath.Join(outputPath, dialectType.MigrationDirectory()), prefix)
+	err = generateDiffForDialect(ctx, logger, afero.Afero{Fs: afero.OsFs{}}, conn, schemaName, dialect, p, filepath.Join(outputPath, dialectType.MigrationDirectory()), prefix)
 	if err == errNoChange {
 		return nil
 	}

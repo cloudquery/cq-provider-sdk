@@ -106,7 +106,7 @@ func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 		}
 		assert.NoError(t, err)
 
-		fs := afero.Afero{afero.NewMemMapFs()}
+		fs := afero.Afero{Fs: afero.NewMemMapFs()}
 		dialectType, err := schema.GetDialect(dialect)
 		assert.NoError(t, err)
 
