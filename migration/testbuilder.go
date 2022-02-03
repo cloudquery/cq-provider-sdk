@@ -100,25 +100,20 @@ func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 
 	// Go to latest again and check if we have missing migrations
 	{
-		err := mig.UpgradeProvider(migrator.Latest)
-		if err == migrate.ErrNoChange {
-			err = nil
+		if err := mig.UpgradeProvider(migrator.Latest); err != migrate.ErrNoChange {
+			assert.NoError(t, err)
 		}
-		assert.NoError(t, err)
 
 		fs := afero.Afero{Fs: afero.NewMemMapFs()}
 		dialectType, err := schema.GetDialect(dialect)
 		assert.NoError(t, err)
 
-		err = generateDiffForDialect(ctx, hclog.NewNullLogger(), fs, conn, "public", dialectType, prov, "/", "")
-		if err != errNoChange {
-			if err != nil {
-				assert.NoError(t, err)
-			} else {
-				mig, err := fs.ReadFile("/up.sql")
-				assert.NoError(t, err)
-				assert.Empty(t, string(mig), "Found missing migrations")
-			}
+		if err := generateDiffForDialect(ctx, hclog.NewNullLogger(), fs, conn, "public", dialectType, prov, "/", ""); err != errNoChange {
+			assert.NoError(t, err)
+
+			mig, err := fs.ReadFile("/up.sql")
+			assert.NoError(t, err)
+			assert.Empty(t, string(mig), "Found missing migrations")
 		}
 	}
 
