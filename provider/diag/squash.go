@@ -11,11 +11,11 @@ type SquashedDiag struct {
 }
 
 func (s SquashedDiag) Description() Description {
-	if _, ok := s.Diagnostic.(Countable); ok { // already squashed, don't add repeat count
-		return s.Diagnostic.Description()
-	}
-
 	description := s.Diagnostic.Description()
+
+	if _, ok := s.Diagnostic.(Countable); ok { // already squashed, don't add repeat count
+		return description
+	}
 
 	switch {
 	case s.count == 1:
