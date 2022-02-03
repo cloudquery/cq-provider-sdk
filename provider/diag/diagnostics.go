@@ -94,12 +94,12 @@ func (diags Diagnostics) Squash() Diagnostics {
 	for _, d := range diags {
 		key := fmt.Sprintf("%s_%s_%d_%d", d.Error(), d.Description().Resource, d.Severity(), d.Type())
 		if sd, ok := dd[key]; ok {
-			sd.Count++
+			sd.count += CountDiag(d)
 			continue
 		}
 		nsd := &SquashedDiag{
 			Diagnostic: d,
-			Count:      1,
+			count:      CountDiag(d),
 		}
 		dd[key] = nsd
 		sdd = append(sdd, nsd)
@@ -108,23 +108,22 @@ func (diags Diagnostics) Squash() Diagnostics {
 }
 
 func (diags Diagnostics) Warnings() uint64 {
-	var warningsCount uint64 = 0
-	for _, d := range diags {
-		if d.Severity() == WARNING {
-			warningsCount++
-		}
-	}
-	return warningsCount
+	return diags.CountBySeverity(WARNING)
 }
 
 func (diags Diagnostics) Errors() uint64 {
-	var errorCount uint64 = 0
+	return diags.CountBySeverity(ERROR)
+}
+
+func (diags Diagnostics) CountBySeverity(sev Severity) uint64 {
+	var count uint64 = 0
+
 	for _, d := range diags {
-		if d.Severity() == ERROR {
-			errorCount++
+		if d.Severity() == sev {
+			count += CountDiag(d)
 		}
 	}
-	return errorCount
+	return count
 }
 
 func (diags Diagnostics) Len() int      { return len(diags) }
