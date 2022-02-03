@@ -33,8 +33,8 @@ type ResourceTestCase struct {
 }
 
 func init() {
-	faker.SetRandomMapAndSliceMinSize(1)
-	faker.SetRandomMapAndSliceMaxSize(1)
+	_ = faker.SetRandomMapAndSliceMinSize(1)
+	_ = faker.SetRandomMapAndSliceMaxSize(1)
 }
 
 // IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
