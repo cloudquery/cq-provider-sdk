@@ -227,6 +227,9 @@ func (m *Migrator) DropProvider(ctx context.Context, schema map[string]*schema.T
 			return err
 		}
 	}
+
+	_, _ = m.m.Close()
+
 	newM, err := migrate.NewWithSourceInstance(m.provider, m.driver, m.migratorUrl.String())
 	if err != nil {
 		return err

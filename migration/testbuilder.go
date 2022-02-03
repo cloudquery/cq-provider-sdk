@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cloudquery/cq-provider-sdk/database"
+	"github.com/cloudquery/cq-provider-sdk/database/dsn"
 	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
 	"github.com/cloudquery/cq-provider-sdk/provider"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
@@ -24,6 +25,32 @@ func RunMigrationsTest(t *testing.T, prov *provider.Provider, additionalVersions
 	}
 
 	doMigrationsTest(t, context.Background(), dsn, prov, additionalVersionsToTest)
+}
+
+func RunMigrationsTestWithNewDB(t *testing.T, dbDSN string, newDBName string, prov *provider.Provider, additionalVersionsToTest []string) {
+	ctx := context.Background()
+	pool, _, err := connect(ctx, dbDSN)
+	assert.NoError(t, err)
+
+	_, err = pool.Exec(ctx, "CREATE DATABASE "+newDBName)
+	assert.NoError(t, err)
+	if t.Failed() {
+		t.FailNow()
+	}
+
+	defer func() {
+		if _, err := pool.Exec(ctx, "DROP DATABASE "+newDBName); err != nil {
+			t.Logf("DROP DATABASE failed: %v", err)
+		}
+	}()
+
+	u, err := dsn.ParseConnectionString(dbDSN)
+	assert.NoError(t, err)
+	u.Path = "/" + newDBName
+	newDSN := u.String()
+	t.Log(newDSN)
+
+	doMigrationsTest(t, context.Background(), newDSN, prov, additionalVersionsToTest)
 }
 
 func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provider.Provider, additionalVersionsToTest []string) {
@@ -56,6 +83,7 @@ func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 
 	pool, _, err := connect(ctx, dsn)
 	assert.NoError(t, err)
+	defer pool.Close()
 
 	dialect, dsn, err = database.ParseDialectDSN(dsn)
 	assert.Nil(t, err)
@@ -81,6 +109,7 @@ func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 
 	mig, err := migrator.New(hclog.L(), dialect, migFiles, dsn, prov.Name, nil)
 	assert.NoError(t, err)
+	defer mig.Close()
 
 	// clean up first... just as a precaution
 	assert.NoError(t, mig.DropProvider(ctx, prov.ResourceMap))
