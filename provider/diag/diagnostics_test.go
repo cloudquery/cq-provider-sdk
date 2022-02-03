@@ -138,7 +138,67 @@ func TestDiagnostics_Squash(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			assert.Equal(t, tc.Want, FlattenDiags(tc.Value.Squash(), false))
+			sq := tc.Value.Squash()
+			assert.Equal(t, tc.Want, FlattenDiags(sq, false))
+			assert.Equal(t, tc.Want, FlattenDiags(sq.Squash(), false)) // double squash, should still work
 		})
 	}
+}
+
+func TestDiagnostics_SquashRedactable(t *testing.T) {
+	input := Diagnostics{
+		NewRedactedDiagnostic(
+			NewBaseError(errors.New("error test: 123"), ERROR, RESOLVING, "a", "some summary: 123", ""),
+			NewBaseError(errors.New("error test: xxx"), ERROR, RESOLVING, "a", "some summary: xxx", ""),
+		),
+		NewRedactedDiagnostic(
+			NewBaseError(errors.New("error test: 123"), ERROR, RESOLVING, "a", "some summary: 123", ""),
+			NewBaseError(errors.New("error test: xxx"), ERROR, RESOLVING, "a", "some summary: xxx", ""),
+		),
+	}
+	out := input.Squash()
+
+	assert.Equal(t, []FlatDiag{
+		{
+			Err:      "error test: 123",
+			Resource: "a",
+			Type:     RESOLVING,
+			Severity: ERROR,
+			Summary:  "some summary: 123",
+			Description: Description{
+				Resource: "a",
+				Summary:  "some summary: 123",
+				Detail:   "[Repeated:2]",
+			},
+		},
+	}, FlattenDiags(out, false))
+
+	assert.Len(t, out, 1)
+
+	rd, ok := out[0].(Redactable)
+	assert.True(t, ok)
+	assert.NotNil(t, rd)
+
+	if t.Failed() {
+		t.FailNow()
+	}
+
+	r := rd.Redacted()
+	assert.NotNil(t, r)
+
+	assert.Equal(t, []FlatDiag{
+		{
+			Err:      "error test: xxx",
+			Resource: "a",
+			Type:     RESOLVING,
+			Severity: ERROR,
+			Summary:  "some summary: xxx",
+			Description: Description{
+				Resource: "a",
+				Summary:  "some summary: xxx",
+				Detail:   "[Repeated:2]",
+			},
+		},
+	}, FlattenDiags(Diagnostics{r}, false))
+
 }

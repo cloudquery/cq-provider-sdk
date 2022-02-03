@@ -11,6 +11,10 @@ type SquashedDiag struct {
 }
 
 func (s SquashedDiag) Description() Description {
+	if _, ok := s.Diagnostic.(Countable); ok { // already squashed, don't add repeat count
+		return s.Diagnostic.Description()
+	}
+
 	description := s.Diagnostic.Description()
 
 	switch {
@@ -29,6 +33,23 @@ func (s SquashedDiag) Description() Description {
 
 func (s SquashedDiag) Count() uint64 {
 	return s.count
+}
+
+func (s SquashedDiag) Redacted() Diagnostic {
+	rd, ok := s.Diagnostic.(Redactable)
+	if !ok {
+		return nil
+	}
+
+	r := rd.Redacted()
+	if r == nil {
+		return nil
+	}
+
+	return SquashedDiag{
+		Diagnostic: r,
+		count:      s.count,
+	}
 }
 
 type Countable interface {

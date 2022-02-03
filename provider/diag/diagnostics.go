@@ -91,7 +91,7 @@ func (diags Diagnostics) Add(new ...interface{}) Diagnostics {
 func (diags Diagnostics) Squash() Diagnostics {
 	dd := make(map[string]*SquashedDiag, len(diags))
 	sdd := make(Diagnostics, 0)
-	for _, d := range diags {
+	for i, d := range diags {
 		keygen := d
 		if rd, ok := d.(Redactable); ok {
 			if r := rd.Redacted(); r != nil {
@@ -105,7 +105,7 @@ func (diags Diagnostics) Squash() Diagnostics {
 			continue
 		}
 		nsd := &SquashedDiag{
-			Diagnostic: d,
+			Diagnostic: diags[i],
 			count:      CountDiag(d),
 		}
 		dd[key] = nsd
