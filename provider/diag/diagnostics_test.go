@@ -29,7 +29,7 @@ func TestDiagnostics_Squash(t *testing.T) {
 					Description: Description{
 						Resource: "a",
 						Summary:  "some summary",
-						Detail:   "Repeated[2]",
+						Detail:   "[Repeated:2]",
 					},
 				},
 			},
@@ -39,6 +39,8 @@ func TestDiagnostics_Squash(t *testing.T) {
 			Value: Diagnostics{
 				NewBaseError(errors.New("error test"), ERROR, RESOLVING, "a", "some summary", "some details"),
 				NewBaseError(errors.New("error test"), ERROR, RESOLVING, "a", "some summary", "some details"),
+				NewBaseError(errors.New("error test2"), ERROR, RESOLVING, "a", "some summary2", "some details2."),
+				NewBaseError(errors.New("error test2"), ERROR, RESOLVING, "a", "some summary2", "some details2."),
 			},
 			Want: []FlatDiag{
 				{
@@ -50,7 +52,19 @@ func TestDiagnostics_Squash(t *testing.T) {
 					Description: Description{
 						Resource: "a",
 						Summary:  "some summary",
-						Detail:   "Repeated[2]: some details",
+						Detail:   "some details. [Repeated:2]",
+					},
+				},
+				{
+					Err:      "error test2",
+					Resource: "a",
+					Type:     RESOLVING,
+					Severity: ERROR,
+					Summary:  "some summary2",
+					Description: Description{
+						Resource: "a",
+						Summary:  "some summary2",
+						Detail:   "some details2. [Repeated:2]",
 					},
 				},
 			},

@@ -92,7 +92,14 @@ func (diags Diagnostics) Squash() Diagnostics {
 	dd := make(map[string]*SquashedDiag, len(diags))
 	sdd := make(Diagnostics, 0)
 	for _, d := range diags {
-		key := fmt.Sprintf("%s_%s_%d_%d", d.Error(), d.Description().Resource, d.Severity(), d.Type())
+		keygen := d
+		if rd, ok := d.(Redactable); ok {
+			if r := rd.Redacted(); r != nil {
+				keygen = r
+			}
+		}
+
+		key := fmt.Sprintf("%s_%s_%d_%d", keygen.Error(), keygen.Description().Resource, keygen.Severity(), keygen.Type())
 		if sd, ok := dd[key]; ok {
 			sd.count += CountDiag(d)
 			continue

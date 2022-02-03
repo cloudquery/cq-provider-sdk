@@ -17,7 +17,7 @@ func (s SquashedDiag) Description() Description {
 	case s.count == 1:
 		// no-op
 	case description.Detail == "":
-		description.Detail = fmt.Sprintf("Repeated[%d]", s.count)
+		description.Detail = fmt.Sprintf("[Repeated:%d]", s.count)
 	case strings.HasSuffix(description.Detail, "."):
 		description.Detail = fmt.Sprintf("%s [Repeated:%d]", description.Detail, s.count)
 	default:
