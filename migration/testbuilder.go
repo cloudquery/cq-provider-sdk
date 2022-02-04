@@ -11,6 +11,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/hashicorp/go-hclog"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -53,29 +54,27 @@ func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 				$BODY$;`
 	)
 
-	t.Run("Setup", func(t *testing.T) {
-		pool, _, err := connect(ctx, dsn)
-		assert.NoError(t, err)
+	pool, _, err := connect(ctx, dsn)
+	assert.NoError(t, err)
 
-		dialect, dsn, err = database.ParseDialectDSN(dsn)
-		assert.Nil(t, err)
+	dialect, dsn, err = database.ParseDialectDSN(dsn)
+	assert.Nil(t, err)
 
-		conn, err := pool.Acquire(ctx)
-		assert.NoError(t, err)
-		defer conn.Release()
+	conn, err := pool.Acquire(ctx)
+	assert.NoError(t, err)
+	defer conn.Release()
 
-		if dialect == schema.TSDB {
-			// mock history functions... in the default schema
-			for _, sql := range []string{
-				setupTSDBChildFnMock,
-				setupTSDBParentFnMock,
-			} {
-				_, err := conn.Exec(ctx, sql)
-				assert.NoError(t, err)
-			}
+	if dialect == schema.TSDB {
+		// mock history functions... in the default schema
+		for _, sql := range []string{
+			setupTSDBChildFnMock,
+			setupTSDBParentFnMock,
+		} {
+			_, err := conn.Exec(ctx, sql)
+			assert.NoError(t, err)
 		}
-		assert.NoError(t, err)
-	})
+	}
+	assert.NoError(t, err)
 
 	migFiles, err := migrator.ReadMigrationFiles(hclog.L(), prov.Migrations)
 	assert.NoError(t, err)
@@ -86,28 +85,37 @@ func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 	// clean up first... just as a precaution
 	assert.NoError(t, mig.DropProvider(ctx, prov.ResourceMap))
 
-	t.Run("Up", func(t *testing.T) {
-		assert.NoError(t, mig.UpgradeProvider(migrator.Latest))
-	})
-	t.Run("DowngradeToOldest", func(t *testing.T) {
-		err := mig.DowngradeProvider(migrator.Initial)
-		if err == migrate.ErrNoChange {
-			err = nil
-		}
-		assert.NoError(t, err)
-	})
-	t.Run("Down", func(t *testing.T) {
-		assert.NoError(t, mig.DowngradeProvider(migrator.Down))
-	})
+	assert.NoError(t, mig.UpgradeProvider(migrator.Latest))
+	err = mig.DowngradeProvider(migrator.Initial)
+	if err == migrate.ErrNoChange {
+		err = nil
+	}
+	assert.NoError(t, err)
+	assert.NoError(t, mig.DowngradeProvider(migrator.Down))
 
 	// Run user supplied versions
 	for _, v := range additionalVersionsToTest {
-		t.Run("Version "+v, func(t *testing.T) {
-			assert.NoError(t, mig.UpgradeProvider(v))
-		})
+		assert.NoError(t, mig.UpgradeProvider(v))
 	}
 
-	t.Run("Drop", func(t *testing.T) {
-		assert.NoError(t, mig.DropProvider(ctx, prov.ResourceMap))
-	})
+	// Go to latest again and check if we have missing migrations
+	{
+		if err := mig.UpgradeProvider(migrator.Latest); err != migrate.ErrNoChange {
+			assert.NoError(t, err)
+		}
+
+		fs := afero.Afero{Fs: afero.NewMemMapFs()}
+		dialectType, err := schema.GetDialect(dialect)
+		assert.NoError(t, err)
+
+		if err := generateDiffForDialect(ctx, hclog.NewNullLogger(), fs, conn, "public", dialectType, prov, "/", ""); err != errNoChange {
+			assert.NoError(t, err)
+
+			mig, err := fs.ReadFile("/up.sql")
+			assert.NoError(t, err)
+			assert.Empty(t, string(mig), "Found missing migrations")
+		}
+	}
+
+	assert.NoError(t, mig.DropProvider(ctx, prov.ResourceMap))
 }
