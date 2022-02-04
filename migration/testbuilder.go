@@ -18,13 +18,13 @@ import (
 
 // RunMigrationsTest helper tests the migration files of the provider using the database (and dialect) specified in CQ_MIGRATION_TEST_DSN
 func RunMigrationsTest(t *testing.T, prov *provider.Provider, additionalVersionsToTest []string) {
-	dsn := os.Getenv("CQ_MIGRATION_TEST_DSN")
-	if dsn == "" {
+	dbDSN := os.Getenv("CQ_MIGRATION_TEST_DSN")
+	if dbDSN == "" {
 		t.Skip("CQ_MIGRATION_TEST_DSN not set")
 		return
 	}
 
-	doMigrationsTest(t, context.Background(), dsn, prov, additionalVersionsToTest)
+	doMigrationsTest(t, context.Background(), dbDSN, prov, additionalVersionsToTest)
 }
 
 func RunMigrationsTestWithNewDB(t *testing.T, dbDSN string, newDBName string, prov *provider.Provider, additionalVersionsToTest []string) {
@@ -48,7 +48,6 @@ func RunMigrationsTestWithNewDB(t *testing.T, dbDSN string, newDBName string, pr
 	assert.NoError(t, err)
 	u.Path = "/" + newDBName
 	newDSN := u.String()
-	t.Log(newDSN)
 
 	doMigrationsTest(t, ctx, newDSN, prov, additionalVersionsToTest)
 }
