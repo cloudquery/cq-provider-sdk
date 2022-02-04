@@ -159,6 +159,10 @@ func (m *Migrator) callPostHook(ctx context.Context) error {
 }
 
 func (m *Migrator) Close() error {
+	if m.m == nil {
+		return nil
+	}
+
 	_, dbErr := m.m.Close()
 	return dbErr
 }
