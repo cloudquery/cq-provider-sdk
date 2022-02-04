@@ -66,8 +66,7 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 // Resolve is the root function of table executor which starts an execution of a Table resolving it, and it's relations.
 func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uint64, diag.Diagnostics) {
 	if e.Table.Multiplex != nil {
-		clients := e.Table.Multiplex(meta)
-		if len(clients) > 0 {
+		if clients := e.Table.Multiplex(meta); len(clients) > 0 {
 			return e.doMultiplexResolve(ctx, clients, nil)
 		}
 	}
