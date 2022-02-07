@@ -40,12 +40,12 @@ type TableExecutor struct {
 	executionStart time.Time
 	// columns of table, this is to reduce calls to sift each time
 	columns [2]schema.ColumnList
-	// limiter to limit number of goroutines (resources fetched) concurrently
-	limiter *semaphore.Weighted
+	// goroutinesSem to limit number of goroutines (resources fetched) concurrently
+	goroutinesSem *semaphore.Weighted
 }
 
 // NewTableExecutor creates a new TableExecutor for given schema.Table
-func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields map[string]interface{}, classifier ErrorClassifier, limiter *semaphore.Weighted) TableExecutor {
+func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted) TableExecutor {
 
 	var classifiers = []ErrorClassifier{defaultErrorClassifier}
 	if classifier != nil {
@@ -63,7 +63,7 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 		classifiers:    classifiers,
 		executionStart: time.Now().Add(executionJitter),
 		columns:        c,
-		limiter:        limiter,
+		goroutinesSem:  goroutinesSem,
 	}
 }
 
@@ -90,7 +90,7 @@ func (e TableExecutor) withTable(t *schema.Table) *TableExecutor {
 		extraFields:    e.extraFields,
 		executionStart: e.executionStart,
 		columns:        c,
-		limiter:        e.limiter,
+		goroutinesSem:  e.goroutinesSem,
 	}
 }
 
@@ -110,13 +110,13 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	for _, client := range clients {
 		// we can only limit on a granularity of a top table otherwise we can get deadlock
 		if parent == nil {
-			if err := e.limiter.Acquire(ctx, 1); err != nil {
+			if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
 				return totalResources, allDiags.Add(FromError(err, WithResource(e.ResourceName), WithErrorClassifier))
 			}
 		}
 		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics) {
 			if parent == nil {
-				defer e.limiter.Release(1)
+				defer e.goroutinesSem.Release(1)
 			}
 			count, resolveDiags := e.callTableResolve(ctx, c, parent)
 			atomic.AddUint64(&totalResources, count)
@@ -184,7 +184,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 	res := make(chan interface{})
 	var resolverErr error
 
-	// we are using semaphore limiter here as it's just a +1 goroutine and it might get us deadlocked
+	// we are not using goroutinesSem semaphore here as it's just a +1 goroutine and it might get us deadlocked
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
