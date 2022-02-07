@@ -171,7 +171,11 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 
 	// limiter used to limit the amount of resources fetched concurrently
 	var limiter *semaphore.Weighted
-	if request.ParallelFetchingLimit > 0 {
+	if request.ParallelFetchingLimit == 0 {
+		// TODO: I don't like this conversion to int64
+		limiter = semaphore.NewWeighted(int64(helpers.GetMaxGoRoutines()))
+	} else {
+		// TODO: I don't like this conversion to int64
 		limiter = semaphore.NewWeighted(int64(request.ParallelFetchingLimit))
 	}
 
@@ -184,7 +188,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		tableExec := execution.NewTableExecutor(resource, conn, p.Logger, table, p.extraFields, p.ErrorClassifier)
+		tableExec := execution.NewTableExecutor(resource, conn, p.Logger, table, p.extraFields, p.ErrorClassifier, limiter)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource
@@ -192,12 +196,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		finishedResources[r] = false
 		l.Unlock()
 		g.Go(func() error {
-			if limiter != nil {
-				if err := limiter.Acquire(gctx, 1); err != nil {
-					return err
-				}
-				defer limiter.Release(1)
-			}
 			resourceCount, diags := tableExec.Resolve(gctx, p.meta)
 			l.Lock()
 			defer l.Unlock()
