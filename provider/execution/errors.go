@@ -37,6 +37,9 @@ type Error struct {
 	// Resource indicates the resource that failed in the execution
 	resource string
 
+	// ResourceId indicates the id of the resource that failed in the execution
+	resourceId string
+
 	// Severity indicates the level of the Diagnostic. Currently, can be set to
 	// either Error/Warning/Ignore
 	severity diag.Severity
@@ -73,9 +76,10 @@ func (e Error) Severity() diag.Severity {
 
 func (e Error) Description() diag.Description {
 	return diag.Description{
-		Resource: e.resource,
-		Summary:  e.summary,
-		Detail:   e.detail,
+		Resource:   e.resource,
+		ResourceID: e.resourceId,
+		Summary:    e.summary,
+		Detail:     e.detail,
 	}
 }
 
@@ -89,6 +93,15 @@ func (e Error) Error() string {
 		return e.err.Error()
 	}
 	return e.summary
+}
+
+func (e Error) Apply(opts ...Option) Error {
+	for _, o := range opts {
+		if o != nil {
+			o(&e)
+		}
+	}
+	return e
 }
 
 type Option func(e *Error)
@@ -117,6 +130,12 @@ func WithResource(resource string) Option {
 	}
 }
 
+func WithResourceID(id string) Option {
+	return func(e *Error) {
+		e.resourceId = id
+	}
+}
+
 func WithDetails(detail string) Option {
 	return func(e *Error) {
 		e.detail = detail
@@ -139,14 +158,20 @@ func FromError(err error, opts ...Option) diag.Diagnostics {
 	case diag.Diagnostics:
 		return ti
 	default:
-		e := &Error{
+		e := Error{
 			err:            err,
 			severity:       diag.ERROR,
 			diagnosticType: diag.RESOLVING,
 		}
-		for _, o := range opts {
-			o(e)
+		if ri, ok := err.(resourceIDer); ok {
+			e = e.Apply(WithResourceID(ri.ResourceID()))
 		}
+		e = e.Apply(opts...)
+
 		return diag.Diagnostics{e}
 	}
+}
+
+type resourceIDer interface {
+	ResourceID() string
 }

@@ -2,8 +2,10 @@ package execution
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -194,9 +196,9 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
 				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-				err = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table[%s] resolver ignored error. Error: %s", e.Table.Name, err)
+				err = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table[%s] resolver ignored error. Error: %s", e.Table.Name, wrapResourceId(parent, err))
 			}
-			resolverErr = e.handleResolveError(client, err)
+			resolverErr = e.handleResolveError(client, wrapResourceId(parent, err))
 		}
 	}()
 
@@ -310,13 +312,13 @@ func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.Cl
 	// call PostRowResolver if defined after columns have been resolved
 	if e.Table.PostResourceResolver != nil {
 		if err := e.Table.PostResourceResolver(ctx, meta, resource); err != nil {
-			return e.handleResolveError(meta, err, WithSummary("post resource resolver failed for \"%s\"", e.Table.Name))
+			return e.handleResolveError(meta, wrapResourceId(resource, err), WithSummary("post resource resolver failed for \"%s\"", e.Table.Name))
 		}
 	}
 	// Finally, resolve columns internal to the SDK
 	for _, c := range e.columns[1] {
 		if err := c.Resolver(ctx, meta, resource, c); err != nil {
-			return FromError(err, WithResource(e.ResourceName), WithType(diag.INTERNAL), WithSummary("default column %s resolver execution", c.Name))
+			return FromError(wrapResourceId(resource, err), WithResource(e.ResourceName), WithType(diag.INTERNAL), WithSummary("default column %s resolver execution", c.Name))
 		}
 	}
 	return diags
@@ -376,4 +378,42 @@ func (e TableExecutor) handleResolveError(meta schema.ClientMeta, err error, opt
 	opts = append([]Option{WithResource(e.ResourceName), WithSeverity(diag.ERROR), WithType(diag.RESOLVING),
 		WithSummary("failed to resolve table \"%s\"", e.Table.Name)}, opts...)
 	return FromError(err, opts...)
+}
+
+func wrapResourceId(r *schema.Resource, err error) error {
+	if r == nil {
+		return err
+	}
+
+	// don't double wrap
+	var prev *errorWithResourceId
+	if errors.As(err, &prev) {
+		return err
+	}
+
+	return &errorWithResourceId{
+		err:        err,
+		resourceId: r.PrimaryKeyValues(),
+	}
+}
+
+type errorWithResourceId struct {
+	err        error
+	resourceId []string
+}
+
+func (e *errorWithResourceId) Error() string {
+	return e.err.Error()
+}
+
+func (e *errorWithResourceId) Unwrap() error {
+	return e.err
+}
+
+func (e *errorWithResourceId) ResourceID() string {
+	return strings.Join(e.resourceId, ",")
+}
+
+func (e *errorWithResourceId) ResourceIDs() []string {
+	return e.resourceId
 }

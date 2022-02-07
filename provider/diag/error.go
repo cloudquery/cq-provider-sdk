@@ -8,6 +8,9 @@ type BaseError struct {
 	// Resource indicates the resource that failed in the execution
 	resource string
 
+	// ResourceId indicates the id of the resource that failed in the execution
+	resourceId string
+
 	// Severity indicates the level of the Diagnostic. Currently, can be set to
 	// either Error/Warning/Ignore
 	severity Severity
@@ -45,6 +48,7 @@ func (e BaseError) Description() Description {
 	}
 	return Description{
 		e.resource,
+		e.resourceId,
 		summary,
 		e.detail,
 	}
