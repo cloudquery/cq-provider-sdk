@@ -328,11 +328,12 @@ func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
 	diagnostics := make([]*internal.Diagnostic, len(in))
 	for i, p := range in {
 		diagnostics[i] = &internal.Diagnostic{
-			Type:     internal.Diagnostic_Type(p.Type()),
-			Severity: internal.Diagnostic_Severity(p.Severity()),
-			Summary:  p.Description().Summary,
-			Detail:   p.Description().Detail,
-			Resource: p.Description().Resource,
+			Type:       internal.Diagnostic_Type(p.Type()),
+			Severity:   internal.Diagnostic_Severity(p.Severity()),
+			Summary:    p.Description().Summary,
+			Detail:     p.Description().Detail,
+			Resource:   p.Description().Resource,
+			ResourceId: p.Description().ResourceID,
 		}
 		if rd, ok := p.(diag.Redactable); ok {
 			if r := rd.Redacted(); r != nil {
@@ -342,6 +343,7 @@ func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
 					Summary:  r.Description().Summary,
 					Detail:   r.Description().Detail,
 					Resource: r.Description().Resource,
+					//ResourceId: p.Description().ResourceID,
 				}
 			}
 		}
@@ -357,6 +359,7 @@ func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.D
 	for i, p := range in {
 		pdiag := &ProviderDiagnostic{
 			ResourceName:       resourceName,
+			ResourceId:         p.GetResourceId(),
 			DiagnosticType:     diag.DiagnosticType(p.GetType()),
 			DiagnosticSeverity: diag.Severity(p.GetSeverity()),
 			Summary:            p.GetSummary(),
@@ -364,7 +367,8 @@ func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.D
 		}
 		if r := p.GetRedacted(); r != nil {
 			diagnostics[i] = diag.NewRedactedDiagnostic(pdiag, &ProviderDiagnostic{
-				ResourceName:       resourceName,
+				ResourceName: resourceName,
+				//ResourceId:         p.GetResourceId(),
 				DiagnosticType:     diag.DiagnosticType(r.GetType()),
 				DiagnosticSeverity: diag.Severity(r.GetSeverity()),
 				Summary:            r.GetSummary(),

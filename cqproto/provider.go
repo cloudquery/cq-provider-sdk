@@ -162,6 +162,7 @@ type ConnectionDetails struct {
 
 type ProviderDiagnostic struct {
 	ResourceName       string
+	ResourceId         string
 	DiagnosticType     diag.DiagnosticType
 	DiagnosticSeverity diag.Severity
 	Summary            string
@@ -178,9 +179,10 @@ func (p ProviderDiagnostic) Type() diag.DiagnosticType {
 
 func (p ProviderDiagnostic) Description() diag.Description {
 	return diag.Description{
-		Resource: p.ResourceName,
-		Summary:  p.Summary,
-		Detail:   p.Details,
+		Resource:   p.ResourceName,
+		ResourceID: p.ResourceId,
+		Summary:    p.Summary,
+		Detail:     p.Details,
 	}
 }
 

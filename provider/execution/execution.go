@@ -196,7 +196,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
 				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-				err = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table[%s] resolver ignored error. Error: %s", e.Table.Name, wrapResourceId(parent, err))
+				err = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table[%s] resolver ignored error. Error: %s", e.Table.Name, err) //.Apply(optResourceId(parent)...)
 			}
 			resolverErr = e.handleResolveError(client, wrapResourceId(parent, err))
 		}
@@ -378,6 +378,16 @@ func (e TableExecutor) handleResolveError(meta schema.ClientMeta, err error, opt
 	opts = append([]Option{WithResource(e.ResourceName), WithSeverity(diag.ERROR), WithType(diag.RESOLVING),
 		WithSummary("failed to resolve table \"%s\"", e.Table.Name)}, opts...)
 	return FromError(err, opts...)
+}
+
+func optResourceId(r *schema.Resource) []Option {
+	if r == nil {
+		return nil
+	}
+
+	return []Option{
+		WithResourceID(strings.Join(r.PrimaryKeyValues(), ",")),
+	}
 }
 
 func wrapResourceId(r *schema.Resource, err error) error {

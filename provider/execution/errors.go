@@ -163,15 +163,11 @@ func FromError(err error, opts ...Option) diag.Diagnostics {
 			severity:       diag.ERROR,
 			diagnosticType: diag.RESOLVING,
 		}
-		if ri, ok := err.(resourceIDer); ok {
-			e = e.Apply(WithResourceID(ri.ResourceID()))
+		if id, ok := diag.ExtractResourceId(err); ok {
+			e = e.Apply(WithResourceID(id))
 		}
 		e = e.Apply(opts...)
 
 		return diag.Diagnostics{e}
 	}
-}
-
-type resourceIDer interface {
-	ResourceID() string
 }
