@@ -17,12 +17,14 @@ func FlattenDiags(dd Diagnostics, skipDescription bool) []FlatDiag {
 	for i, d := range dd {
 		description := d.Description()
 		df[i] = FlatDiag{
-			Err:        d.Error(),
-			Resource:   description.Resource,
-			ResourceID: description.ResourceID,
-			Type:       d.Type(),
-			Severity:   d.Severity(),
-			Summary:    description.Summary,
+			Err:      d.Error(),
+			Resource: description.Resource,
+			Type:     d.Type(),
+			Severity: d.Severity(),
+			Summary:  description.Summary,
+		}
+		if len(description.ResourceID) > 0 {
+			df[i].ResourceID = description.ResourceID
 		}
 		if !skipDescription {
 			df[i].Description = description

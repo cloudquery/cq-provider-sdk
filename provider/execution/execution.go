@@ -197,7 +197,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
 				err = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table[%s] resolver ignored error. Error: %s", e.Table.Name, err)
 			}
-			resolverErr = e.handleResolveError(client, wrapResourceId(parent, err))
+			resolverErr = e.handleResolveError(client, parent, err)
 		}
 	}()
 
@@ -311,13 +311,13 @@ func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.Cl
 	// call PostRowResolver if defined after columns have been resolved
 	if e.Table.PostResourceResolver != nil {
 		if err := e.Table.PostResourceResolver(ctx, meta, resource); err != nil {
-			return e.handleResolveError(meta, wrapResourceId(resource, err), WithSummary("post resource resolver failed for \"%s\"", e.Table.Name))
+			return e.handleResolveError(meta, resource, err, WithSummary("post resource resolver failed for \"%s\"", e.Table.Name))
 		}
 	}
 	// Finally, resolve columns internal to the SDK
 	for _, c := range e.columns[1] {
 		if err := c.Resolver(ctx, meta, resource, c); err != nil {
-			return FromError(wrapResourceId(resource, err), WithResource(e.ResourceName), WithType(diag.INTERNAL), WithSummary("default column %s resolver execution", c.Name))
+			return FromError(err, WithType(diag.INTERNAL), WithSummary("default column %s resolver execution", c.Name), optResourceId(resource))
 		}
 	}
 	return diags
@@ -334,11 +334,11 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 			}
 			// Not allowed ignoring PK resolver errors
 			if funk.ContainsString(e.Db.Dialect().PrimaryKeys(e.Table), c.Name) {
-				return FromError(err, WithResource(e.ResourceName), WithSummary("failed to resolve column %s@%s", e.Table.Name, c.Name), WithErrorClassifier)
+				return FromError(err, WithResource(e.ResourceName), WithSummary("failed to resolve column %s@%s", e.Table.Name, c.Name), WithErrorClassifier, optResourceId(resource))
 			}
 			// check if column resolver defined an IgnoreError function, if it does check if ignore should be ignored.
 			if c.IgnoreError == nil || !c.IgnoreError(err) {
-				return e.handleResolveError(meta, err, WithSummary("column resolver \"%s\" failed for table \"%s\"", c.Name, e.Table.Name))
+				return e.handleResolveError(meta, resource, err, WithSummary("column resolver \"%s\" failed for table \"%s\"", c.Name, e.Table.Name))
 			}
 			// TODO: double check logic here
 			if reflect2.IsNil(c.Default) {
@@ -368,47 +368,55 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 }
 
 // handleResolveError handles errors returned by user defined functions, using the ErrorClassifiers if defined.
-func (e TableExecutor) handleResolveError(meta schema.ClientMeta, err error, opts ...Option) diag.Diagnostics {
+func (e TableExecutor) handleResolveError(meta schema.ClientMeta, r *schema.Resource, err error, opts ...Option) diag.Diagnostics {
+	wrappedErr := wrapResourceId(r, err)
 	for _, c := range e.classifiers {
-		if diags := c(meta, e.ResourceName, err); diags != nil {
+		if diags := c(meta, e.ResourceName, wrappedErr); diags != nil {
 			return diags
 		}
 	}
-	opts = append([]Option{WithResource(e.ResourceName), WithSeverity(diag.ERROR), WithType(diag.RESOLVING),
+	opts = append([]Option{WithResource(e.ResourceName), WithSeverity(diag.ERROR), WithType(diag.RESOLVING), optResourceId(r),
 		WithSummary("failed to resolve table \"%s\"", e.Table.Name)}, opts...)
 	return FromError(err, opts...)
 }
 
+// optResourceId returns an Option to wrap the given resource's id, or nil.
+func optResourceId(r *schema.Resource) Option {
+	if r == nil {
+		return nil
+	}
+
+	return WithResourceID(r.PrimaryKeyValues())
+}
+
+// wrapResourceId wraps the given error with the given resource's id. Should be used as a last resort when optResourceId is not applicable.
 func wrapResourceId(r *schema.Resource, err error) error {
 	if r == nil {
 		return err
 	}
 
-	// don't double wrap
+	// never double wrap
 	var prev *errorWithResourceId
 	if errors.As(err, &prev) {
 		return err
 	}
 
 	return &errorWithResourceId{
-		err:        err,
+		error:      err,
 		resourceId: r.PrimaryKeyValues(),
 	}
 }
 
 type errorWithResourceId struct {
-	err        error
+	error
 	resourceId []string
 }
 
-func (e *errorWithResourceId) Error() string {
-	return e.err.Error()
-}
-
 func (e *errorWithResourceId) Unwrap() error {
-	return e.err
+	return e.error
 }
 
+// ResourceID satisfies the diag.resourceIDer interface to return the wrapped resource id.
 func (e *errorWithResourceId) ResourceID() []string {
 	return e.resourceId
 }

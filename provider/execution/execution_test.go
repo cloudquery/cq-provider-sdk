@@ -451,10 +451,10 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			if tc.ErrorExpected {
 				require.True(t, diags.HasDiags())
 				if tc.ExpectedDiags != nil {
-					assert.Equal(t, tc.ExpectedDiags, diag.FlattenDiags(diags, true))
+					assert.EqualValues(t, tc.ExpectedDiags, diag.FlattenDiags(diags, true))
 				}
 			} else {
-				require.Nil(t, diags)
+				require.Empty(t, diags)
 			}
 		})
 	}
