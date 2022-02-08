@@ -12,8 +12,7 @@ func GetMaxGoRoutines() uint64 {
 	if totalMemory == 0 {
 		// than we assume we have 2 GB RAM
 		return GO_ROUTINES_PER_GB * 2
-	} else {
-		gb := float64(totalMemory) / float64(GB_IN_BYTES)
-		return uint64(gb) * GO_ROUTINES_PER_GB
 	}
+	gb := float64(totalMemory) / float64(GB_IN_BYTES)
+	return uint64(gb) * GO_ROUTINES_PER_GB
 }

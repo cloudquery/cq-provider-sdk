@@ -40,7 +40,7 @@ type TableExecutor struct {
 	executionStart time.Time
 	// columns of table, this is to reduce calls to sift each time
 	columns [2]schema.ColumnList
-	// goroutinesSem to limit number of goroutines (resources fetched) concurrently
+	// goroutinesSem to limit number of goroutines (clients fetched) concurrently
 	goroutinesSem *semaphore.Weighted
 }
 
@@ -71,7 +71,7 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uint64, diag.Diagnostics) {
 	if e.Table.Multiplex != nil {
 		if clients := e.Table.Multiplex(meta); len(clients) > 0 {
-			return e.doMultiplexResolve(ctx, clients, nil)
+			return e.doMultiplexResolve(ctx, clients)
 		}
 	}
 	return e.callTableResolve(ctx, meta, nil)
@@ -95,7 +95,7 @@ func (e TableExecutor) withTable(t *schema.Table) *TableExecutor {
 }
 
 // doMultiplexResolve resolves table with multiplexed clients appending all diagnostics returned from each multiplex.
-func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
+func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.ClientMeta) (uint64, diag.Diagnostics) {
 	var (
 		diagsChan      = make(chan diag.Diagnostics)
 		totalResources uint64
@@ -109,16 +109,12 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	defer close(diagsChan)
 	for _, client := range clients {
 		// we can only limit on a granularity of a top table otherwise we can get deadlock
-		if parent == nil {
-			if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
-				return totalResources, allDiags.Add(FromError(err, WithResource(e.ResourceName), WithErrorClassifier))
-			}
+		if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
+			return totalResources, allDiags.Add(FromError(err, WithResource(e.ResourceName), WithErrorClassifier))
 		}
 		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics) {
-			if parent == nil {
-				defer e.goroutinesSem.Release(1)
-			}
-			count, resolveDiags := e.callTableResolve(ctx, c, parent)
+			defer e.goroutinesSem.Release(1)
+			count, resolveDiags := e.callTableResolve(ctx, c, nil)
 			atomic.AddUint64(&totalResources, count)
 			diagsChan <- resolveDiags
 		}(client, diagsChan)
