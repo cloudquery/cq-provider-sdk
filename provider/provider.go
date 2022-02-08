@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"math"
 	"os"
 	"strconv"
 	"sync"
@@ -176,23 +175,13 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	if maxGoroutines == 0 {
 		maxGoroutines = helpers.GetMaxGoRoutines()
 	}
-	// NewWeighted is recieveing int64 (due to how semaphore works)
-	// and not uint64 so the max value can be MaxInt64
-	if maxGoroutines > math.MaxInt64 {
-		maxGoroutines = math.MaxInt64
-	}
-	goroutinesSem = semaphore.NewWeighted(int64(maxGoroutines))
+	goroutinesSem = semaphore.NewWeighted(helpers.Uint64ToInt64(maxGoroutines))
 
 	// limiter used to limit the amount of resources fetched concurrently
 	var parallelResourceSem *semaphore.Weighted
 	maxParallelFetchingLimit := request.ParallelFetchingLimit
 	if maxParallelFetchingLimit > 0 {
-		// NewWeighted is recieveing int64 (due to how semaphore works)
-		// and not uint64 so the max value can be MaxInt64
-		if request.ParallelFetchingLimit > math.MaxInt64 {
-			maxParallelFetchingLimit = math.MaxInt64
-		}
-		parallelResourceSem = semaphore.NewWeighted(int64(maxParallelFetchingLimit))
+		parallelResourceSem = semaphore.NewWeighted(helpers.Uint64ToInt64(maxParallelFetchingLimit))
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
