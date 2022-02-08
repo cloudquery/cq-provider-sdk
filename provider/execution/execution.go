@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -196,7 +195,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
 				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-				err = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table[%s] resolver ignored error. Error: %s", e.Table.Name, err) //.Apply(optResourceId(parent)...)
+				err = NewError(diag.IGNORE, diag.RESOLVING, e.ResourceName, "table[%s] resolver ignored error. Error: %s", e.Table.Name, err)
 			}
 			resolverErr = e.handleResolveError(client, wrapResourceId(parent, err))
 		}
@@ -380,16 +379,6 @@ func (e TableExecutor) handleResolveError(meta schema.ClientMeta, err error, opt
 	return FromError(err, opts...)
 }
 
-func optResourceId(r *schema.Resource) []Option {
-	if r == nil {
-		return nil
-	}
-
-	return []Option{
-		WithResourceID(strings.Join(r.PrimaryKeyValues(), ",")),
-	}
-}
-
 func wrapResourceId(r *schema.Resource, err error) error {
 	if r == nil {
 		return err
@@ -420,10 +409,6 @@ func (e *errorWithResourceId) Unwrap() error {
 	return e.err
 }
 
-func (e *errorWithResourceId) ResourceID() string {
-	return strings.Join(e.resourceId, ",")
-}
-
-func (e *errorWithResourceId) ResourceIDs() []string {
+func (e *errorWithResourceId) ResourceID() []string {
 	return e.resourceId
 }

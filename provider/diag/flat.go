@@ -4,7 +4,7 @@ package diag
 type FlatDiag struct {
 	Err         string
 	Resource    string
-	ResourceID  string
+	ResourceID  []string
 	Type        DiagnosticType
 	Severity    Severity
 	Summary     string

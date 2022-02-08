@@ -162,7 +162,7 @@ type ConnectionDetails struct {
 
 type ProviderDiagnostic struct {
 	ResourceName       string
-	ResourceId         string
+	ResourceId         []string
 	DiagnosticType     diag.DiagnosticType
 	DiagnosticSeverity diag.Severity
 	Summary            string

@@ -38,7 +38,7 @@ type Error struct {
 	resource string
 
 	// ResourceId indicates the id of the resource that failed in the execution
-	resourceId string
+	resourceId []string
 
 	// Severity indicates the level of the Diagnostic. Currently, can be set to
 	// either Error/Warning/Ignore
@@ -130,7 +130,7 @@ func WithResource(resource string) Option {
 	}
 }
 
-func WithResourceID(id string) Option {
+func WithResourceID(id []string) Option {
 	return func(e *Error) {
 		e.resourceId = id
 	}
@@ -163,7 +163,7 @@ func FromError(err error, opts ...Option) diag.Diagnostics {
 			severity:       diag.ERROR,
 			diagnosticType: diag.RESOLVING,
 		}
-		if id, ok := diag.ExtractResourceId(err); ok {
+		if id := diag.ExtractResourceId(err); id != nil {
 			e = e.Apply(WithResourceID(id))
 		}
 		e = e.Apply(opts...)

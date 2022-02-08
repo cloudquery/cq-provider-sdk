@@ -3,6 +3,7 @@ package diag
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/hcl/v2"
@@ -19,8 +20,8 @@ func (diags Diagnostics) Error() string {
 	case len(diags) == 1:
 		desc := diags[0].Description()
 		var ret bytes.Buffer
-		if desc.ResourceID != "" {
-			fmt.Fprintf(&ret, "[%s] ", desc.ResourceID)
+		if len(desc.ResourceID) > 0 {
+			fmt.Fprintf(&ret, "[%s] ", strings.Join(desc.ResourceID, ","))
 		}
 		if desc.Detail == "" {
 			fmt.Fprintf(&ret, "%s", desc.Summary)
@@ -34,8 +35,8 @@ func (diags Diagnostics) Error() string {
 		for _, diag := range diags {
 			desc := diag.Description()
 			fmt.Fprintf(&ret, "\n- ")
-			if desc.ResourceID != "" {
-				fmt.Fprintf(&ret, "[%s] ", desc.ResourceID)
+			if len(desc.ResourceID) > 0 {
+				fmt.Fprintf(&ret, "[%s] ", strings.Join(desc.ResourceID, ","))
 			}
 			if desc.Detail == "" {
 				fmt.Fprintf(&ret, "%s", desc.Summary)

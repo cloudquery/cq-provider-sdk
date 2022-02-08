@@ -9,7 +9,7 @@ type BaseError struct {
 	resource string
 
 	// ResourceId indicates the id of the resource that failed in the execution
-	resourceId string
+	resourceId []string
 
 	// Severity indicates the level of the Diagnostic. Currently, can be set to
 	// either Error/Warning/Ignore
@@ -35,7 +35,7 @@ func NewBaseError(err error, severity Severity, dt DiagnosticType, resource, sum
 		detail:         details,
 		diagnosticType: dt,
 	}
-	if r, ok := ExtractResourceId(err); ok {
+	if r := ExtractResourceId(err); r != nil {
 		be.resourceId = r
 	}
 	return be
@@ -70,14 +70,14 @@ func (e BaseError) Error() string {
 	return e.summary
 }
 
-func ExtractResourceId(err error) (string, bool) {
+func ExtractResourceId(err error) []string {
 	ri, ok := err.(resourceIDer)
 	if !ok {
-		return "", false
+		return nil
 	}
-	return ri.ResourceID(), true
+	return ri.ResourceID()
 }
 
 type resourceIDer interface {
-	ResourceID() string
+	ResourceID() []string
 }
