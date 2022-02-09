@@ -3,6 +3,7 @@ package migrator
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -13,7 +14,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/hashicorp/go-hclog"
@@ -134,9 +135,8 @@ func New(log hclog.Logger, dt schema.DialectType, migrationFiles map[string]map[
 		u.RawQuery += fmt.Sprintf("x-migrations-table=%s_schema_migrations", providerName)
 	}
 	m, err := migrate.NewWithSourceInstance(providerName, driver, u.String())
-
 	if err != nil {
-		return nil, err
+		return nil, convertMigrateError(err)
 	}
 	return &Migrator{
 		log:           log,
@@ -242,7 +242,7 @@ func (m *Migrator) DropProvider(ctx context.Context, schema map[string]*schema.T
 
 	newM, err := migrate.NewWithSourceInstance(m.provider, m.driver, m.migratorUrl.String())
 	if err != nil {
-		return err
+		return convertMigrateError(err)
 	}
 	// reset migrator
 	m.m = newM
@@ -322,4 +322,18 @@ func dropTables(ctx context.Context, conn *pgx.Conn, table *schema.Table) error 
 		}
 	}
 	return nil
+}
+
+var ErrNoSchema = errors.New("CURRENT_SCHEMA seems empty, possibly due to empty search_path. Try `GRANT ALL PRIVILEGES ON <search_path> TO <user>`")
+
+func convertMigrateError(err error) error {
+	if err == nil {
+		return err
+	}
+
+	if err == migratepostgres.ErrNoSchema || strings.Contains(err.Error(), `"current_schema": converting NULL to string`) {
+		return ErrNoSchema
+	}
+
+	return err
 }
