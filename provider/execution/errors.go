@@ -13,9 +13,9 @@ const (
 	fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
 )
 
-type ErrorClassifier func(meta schema.ClientMeta, resource string, err error) diag.Diagnostics
+type ErrorClassifier func(meta schema.ClientMeta, resourceName string, resource *schema.Resource, err error) diag.Diagnostics
 
-func defaultErrorClassifier(_ schema.ClientMeta, resource string, err error) diag.Diagnostics {
+func defaultErrorClassifier(_ schema.ClientMeta, resourceName string, resource *schema.Resource, err error) diag.Diagnostics {
 	if _, ok := err.(diag.Diagnostic); ok {
 		return nil
 	}
@@ -24,7 +24,7 @@ func defaultErrorClassifier(_ schema.ClientMeta, resource string, err error) dia
 	}
 	if strings.Contains(err.Error(), ": socket: too many open files") {
 		// Return a Diagnostic error so that it can be properly propagated back to the user via the CLI
-		return FromError(err, WithResource(resource), WithSummary(fdLimitMessage), WithType(diag.THROTTLE), WithSeverity(diag.WARNING))
+		return FromError(err, WithResourceName(resourceName), WithResource(resource), WithSummary(fdLimitMessage), WithType(diag.THROTTLE), WithSeverity(diag.WARNING))
 	}
 	return nil
 }
@@ -124,15 +124,15 @@ func WithSummary(summary string, args ...interface{}) Option {
 	}
 }
 
-func WithResource(resource string) Option {
+func WithResourceName(resource string) Option {
 	return func(e *Error) {
 		e.resource = resource
 	}
 }
 
-func WithResourceID(id []string) Option {
+func WithResource(resource *schema.Resource) Option {
 	return func(e *Error) {
-		e.resourceId = id
+		e.resourceId = resource.PrimaryKeyValues()
 	}
 }
 
@@ -162,9 +162,6 @@ func FromError(err error, opts ...Option) diag.Diagnostics {
 			err:            err,
 			severity:       diag.ERROR,
 			diagnosticType: diag.RESOLVING,
-		}
-		if id := diag.ExtractResourceId(err); id != nil {
-			e = e.Apply(WithResourceID(id))
 		}
 		e = e.Apply(opts...)
 

@@ -16,8 +16,8 @@ func TestDiagnostics_Squash(t *testing.T) {
 		{
 			Name: "simple squash no details",
 			Value: Diagnostics{
-				NewBaseError(errors.New("error test"), ERROR, RESOLVING, "a", "some summary", ""),
-				NewBaseError(errors.New("error test"), ERROR, RESOLVING, "a", "some summary", ""),
+				NewBaseError(errors.New("error test"), ERROR, RESOLVING, nil, "a", "some summary", ""),
+				NewBaseError(errors.New("error test"), ERROR, RESOLVING, nil, "a", "some summary", ""),
 			},
 			Want: []FlatDiag{
 				{
@@ -37,10 +37,10 @@ func TestDiagnostics_Squash(t *testing.T) {
 		{
 			Name: "simple squash w/details",
 			Value: Diagnostics{
-				NewBaseError(errors.New("error test"), ERROR, RESOLVING, "a", "some summary", "some details"),
-				NewBaseError(errors.New("error test"), ERROR, RESOLVING, "a", "some summary", "some details"),
-				NewBaseError(errors.New("error test2"), ERROR, RESOLVING, "a", "some summary2", "some details2."),
-				NewBaseError(errors.New("error test2"), ERROR, RESOLVING, "a", "some summary2", "some details2."),
+				NewBaseError(errors.New("error test"), ERROR, RESOLVING, nil, "a", "some summary", "some details"),
+				NewBaseError(errors.New("error test"), ERROR, RESOLVING, nil, "a", "some summary", "some details"),
+				NewBaseError(errors.New("error test2"), ERROR, RESOLVING, nil, "a", "some summary2", "some details2."),
+				NewBaseError(errors.New("error test2"), ERROR, RESOLVING, nil, "a", "some summary2", "some details2."),
 			},
 			Want: []FlatDiag{
 				{
@@ -72,8 +72,8 @@ func TestDiagnostics_Squash(t *testing.T) {
 		{
 			Name: "different resource no squash",
 			Value: Diagnostics{
-				NewBaseError(errors.New("error test"), ERROR, RESOLVING, "a", "some summary", ""),
-				NewBaseError(errors.New("error test"), ERROR, RESOLVING, "b", "some summary", ""),
+				NewBaseError(errors.New("error test"), ERROR, RESOLVING, nil, "a", "some summary", ""),
+				NewBaseError(errors.New("error test"), ERROR, RESOLVING, nil, "b", "some summary", ""),
 			},
 			Want: []FlatDiag{
 				{
@@ -105,8 +105,8 @@ func TestDiagnostics_Squash(t *testing.T) {
 		{
 			Name: "different severity no squash",
 			Value: Diagnostics{
-				NewBaseError(errors.New("error test"), WARNING, RESOLVING, "a", "some summary", ""),
-				NewBaseError(errors.New("error test"), ERROR, RESOLVING, "a", "some summary", ""),
+				NewBaseError(errors.New("error test"), WARNING, RESOLVING, nil, "a", "some summary", ""),
+				NewBaseError(errors.New("error test"), ERROR, RESOLVING, nil, "a", "some summary", ""),
 			},
 			Want: []FlatDiag{
 				{
@@ -148,12 +148,12 @@ func TestDiagnostics_Squash(t *testing.T) {
 func TestDiagnostics_SquashRedactable(t *testing.T) {
 	input := Diagnostics{
 		NewRedactedDiagnostic(
-			NewBaseError(errors.New("error test: 123"), ERROR, RESOLVING, "a", "some summary: 123", ""),
-			NewBaseError(errors.New("error test: xxx"), ERROR, RESOLVING, "a", "some summary: xxx", ""),
+			NewBaseError(errors.New("error test: 123"), ERROR, RESOLVING, nil, "a", "some summary: 123", ""),
+			NewBaseError(errors.New("error test: xxx"), ERROR, RESOLVING, nil, "a", "some summary: xxx", ""),
 		),
 		NewRedactedDiagnostic(
-			NewBaseError(errors.New("error test: 123"), ERROR, RESOLVING, "a", "some summary: 123", ""),
-			NewBaseError(errors.New("error test: xxx"), ERROR, RESOLVING, "a", "some summary: xxx", ""),
+			NewBaseError(errors.New("error test: 123"), ERROR, RESOLVING, nil, "a", "some summary: 123", ""),
+			NewBaseError(errors.New("error test: xxx"), ERROR, RESOLVING, nil, "a", "some summary: xxx", ""),
 		),
 	}
 	out := input.Squash()

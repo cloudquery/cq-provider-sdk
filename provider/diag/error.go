@@ -26,19 +26,16 @@ type BaseError struct {
 }
 
 // NewBaseError creates a BaseError from given error
-func NewBaseError(err error, severity Severity, dt DiagnosticType, resource, summary, details string) *BaseError {
-	be := &BaseError{
+func NewBaseError(err error, severity Severity, dt DiagnosticType, resourceId []string, resource, summary, details string) *BaseError {
+	return &BaseError{
 		Err:            err,
 		severity:       severity,
+		resourceId:     resourceId,
 		resource:       resource,
 		summary:        summary,
 		detail:         details,
 		diagnosticType: dt,
 	}
-	if r := ExtractResourceId(err); r != nil {
-		be.resourceId = r
-	}
-	return be
 }
 
 func (e BaseError) Severity() Severity {
@@ -68,16 +65,4 @@ func (e BaseError) Error() string {
 		return e.Err.Error()
 	}
 	return e.summary
-}
-
-func ExtractResourceId(err error) []string {
-	ri, ok := err.(resourceIDer)
-	if !ok {
-		return nil
-	}
-	return ri.ResourceID()
-}
-
-type resourceIDer interface {
-	ResourceID() []string
 }
