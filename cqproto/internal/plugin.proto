@@ -39,6 +39,8 @@ message FetchResources {
     bool partial_fetching_enabled = 2;
     // if value is more than 0 it enables throttling for concurrent fetch
     uint64 parallel_fetching_limit = 3;
+    // approximate maximum goroutines spawned during fetch
+    uint64 max_goroutines = 4;
   }
   message Response {
     // map of resources that have finished fetching
@@ -97,17 +99,21 @@ message Diagnostic {
     ACCESS = 2;
     THROTTLE = 3;
     DATABASE = 4;
+    SCHEMA = 5;
+    INTERNAL = 6;
   }
   enum Severity {
     INVALID = 0;
     ERROR = 1;
     WARNING = 2;
+    PANIC = 3;
   }
   Type type = 1;
   Severity severity = 2;
   string summary = 3;
   string detail = 4;
   string resource = 5;
+  Diagnostic redacted = 6;
 }
 
 message DialectMigration {

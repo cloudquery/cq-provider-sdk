@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/execution"
+
 	sq "github.com/Masterminds/squirrel"
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/database"
@@ -30,18 +32,17 @@ type ResourceTestCase struct {
 	ParallelFetchingLimit uint64
 }
 
+func init() {
+	_ = faker.SetRandomMapAndSliceMinSize(1)
+	_ = faker.SetRandomMapAndSliceMaxSize(1)
+}
+
 // IntegrationTest - creates resources using terraform, fetches them to db and compares with expected values
 func TestResource(t *testing.T, resource ResourceTestCase) {
 	if !resource.NotParallel {
 		t.Parallel()
 	}
 	t.Helper()
-	if err := faker.SetRandomMapAndSliceMinSize(1); err != nil {
-		t.Fatal(err)
-	}
-	if err := faker.SetRandomMapAndSliceMaxSize(1); err != nil {
-		t.Fatal(err)
-	}
 
 	// No need for configuration or db connection, get it out of the way first
 	// testTableIdentifiersForProvider(t, resource.Provider)
@@ -114,7 +115,7 @@ func fetch(t *testing.T, resource *ResourceTestCase) error {
 	return nil
 }
 
-func truncateTables(conn schema.QueryExecer, table *schema.Table) error {
+func truncateTables(conn execution.QueryExecer, table *schema.Table) error {
 	s := sq.Delete(table.Name)
 	sql, args, err := s.ToSql()
 	if err != nil {
@@ -207,11 +208,11 @@ func (f *testResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 
 var (
 	dbConnOnce sync.Once
-	pool       schema.QueryExecer
+	pool       execution.QueryExecer
 	dbErr      error
 )
 
-func setupDatabase() (schema.QueryExecer, error) {
+func setupDatabase() (execution.QueryExecer, error) {
 	dbConnOnce.Do(func() {
 		pool, dbErr = database.New(context.Background(), hclog.NewNullLogger(), getEnv("DATABASE_URL", "host=localhost user=postgres password=pass DB.name=postgres port=5432"))
 		if dbErr != nil {

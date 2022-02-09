@@ -105,6 +105,10 @@ func New(log hclog.Logger, dt schema.DialectType, migrationFiles map[string]map[
 			return nil, err
 		}
 		raw := strings.Split(strings.TrimSuffix(strings.TrimSuffix(k, ".up.sql"), ".down.sql"), "_")
+		if len(raw) == 1 {
+			return nil, fmt.Errorf("invalid migration filename %q: should be in format <int>_v<version>.up|down.sql", k)
+		}
+
 		// add version once to mapper, up/down should have same migration number anyway
 		if _, ok := versionMapper[raw[1]]; !ok {
 			versionMapper[raw[1]] = cast.ToUint(raw[0])
@@ -155,6 +159,10 @@ func (m *Migrator) callPostHook(ctx context.Context) error {
 }
 
 func (m *Migrator) Close() error {
+	if m.m == nil {
+		return nil
+	}
+
 	_, dbErr := m.m.Close()
 	return dbErr
 }
@@ -227,6 +235,11 @@ func (m *Migrator) DropProvider(ctx context.Context, schema map[string]*schema.T
 			return err
 		}
 	}
+
+	if _, dbErr := m.m.Close(); dbErr != nil {
+		m.log.Warn("error closing migrator", "error", dbErr)
+	}
+
 	newM, err := migrate.NewWithSourceInstance(m.provider, m.driver, m.migratorUrl.String())
 	if err != nil {
 		return err
