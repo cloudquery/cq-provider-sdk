@@ -260,5 +260,6 @@ func TestNoSchemaError(t *testing.T) {
 	if t.Failed() {
 		m.Close()
 	}
-	assert.EqualError(t, err, ErrNoSchema.Error())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `CURRENT_SCHEMA seems empty, possibly due to empty search_path`)
 }

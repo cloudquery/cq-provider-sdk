@@ -3,7 +3,6 @@ package migrator
 import (
 	"context"
 	"embed"
-	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -136,7 +135,7 @@ func New(log hclog.Logger, dt schema.DialectType, migrationFiles map[string]map[
 	}
 	m, err := migrate.NewWithSourceInstance(providerName, driver, u.String())
 	if err != nil {
-		return nil, convertMigrateError(err)
+		return nil, convertMigrateError(u.String(), err)
 	}
 	return &Migrator{
 		log:           log,
@@ -242,7 +241,7 @@ func (m *Migrator) DropProvider(ctx context.Context, schema map[string]*schema.T
 
 	newM, err := migrate.NewWithSourceInstance(m.provider, m.driver, m.migratorUrl.String())
 	if err != nil {
-		return convertMigrateError(err)
+		return convertMigrateError(m.migratorUrl.String(), err)
 	}
 	// reset migrator
 	m.m = newM
@@ -324,17 +323,26 @@ func dropTables(ctx context.Context, conn *pgx.Conn, table *schema.Table) error 
 	return nil
 }
 
-var ErrNoSchema = errors.New("CURRENT_SCHEMA seems empty, possibly due to empty search_path. Try `GRANT ALL PRIVILEGES ON public TO <user>`")
-
-func convertMigrateError(err error) error {
+func convertMigrateError(dsnURI string, err error) error {
 	if err == nil {
 		return err
 	}
 
 	// https://github.com/golang-migrate/migrate/issues/696
-	if err == mpg.ErrNoSchema || strings.Contains(err.Error(), `"current_schema": converting NULL to string`) {
-		return ErrNoSchema
+	if err != mpg.ErrNoSchema && !strings.Contains(err.Error(), `"current_schema": converting NULL to string`) {
+		return err
 	}
 
-	return err
+	const errFmt = "CURRENT_SCHEMA seems empty, possibly due to empty search_path. Try `GRANT ALL PRIVILEGES ON %s TO <user>`"
+
+	u, err2 := dsn.ParseConnectionString(dsnURI)
+	if err2 != nil {
+		return fmt.Errorf(errFmt, `<schema>`)
+	}
+	p := u.Query().Get("search_path")
+	if p == "" {
+		p = "public"
+	}
+
+	return fmt.Errorf(errFmt, p)
 }
