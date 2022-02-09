@@ -14,7 +14,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 
 	"github.com/golang-migrate/migrate/v4"
-	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
+	mpg "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/hashicorp/go-hclog"
@@ -324,7 +324,7 @@ func dropTables(ctx context.Context, conn *pgx.Conn, table *schema.Table) error 
 	return nil
 }
 
-var ErrNoSchema = errors.New("CURRENT_SCHEMA seems empty, possibly due to empty search_path. Try `GRANT ALL PRIVILEGES ON <search_path> TO <user>`")
+var ErrNoSchema = errors.New("CURRENT_SCHEMA seems empty, possibly due to empty search_path. Try `GRANT ALL PRIVILEGES ON public TO <user>`")
 
 func convertMigrateError(err error) error {
 	if err == nil {
@@ -332,7 +332,7 @@ func convertMigrateError(err error) error {
 	}
 
 	// https://github.com/golang-migrate/migrate/issues/696
-	if err == migratepostgres.ErrNoSchema || strings.Contains(err.Error(), `"current_schema": converting NULL to string`) {
+	if err == mpg.ErrNoSchema || strings.Contains(err.Error(), `"current_schema": converting NULL to string`) {
 		return ErrNoSchema
 	}
 
