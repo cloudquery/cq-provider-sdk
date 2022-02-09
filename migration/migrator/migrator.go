@@ -331,6 +331,7 @@ func convertMigrateError(err error) error {
 		return err
 	}
 
+	// https://github.com/golang-migrate/migrate/issues/696
 	if err == migratepostgres.ErrNoSchema || strings.Contains(err.Error(), `"current_schema": converting NULL to string`) {
 		return ErrNoSchema
 	}
