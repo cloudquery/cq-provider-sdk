@@ -95,15 +95,6 @@ func (e Error) Error() string {
 	return e.summary
 }
 
-func (e Error) Apply(opts ...Option) Error {
-	for _, o := range opts {
-		if o != nil {
-			o(&e)
-		}
-	}
-	return e
-}
-
 type Option func(e *Error)
 
 func WithSeverity(s diag.Severity) Option {
@@ -132,6 +123,9 @@ func WithResourceName(resource string) Option {
 
 func WithResource(resource *schema.Resource) Option {
 	return func(e *Error) {
+		if resource == nil {
+			return
+		}
 		e.resourceId = resource.PrimaryKeyValues()
 	}
 }
@@ -163,7 +157,9 @@ func FromError(err error, opts ...Option) diag.Diagnostics {
 			severity:       diag.ERROR,
 			diagnosticType: diag.RESOLVING,
 		}
-		e = e.Apply(opts...)
+		for _, o := range opts {
+			o(&e)
+		}
 
 		return diag.Diagnostics{e}
 	}
