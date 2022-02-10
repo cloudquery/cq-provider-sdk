@@ -6,8 +6,8 @@ import (
 
 // BaseError is a generic error returned when execution is run, satisfies Diagnostic interface
 type BaseError struct {
-	// err is the underlying go error this diagnostic wraps
-	Err error
+	// err is the underlying go error this diagnostic wraps. Can be nil
+	err error
 
 	// Resource indicates the resource that failed in the execution
 	resource string
@@ -30,16 +30,25 @@ type BaseError struct {
 	// DiagnosticType indicates the classification family of this diagnostic
 	diagnosticType DiagnosticType
 
-	// if noOverwrite is true, further Options won't overwrite previously set values
+	// if noOverwrite is true, further Options won't overwrite previously set values. Valid for the duration of one "invocation"
 	noOverwrite bool
 }
 
-// NewBaseError creates a BaseError from given error
+// NewBaseError creates a BaseError from given error, except the given error is a BaseError itself
 func NewBaseError(err error, dt DiagnosticType, opts ...BaseErrorOption) *BaseError {
-	be := baseFromError(err, dt)
+	be, ok := err.(*BaseError)
+	if !ok {
+		be = &BaseError{
+			err:            err,
+			diagnosticType: dt,
+			severity:       ERROR,
+		}
+	}
 	for _, o := range opts {
 		o(be)
 	}
+	be.noOverwrite = false // reset overwrite switch after every application of opts
+
 	return be
 }
 
@@ -65,8 +74,9 @@ func (e BaseError) Type() DiagnosticType {
 }
 
 func (e BaseError) Error() string {
-	if e.Err != nil {
-		return e.Err.Error()
+	// return original error
+	if e.err != nil {
+		return e.err.Error()
 	}
 	if e.summary == "" {
 		return "No summary"
@@ -75,11 +85,12 @@ func (e BaseError) Error() string {
 }
 
 func (e BaseError) Unwrap() error {
-	return e.Err
+	return e.err
 }
 
 type BaseErrorOption func(*BaseError)
 
+// WithNoOverwrite sets the noOverwrite flag of BaseError, active for the duration of the application of options
 func WithNoOverwrite() BaseErrorOption {
 	return func(e *BaseError) {
 		e.noOverwrite = true
@@ -132,18 +143,5 @@ func WithDetails(detail string, args ...interface{}) BaseErrorOption {
 		if !e.noOverwrite || e.detail != "" {
 			e.detail = fmt.Sprintf(detail, args...)
 		}
-	}
-}
-
-// baseFromError creates a BaseError from the given error if it's not already a BaseError
-func baseFromError(err error, dt DiagnosticType) *BaseError {
-	d, ok := err.(*BaseError)
-	if ok {
-		return d
-	}
-	return &BaseError{
-		Err:            err,
-		diagnosticType: dt,
-		severity:       ERROR,
 	}
 }
