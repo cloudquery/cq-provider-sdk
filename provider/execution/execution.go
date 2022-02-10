@@ -368,7 +368,7 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 
 // handleResolveError handles errors returned by user defined functions, using the ErrorClassifiers if defined.
 func (e TableExecutor) handleResolveError(meta schema.ClientMeta, r *schema.Resource, err error, opts ...diag.BaseErrorOption) diag.Diagnostics {
-	errWithDiag := FromError(err, append(opts,
+	errAsDiags := FromError(err, append(opts,
 		diag.WithResourceName(e.ResourceName),
 		WithResource(r),
 		diag.WithSeverity(diag.ERROR),
@@ -376,9 +376,11 @@ func (e TableExecutor) handleResolveError(meta schema.ClientMeta, r *schema.Reso
 		diag.WithSummary("failed to resolve table %q", e.Table.Name),
 	)...)
 
-	classifiedDiags := make(diag.Diagnostics, 0, len(errWithDiag))
+	classifiedDiags := make(diag.Diagnostics, 0, len(errAsDiags))
 	for _, c := range e.classifiers {
-		for _, d := range errWithDiag {
+		// FromError gives us diag.Diagnostics, but we need to make sure to pass one diag at a time to the classifiers and collect results,
+		// mostly because Unwrap()/errors.As() can't work on multiple diags
+		for _, d := range errAsDiags {
 			if diags := c(meta, e.ResourceName, d); diags != nil {
 				classifiedDiags = classifiedDiags.Add(diags)
 			}
@@ -388,5 +390,5 @@ func (e TableExecutor) handleResolveError(meta schema.ClientMeta, r *schema.Reso
 		return classifiedDiags
 	}
 
-	return errWithDiag
+	return errAsDiags
 }
