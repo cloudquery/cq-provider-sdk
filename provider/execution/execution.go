@@ -186,15 +186,15 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 			if r := recover(); r != nil {
 				stack := string(debug.Stack())
 				client.Logger().Error("table resolver recovered from panic", "table", e.Table.Name, "stack", stack)
-				resolverErr = FromError(fmt.Errorf("table resolver panic: %s", r), diag.WithResourceName(e.ResourceName), diag.WithSeverity(diag.PANIC),
-					diag.WithType(diag.RESOLVING), diag.WithSummary("panic on resource table %q fetch", e.Table.Name), diag.WithDetails("%s", stack))
+				resolverErr = diag.NewBaseError(fmt.Errorf("table resolver panic: %s", r), diag.RESOLVING, diag.WithResourceName(e.ResourceName), diag.WithSeverity(diag.PANIC),
+					diag.WithSummary("panic on resource table %q fetch", e.Table.Name), diag.WithDetails("%s", stack))
 			}
 			close(res)
 		}()
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
 				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-				err = diag.NewBaseError(nil, diag.RESOLVING, diag.WithSeverity(diag.IGNORE), diag.WithResourceName(e.ResourceName), diag.WithSummary("table[%s] resolver ignored error. Error: %s", e.Table.Name, err))
+				err = diag.NewBaseError(err, diag.RESOLVING, diag.WithSeverity(diag.IGNORE), diag.WithSummary("table[%s] resolver ignored error. Error: %s", e.Table.Name, err))
 			}
 			resolverErr = e.handleResolveError(client, parent, err)
 		}
@@ -368,12 +368,25 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 
 // handleResolveError handles errors returned by user defined functions, using the ErrorClassifiers if defined.
 func (e TableExecutor) handleResolveError(meta schema.ClientMeta, r *schema.Resource, err error, opts ...diag.BaseErrorOption) diag.Diagnostics {
+	errWithDiag := FromError(err, append(opts,
+		diag.WithResourceName(e.ResourceName),
+		WithResource(r),
+		diag.WithSeverity(diag.ERROR),
+		diag.WithType(diag.RESOLVING),
+		diag.WithSummary("failed to resolve table %q", e.Table.Name),
+	)...)
+
+	classifiedDiags := make(diag.Diagnostics, 0, len(errWithDiag))
 	for _, c := range e.classifiers {
-		if diags := c(meta, e.ResourceName, r, err); diags != nil {
-			return diags
+		for _, d := range errWithDiag {
+			if diags := c(meta, e.ResourceName, d); diags != nil {
+				classifiedDiags = classifiedDiags.Add(diags)
+			}
 		}
 	}
-	opts = append([]diag.BaseErrorOption{diag.WithResourceName(e.ResourceName), WithResource(r), diag.WithSeverity(diag.ERROR), diag.WithType(diag.RESOLVING),
-		diag.WithSummary("failed to resolve table %q", e.Table.Name)}, opts...)
-	return FromError(err, opts...)
+	if classifiedDiags.HasDiags() {
+		return classifiedDiags
+	}
+
+	return errWithDiag
 }

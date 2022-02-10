@@ -7,7 +7,7 @@ import (
 // BaseError is a generic error returned when execution is run, satisfies Diagnostic interface
 type BaseError struct {
 	// err is the underlying go error this diagnostic wraps
-	error
+	Err error
 
 	// Resource indicates the resource that failed in the execution
 	resource string
@@ -19,6 +19,8 @@ type BaseError struct {
 	// either Error/Warning/Ignore
 	severity Severity
 
+	severitySet bool
+
 	// Summary is a short description of the problem
 	summary string
 
@@ -27,15 +29,14 @@ type BaseError struct {
 
 	// DiagnosticType indicates the classification family of this diagnostic
 	diagnosticType DiagnosticType
+
+	// if noOverwrite is true, further Options won't overwrite previously set values
+	noOverwrite bool
 }
 
 // NewBaseError creates a BaseError from given error
 func NewBaseError(err error, dt DiagnosticType, opts ...BaseErrorOption) *BaseError {
-	be := &BaseError{
-		error:          err,
-		diagnosticType: dt,
-		severity:       ERROR,
-	}
+	be := baseFromError(err, dt)
 	for _, o := range opts {
 		o(be)
 	}
@@ -64,8 +65,8 @@ func (e BaseError) Type() DiagnosticType {
 }
 
 func (e BaseError) Error() string {
-	if e.error != nil {
-		return e.error.Error()
+	if e.Err != nil {
+		return e.Err.Error()
 	}
 	if e.summary == "" {
 		return "No summary"
@@ -73,40 +74,76 @@ func (e BaseError) Error() string {
 	return e.summary
 }
 
+func (e BaseError) Unwrap() error {
+	return e.Err
+}
+
 type BaseErrorOption func(*BaseError)
+
+func WithNoOverwrite() BaseErrorOption {
+	return func(e *BaseError) {
+		e.noOverwrite = true
+	}
+}
 
 func WithSeverity(s Severity) BaseErrorOption {
 	return func(e *BaseError) {
-		e.severity = s
+		if !e.noOverwrite || !e.severitySet {
+			e.severity = s
+			e.severitySet = true
+		}
 	}
 }
 
 func WithType(dt DiagnosticType) BaseErrorOption {
 	return func(e *BaseError) {
-		e.diagnosticType = dt
+		if !e.noOverwrite || dt > e.diagnosticType {
+			e.diagnosticType = dt
+		}
 	}
 }
 
 func WithSummary(summary string, args ...interface{}) BaseErrorOption {
 	return func(e *BaseError) {
-		e.summary = fmt.Sprintf(summary, args...)
+		if !e.noOverwrite || e.summary == "" {
+			e.summary = fmt.Sprintf(summary, args...)
+		}
 	}
 }
 
 func WithResourceName(resource string) BaseErrorOption {
 	return func(e *BaseError) {
-		e.resource = resource
+		if !e.noOverwrite || e.resource == "" {
+			e.resource = resource
+		}
 	}
 }
 
 func WithResourceId(id []string) BaseErrorOption {
 	return func(e *BaseError) {
-		e.resourceId = id
+		if !e.noOverwrite || len(e.resourceId) == 0 {
+			e.resourceId = id
+		}
 	}
 }
 
 func WithDetails(detail string, args ...interface{}) BaseErrorOption {
 	return func(e *BaseError) {
-		e.detail = fmt.Sprintf(detail, args...)
+		if !e.noOverwrite || e.detail != "" {
+			e.detail = fmt.Sprintf(detail, args...)
+		}
+	}
+}
+
+// baseFromError creates a BaseError from the given error if it's not already a BaseError
+func baseFromError(err error, dt DiagnosticType) *BaseError {
+	d, ok := err.(*BaseError)
+	if ok {
+		return d
+	}
+	return &BaseError{
+		Err:            err,
+		diagnosticType: dt,
+		severity:       ERROR,
 	}
 }

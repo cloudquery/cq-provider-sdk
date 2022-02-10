@@ -263,7 +263,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			ErrorExpected: true,
 			ExpectedDiags: []diag.FlatDiag{
 				{
-					Err:      "table[simple] resolver ignored error. Error: some error",
+					Err:      "some error",
 					Resource: "error_returning_ignore",
 					Severity: diag.IGNORE,
 					Summary:  "table[simple] resolver ignored error. Error: some error",
@@ -343,7 +343,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 					Resource: "cleanup_stale_data_fail",
 					Severity: diag.ERROR,
 					Type:     diag.DATABASE,
-					Summary:  "failed delete",
+					Summary:  `failed to cleanup stale data on table "cleanup_delete"`,
 				},
 			},
 		},
