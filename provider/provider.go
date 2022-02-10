@@ -188,10 +188,13 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	finishedResources := make(map[string]bool, len(resources))
 	l := &sync.Mutex{}
 	var totalResourceCount uint64 = 0
+	var lastErr error
 	for _, resource := range resources {
 		table, ok := p.ResourceMap[resource]
 		if !ok {
-			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
+			lastErr = fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
+			p.Logger.Error("plugin does not provide resource", "provider", p.Name, "resource", resource)
+			break
 		}
 		tableExec := execution.NewTableExecutor(resource, conn, p.Logger, table, p.extraFields, p.ErrorClassifier, goroutinesSem)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
@@ -202,7 +205,9 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		l.Unlock()
 		if parallelResourceSem != nil {
 			if err := parallelResourceSem.Acquire(ctx, 1); err != nil {
-				return err
+				p.Logger.Error("cloudn't acquire parallelResourceSem", "provider", p.Name, "resource", resource)
+				lastErr = err
+				break
 			}
 		}
 		g.Go(func() error {
@@ -236,7 +241,12 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 			return nil
 		})
 	}
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		// can we wrap multiple errors here or should we just join them?
+		return err
+	}
+
+	return lastErr
 }
 
 func (p *Provider) interpolateAllResources(requestedResources []string) ([]string, error) {

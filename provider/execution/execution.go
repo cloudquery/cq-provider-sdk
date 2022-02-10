@@ -107,11 +107,14 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	logger := clients[0].Logger()
 	logger.Debug("multiplexing client", "count", len(clients), "table", e.Table.Name)
 	defer close(diagsChan)
+	numberOfClients := 0
 	for _, client := range clients {
 		// we can only limit on a granularity of a top table otherwise we can get deadlock
 		if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
-			return totalResources, allDiags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
+			allDiags = allDiags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
+			break
 		}
+		numberOfClients++
 		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics) {
 			defer e.goroutinesSem.Release(1)
 			count, resolveDiags := e.callTableResolve(ctx, c, nil)
@@ -123,8 +126,8 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	for dd := range diagsChan {
 		allDiags = allDiags.Add(dd)
 		doneClients++
-		logger.Debug("multiplexed client finished", "done", doneClients, "total", len(clients), "table", e.Table.Name)
-		if doneClients >= len(clients) {
+		logger.Debug("multiplexed client finished", "done", doneClients, "total", numberOfClients, "table", e.Table.Name)
+		if doneClients >= numberOfClients {
 			break
 		}
 	}
