@@ -205,7 +205,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		l.Unlock()
 		if parallelResourceSem != nil {
 			if err := parallelResourceSem.Acquire(ctx, 1); err != nil {
-				p.Logger.Error("cloudn't acquire parallelResourceSem", "provider", p.Name, "resource", resource)
+				p.Logger.Error("could not acquire parallelResourceSem", "provider", p.Name, "resource", resource)
 				lastErr = err
 				break
 			}
