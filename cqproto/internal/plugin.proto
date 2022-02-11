@@ -145,10 +145,12 @@ message GetProviderConfig {
 message GetProviderModuleInfo {
   message Request {
     string module = 1;
+    repeated uint32 preferred_versions = 2;
   }
   message Response {
-    map<string, bytes> info = 1;
-    repeated Diagnostic diagnostics = 2;
+    uint32 version = 1;
+    map<string, bytes> info = 2;
+    repeated Diagnostic diagnostics = 3;
   }
 }
 

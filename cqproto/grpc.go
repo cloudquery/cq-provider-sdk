@@ -102,12 +102,14 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 
 func (g GRPCClient) GetProviderModuleInfo(ctx context.Context, request *GetProviderModuleInfoRequest) (*GetProviderModuleInfoResponse, error) {
 	res, err := g.client.GetProviderModuleInfo(ctx, &internal.GetProviderModuleInfo_Request{
-		Module: request.Module,
+		Module:            request.Module,
+		PreferredVersions: request.PreferredVersions,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &GetProviderModuleInfoResponse{
+		Version:     res.Version,
 		Info:        res.Info,
 		Diagnostics: diagnosticsFromProto("", res.Diagnostics),
 	}, nil
@@ -196,13 +198,16 @@ func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 
 func (g *GRPCServer) GetProviderModuleInfo(ctx context.Context, request *internal.GetProviderModuleInfo_Request) (*internal.GetProviderModuleInfo_Response, error) {
 	resp, err := g.Impl.GetProviderModuleInfo(ctx, &GetProviderModuleInfoRequest{
-		Module: request.Module,
+		Module:            request.Module,
+		PreferredVersions: request.PreferredVersions,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &internal.GetProviderModuleInfo_Response{
-		Info: resp.Info,
+		Version:     resp.Version,
+		Info:        resp.Info,
+		Diagnostics: diagnosticsToProto(resp.Diagnostics),
 	}, nil
 }
 

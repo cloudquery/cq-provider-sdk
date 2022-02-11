@@ -6,4 +6,4 @@ import (
 )
 
 // InfoReader is called when the user executes a module, to get provider supported metadata about the given module
-type InfoReader func(hclog.Logger, string) (map[string][]byte, diag.Diagnostics)
+type InfoReader func(logger hclog.Logger, module string, prefferedVersions []uint32) (version uint32, info map[string][]byte, diags diag.Diagnostics)
