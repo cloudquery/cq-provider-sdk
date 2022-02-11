@@ -251,10 +251,11 @@ func (p *Provider) GetProviderModuleInfo(_ context.Context, request *cqproto.Get
 		return nil, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
 	}
 
-	info, err := p.ModuleInfoReader(p.Logger, request.Module)
+	info, diags := p.ModuleInfoReader(p.Logger, request.Module)
 	return &cqproto.GetProviderModuleInfoResponse{
-		Info: info,
-	}, err
+		Info:        info,
+		Diagnostics: diags,
+	}, nil
 }
 
 var _ cqproto.CQProviderServer = (*Provider)(nil)

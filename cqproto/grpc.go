@@ -108,7 +108,8 @@ func (g GRPCClient) GetProviderModuleInfo(ctx context.Context, request *GetProvi
 		return nil, err
 	}
 	return &GetProviderModuleInfoResponse{
-		Info: res.Info,
+		Info:        res.Info,
+		Diagnostics: diagnosticsFromProto("", res.Diagnostics),
 	}, nil
 }
 

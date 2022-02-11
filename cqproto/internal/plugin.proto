@@ -148,6 +148,7 @@ message GetProviderModuleInfo {
   }
   message Response {
     map<string, bytes> info = 1;
+    repeated Diagnostic diagnostics = 2;
   }
 }
 
