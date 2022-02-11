@@ -12,6 +12,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
+	"github.com/cloudquery/cq-provider-sdk/provider/module"
 	"github.com/thoas/go-funk"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
@@ -52,6 +53,8 @@ type Provider struct {
 	// Classifier function may return empty slice if it cannot meaningfully convert the error into diagnostics. In this case
 	// the error will be converted by the SDK into diagnostic at ERROR level and RESOLVING type.
 	ErrorClassifier execution.ErrorClassifier
+	// ModuleInfoReader is called when the user executes a module, to get provider supported metadata about the given module
+	ModuleInfoReader module.InfoReader
 	// Database connection string
 	dbURL string
 	// meta is the provider's client created when configure is called
@@ -238,6 +241,23 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	}
 	return g.Wait()
 }
+
+func (p *Provider) GetProviderModuleInfo(_ context.Context, request *cqproto.GetProviderModuleInfoRequest) (*cqproto.GetProviderModuleInfoResponse, error) {
+	if p.ModuleInfoReader == nil {
+		return nil, nil
+	}
+
+	if p.Logger == nil {
+		return nil, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
+	}
+
+	info, err := p.ModuleInfoReader(p.Logger, request.Module)
+	return &cqproto.GetProviderModuleInfoResponse{
+		Info: info,
+	}, err
+}
+
+var _ cqproto.CQProviderServer = (*Provider)(nil)
 
 func (p *Provider) interpolateAllResources(requestedResources []string) ([]string, error) {
 	if len(requestedResources) != 1 {

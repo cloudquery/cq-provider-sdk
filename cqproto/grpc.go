@@ -100,6 +100,18 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 	return fr, nil
 }
 
+func (g GRPCClient) GetProviderModuleInfo(ctx context.Context, request *GetProviderModuleInfoRequest) (*GetProviderModuleInfoResponse, error) {
+	res, err := g.client.GetProviderModuleInfo(ctx, &internal.GetProviderModuleInfo_Request{
+		Module: request.Module,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &GetProviderModuleInfoResponse{
+		Info: res.Info,
+	}, nil
+}
+
 type GRPCServer struct {
 	// This is the real implementation
 	Impl CQProviderServer
@@ -129,7 +141,6 @@ func (g *GRPCServer) GetProviderConfig(ctx context.Context, _ *internal.GetProvi
 }
 
 func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.ConfigureProvider_Request) (*internal.ConfigureProvider_Response, error) {
-
 	var eFields = make(map[string]interface{})
 	if request.GetExtraFields() != nil {
 		if err := msgpack.Unmarshal(request.GetExtraFields(), &eFields); err != nil {
@@ -149,7 +160,6 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 		return nil, err
 	}
 	return &internal.ConfigureProvider_Response{Error: resp.Error}, nil
-
 }
 
 func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, server internal.Provider_FetchResourcesServer) error {
@@ -181,6 +191,18 @@ func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 			Diagnostics:   diagnosticsToProto(response.Summary.Diagnostics),
 		},
 	})
+}
+
+func (g *GRPCServer) GetProviderModuleInfo(ctx context.Context, request *internal.GetProviderModuleInfo_Request) (*internal.GetProviderModuleInfo_Response, error) {
+	resp, err := g.Impl.GetProviderModuleInfo(ctx, &GetProviderModuleInfoRequest{
+		Module: request.Module,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &internal.GetProviderModuleInfo_Response{
+		Info: resp.Info,
+	}, nil
 }
 
 func tablesFromProto(in map[string]*internal.Table) map[string]*schema.Table {

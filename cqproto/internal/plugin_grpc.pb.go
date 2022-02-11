@@ -26,6 +26,8 @@ type ProviderClient interface {
 	ConfigureProvider(ctx context.Context, in *ConfigureProvider_Request, opts ...grpc.CallOption) (*ConfigureProvider_Response, error)
 	// Fetch Provider Resources
 	FetchResources(ctx context.Context, in *FetchResources_Request, opts ...grpc.CallOption) (Provider_FetchResourcesClient, error)
+	// Gets info about specific module config embedded inside provider
+	GetProviderModuleInfo(ctx context.Context, in *GetProviderModuleInfo_Request, opts ...grpc.CallOption) (*GetProviderModuleInfo_Response, error)
 }
 
 type providerClient struct {
@@ -95,6 +97,15 @@ func (x *providerFetchResourcesClient) Recv() (*FetchResources_Response, error) 
 	return m, nil
 }
 
+func (c *providerClient) GetProviderModuleInfo(ctx context.Context, in *GetProviderModuleInfo_Request, opts ...grpc.CallOption) (*GetProviderModuleInfo_Response, error) {
+	out := new(GetProviderModuleInfo_Response)
+	err := c.cc.Invoke(ctx, "/proto.Provider/GetProviderModuleInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProviderServer is the server API for Provider service.
 // All implementations must embed UnimplementedProviderServer
 // for forward compatibility
@@ -107,6 +118,8 @@ type ProviderServer interface {
 	ConfigureProvider(context.Context, *ConfigureProvider_Request) (*ConfigureProvider_Response, error)
 	// Fetch Provider Resources
 	FetchResources(*FetchResources_Request, Provider_FetchResourcesServer) error
+	// Gets info about specific module config embedded inside provider
+	GetProviderModuleInfo(context.Context, *GetProviderModuleInfo_Request) (*GetProviderModuleInfo_Response, error)
 	mustEmbedUnimplementedProviderServer()
 }
 
@@ -125,6 +138,9 @@ func (UnimplementedProviderServer) ConfigureProvider(context.Context, *Configure
 }
 func (UnimplementedProviderServer) FetchResources(*FetchResources_Request, Provider_FetchResourcesServer) error {
 	return status.Errorf(codes.Unimplemented, "method FetchResources not implemented")
+}
+func (UnimplementedProviderServer) GetProviderModuleInfo(context.Context, *GetProviderModuleInfo_Request) (*GetProviderModuleInfo_Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProviderModuleInfo not implemented")
 }
 func (UnimplementedProviderServer) mustEmbedUnimplementedProviderServer() {}
 
@@ -214,6 +230,24 @@ func (x *providerFetchResourcesServer) Send(m *FetchResources_Response) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Provider_GetProviderModuleInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProviderModuleInfo_Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderServer).GetProviderModuleInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.Provider/GetProviderModuleInfo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderServer).GetProviderModuleInfo(ctx, req.(*GetProviderModuleInfo_Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Provider_ServiceDesc is the grpc.ServiceDesc for Provider service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -232,6 +266,10 @@ var Provider_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConfigureProvider",
 			Handler:    _Provider_ConfigureProvider_Handler,
+		},
+		{
+			MethodName: "GetProviderModuleInfo",
+			Handler:    _Provider_GetProviderModuleInfo_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

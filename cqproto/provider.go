@@ -25,6 +25,9 @@ type CQProvider interface {
 	// FetchResources is called when CloudQuery requests to fetch one or more resources from the provider.
 	// The provider reports back status updates on the resources fetching progress.
 	FetchResources(context.Context, *FetchResourcesRequest) (FetchResourcesStream, error)
+
+	// Gets info about specific module config embedded inside provider
+	GetProviderModuleInfo(context.Context, *GetProviderModuleInfoRequest) (*GetProviderModuleInfoResponse, error)
 }
 
 type CQProviderServer interface {
@@ -42,6 +45,9 @@ type CQProviderServer interface {
 	// FetchResources is called when CloudQuery requests to fetch one or more resources from the provider.
 	// The provider reports back status updates on the resources fetching progress.
 	FetchResources(context.Context, *FetchResourcesRequest, FetchResourcesSender) error
+
+	// Gets info about specific module config embedded inside provider
+	GetProviderModuleInfo(context.Context, *GetProviderModuleInfoRequest) (*GetProviderModuleInfoResponse, error)
 }
 
 // GetProviderSchemaRequest represents a CloudQuery RPC request for provider's schemas
@@ -117,6 +123,16 @@ type FetchResourcesResponse struct {
 	PartialFetchFailedResources []*FailedResourceFetch
 	// fetch summary of resource that finished execution
 	Summary ResourceFetchSummary
+}
+
+// GetProviderModuleInfoRequest represents a CloudQuery RPC request of provider's module info for specific provider
+type GetProviderModuleInfoRequest struct {
+	Module string
+}
+
+// GetProviderModuleInfoResponse represents a CloudQuery RPC response of provider's module info for specific provider
+type GetProviderModuleInfoResponse struct {
+	Info map[string][]byte
 }
 
 // ResourceFetchStatus defines execution status of the resource fetch execution
