@@ -133,9 +133,10 @@ type GetProviderModuleInfoRequest struct {
 
 // GetProviderModuleInfoResponse represents a CloudQuery RPC response of provider's module info for specific provider
 type GetProviderModuleInfoResponse struct {
-	Version     uint32
-	Info        map[string][]byte
-	Diagnostics diag.Diagnostics
+	Version       uint32
+	Info          map[string][]byte
+	OtherVersions []uint32
+	Diagnostics   diag.Diagnostics
 }
 
 // ResourceFetchStatus defines execution status of the resource fetch execution

@@ -150,7 +150,8 @@ message GetProviderModuleInfo {
   message Response {
     uint32 version = 1;
     map<string, bytes> info = 2;
-    repeated Diagnostic diagnostics = 3;
+    repeated uint32 other_versions = 3;
+    repeated Diagnostic diagnostics = 4;
   }
 }
 

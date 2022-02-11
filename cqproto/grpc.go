@@ -109,9 +109,10 @@ func (g GRPCClient) GetProviderModuleInfo(ctx context.Context, request *GetProvi
 		return nil, err
 	}
 	return &GetProviderModuleInfoResponse{
-		Version:     res.Version,
-		Info:        res.Info,
-		Diagnostics: diagnosticsFromProto("", res.Diagnostics),
+		Version:       res.Version,
+		Info:          res.Info,
+		OtherVersions: res.OtherVersions,
+		Diagnostics:   diagnosticsFromProto("", res.Diagnostics),
 	}, nil
 }
 
@@ -205,9 +206,10 @@ func (g *GRPCServer) GetProviderModuleInfo(ctx context.Context, request *interna
 		return nil, err
 	}
 	return &internal.GetProviderModuleInfo_Response{
-		Version:     resp.Version,
-		Info:        resp.Info,
-		Diagnostics: diagnosticsToProto(resp.Diagnostics),
+		Version:       resp.Version,
+		Info:          resp.Info,
+		OtherVersions: resp.OtherVersions,
+		Diagnostics:   diagnosticsToProto(resp.Diagnostics),
 	}, nil
 }
 
