@@ -27,7 +27,7 @@ type CQProvider interface {
 	FetchResources(context.Context, *FetchResourcesRequest) (FetchResourcesStream, error)
 
 	// Gets info about specific module config embedded inside provider
-	GetProviderModuleInfo(context.Context, *GetProviderModuleInfoRequest) (*GetProviderModuleInfoResponse, error)
+	GetModuleInfo(context.Context, *GetProviderModuleRequest) (*GetModuleResponse, error)
 }
 
 type CQProviderServer interface {
@@ -47,7 +47,7 @@ type CQProviderServer interface {
 	FetchResources(context.Context, *FetchResourcesRequest, FetchResourcesSender) error
 
 	// Gets info about specific module config embedded inside provider
-	GetProviderModuleInfo(context.Context, *GetProviderModuleInfoRequest) (*GetProviderModuleInfoResponse, error)
+	GetProviderModuleInfo(context.Context, *GetProviderModuleRequest) (*GetModuleResponse, error)
 }
 
 // GetProviderSchemaRequest represents a CloudQuery RPC request for provider's schemas
@@ -125,18 +125,18 @@ type FetchResourcesResponse struct {
 	Summary ResourceFetchSummary
 }
 
-// GetProviderModuleInfoRequest represents a CloudQuery RPC request of provider's module info for specific provider
-type GetProviderModuleInfoRequest struct {
+// GetProviderModuleRequest represents a CloudQuery RPC request of provider's module info for specific provider
+type GetProviderModuleRequest struct {
 	Module            string
 	PreferredVersions []uint32
 }
 
-// GetProviderModuleInfoResponse represents a CloudQuery RPC response of provider's module info for specific provider
-type GetProviderModuleInfoResponse struct {
-	Version       uint32
-	Info          map[string][]byte
-	OtherVersions []uint32
-	Diagnostics   diag.Diagnostics
+// GetModuleResponse represents a CloudQuery RPC response of provider's module info for specific provider
+type GetModuleResponse struct {
+	Version           uint32
+	Info              map[string][]byte
+	SupportedVersions []uint32
+	Diagnostics       diag.Diagnostics
 }
 
 // ResourceFetchStatus defines execution status of the resource fetch execution

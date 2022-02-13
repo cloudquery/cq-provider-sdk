@@ -100,19 +100,19 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 	return fr, nil
 }
 
-func (g GRPCClient) GetProviderModuleInfo(ctx context.Context, request *GetProviderModuleInfoRequest) (*GetProviderModuleInfoResponse, error) {
-	res, err := g.client.GetProviderModuleInfo(ctx, &internal.GetProviderModuleInfo_Request{
+func (g GRPCClient) GetModuleInfo(ctx context.Context, request *GetProviderModuleRequest) (*GetModuleResponse, error) {
+	res, err := g.client.GetModuleInfo(ctx, &internal.GetModuleInfo_Request{
 		Module:            request.Module,
 		PreferredVersions: request.PreferredVersions,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &GetProviderModuleInfoResponse{
-		Version:       res.Version,
-		Info:          res.Info,
-		OtherVersions: res.OtherVersions,
-		Diagnostics:   diagnosticsFromProto("", res.Diagnostics),
+	return &GetModuleResponse{
+		Version:           res.Version,
+		Info:              res.Info,
+		SupportedVersions: res.SupportedVersions,
+		Diagnostics:       diagnosticsFromProto("", res.Diagnostics),
 	}, nil
 }
 
@@ -197,19 +197,19 @@ func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 	})
 }
 
-func (g *GRPCServer) GetProviderModuleInfo(ctx context.Context, request *internal.GetProviderModuleInfo_Request) (*internal.GetProviderModuleInfo_Response, error) {
-	resp, err := g.Impl.GetProviderModuleInfo(ctx, &GetProviderModuleInfoRequest{
+func (g *GRPCServer) GetProviderModuleInfo(ctx context.Context, request *internal.GetModuleInfo_Request) (*internal.GetModuleInfo_Response, error) {
+	resp, err := g.Impl.GetProviderModuleInfo(ctx, &GetProviderModuleRequest{
 		Module:            request.Module,
 		PreferredVersions: request.PreferredVersions,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &internal.GetProviderModuleInfo_Response{
-		Version:       resp.Version,
-		Info:          resp.Info,
-		OtherVersions: resp.OtherVersions,
-		Diagnostics:   diagnosticsToProto(resp.Diagnostics),
+	return &internal.GetModuleInfo_Response{
+		Version:           resp.Version,
+		Info:              resp.Info,
+		SupportedVersions: resp.SupportedVersions,
+		Diagnostics:       diagnosticsToProto(resp.Diagnostics),
 	}, nil
 }
 

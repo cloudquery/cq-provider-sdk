@@ -27,7 +27,7 @@ type ProviderClient interface {
 	// Fetch Provider Resources
 	FetchResources(ctx context.Context, in *FetchResources_Request, opts ...grpc.CallOption) (Provider_FetchResourcesClient, error)
 	// Gets info about specific module config embedded inside provider
-	GetProviderModuleInfo(ctx context.Context, in *GetProviderModuleInfo_Request, opts ...grpc.CallOption) (*GetProviderModuleInfo_Response, error)
+	GetModuleInfo(ctx context.Context, in *GetModuleInfo_Request, opts ...grpc.CallOption) (*GetModuleInfo_Response, error)
 }
 
 type providerClient struct {
@@ -97,9 +97,9 @@ func (x *providerFetchResourcesClient) Recv() (*FetchResources_Response, error) 
 	return m, nil
 }
 
-func (c *providerClient) GetProviderModuleInfo(ctx context.Context, in *GetProviderModuleInfo_Request, opts ...grpc.CallOption) (*GetProviderModuleInfo_Response, error) {
-	out := new(GetProviderModuleInfo_Response)
-	err := c.cc.Invoke(ctx, "/proto.Provider/GetProviderModuleInfo", in, out, opts...)
+func (c *providerClient) GetModuleInfo(ctx context.Context, in *GetModuleInfo_Request, opts ...grpc.CallOption) (*GetModuleInfo_Response, error) {
+	out := new(GetModuleInfo_Response)
+	err := c.cc.Invoke(ctx, "/proto.Provider/GetModuleInfo", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ type ProviderServer interface {
 	// Fetch Provider Resources
 	FetchResources(*FetchResources_Request, Provider_FetchResourcesServer) error
 	// Gets info about specific module config embedded inside provider
-	GetProviderModuleInfo(context.Context, *GetProviderModuleInfo_Request) (*GetProviderModuleInfo_Response, error)
+	GetModuleInfo(context.Context, *GetModuleInfo_Request) (*GetModuleInfo_Response, error)
 	mustEmbedUnimplementedProviderServer()
 }
 
@@ -139,8 +139,8 @@ func (UnimplementedProviderServer) ConfigureProvider(context.Context, *Configure
 func (UnimplementedProviderServer) FetchResources(*FetchResources_Request, Provider_FetchResourcesServer) error {
 	return status.Errorf(codes.Unimplemented, "method FetchResources not implemented")
 }
-func (UnimplementedProviderServer) GetProviderModuleInfo(context.Context, *GetProviderModuleInfo_Request) (*GetProviderModuleInfo_Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetProviderModuleInfo not implemented")
+func (UnimplementedProviderServer) GetModuleInfo(context.Context, *GetModuleInfo_Request) (*GetModuleInfo_Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetModuleInfo not implemented")
 }
 func (UnimplementedProviderServer) mustEmbedUnimplementedProviderServer() {}
 
@@ -230,20 +230,20 @@ func (x *providerFetchResourcesServer) Send(m *FetchResources_Response) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _Provider_GetProviderModuleInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetProviderModuleInfo_Request)
+func _Provider_GetModuleInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetModuleInfo_Request)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ProviderServer).GetProviderModuleInfo(ctx, in)
+		return srv.(ProviderServer).GetModuleInfo(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.Provider/GetProviderModuleInfo",
+		FullMethod: "/proto.Provider/GetModuleInfo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProviderServer).GetProviderModuleInfo(ctx, req.(*GetProviderModuleInfo_Request))
+		return srv.(ProviderServer).GetModuleInfo(ctx, req.(*GetModuleInfo_Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -268,8 +268,8 @@ var Provider_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Provider_ConfigureProvider_Handler,
 		},
 		{
-			MethodName: "GetProviderModuleInfo",
-			Handler:    _Provider_GetProviderModuleInfo_Handler,
+			MethodName: "GetModuleInfo",
+			Handler:    _Provider_GetModuleInfo_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

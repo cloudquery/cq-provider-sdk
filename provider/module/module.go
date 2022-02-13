@@ -14,7 +14,6 @@ type InfoResponse struct {
 	Version uint32
 	// Info, in the given version
 	Info map[string][]byte
-
-	// Other versions supported by the provider, if any
-	OtherVersions []uint32
+	// All versions supported by the provider, if any
+	SupportedVersions []uint32
 }

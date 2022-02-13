@@ -242,7 +242,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	return g.Wait()
 }
 
-func (p *Provider) GetProviderModuleInfo(_ context.Context, request *cqproto.GetProviderModuleInfoRequest) (*cqproto.GetProviderModuleInfoResponse, error) {
+func (p *Provider) GetProviderModuleInfo(_ context.Context, request *cqproto.GetProviderModuleRequest) (*cqproto.GetModuleResponse, error) {
 	if p.ModuleInfoReader == nil {
 		return nil, nil
 	}
@@ -252,11 +252,11 @@ func (p *Provider) GetProviderModuleInfo(_ context.Context, request *cqproto.Get
 	}
 
 	resp, diags := p.ModuleInfoReader(p.Logger, request.Module, request.PreferredVersions)
-	return &cqproto.GetProviderModuleInfoResponse{
-		Version:       resp.Version,
-		Info:          resp.Info,
-		OtherVersions: resp.OtherVersions,
-		Diagnostics:   diags,
+	return &cqproto.GetModuleResponse{
+		Version:           resp.Version,
+		Info:              resp.Info,
+		SupportedVersions: resp.SupportedVersions,
+		Diagnostics:       diags,
 	}, nil
 }
 
