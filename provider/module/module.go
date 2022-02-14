@@ -3,6 +3,7 @@ package module
 import (
 	"embed"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -10,10 +11,10 @@ import (
 )
 
 // InfoReader is called when the user executes a module, to get provider supported metadata about the given module
-type InfoReader func(logger hclog.Logger, module string, prefferedVersions []uint32) (resp InfoResponse, err error)
+type InfoReader func(logger hclog.Logger, module string, prefferedVersions []uint32) (resp Info, err error)
 
-// InfoResponse is what the provider returns from an InfoReader request.
-type InfoResponse struct {
+// Info is what the provider returns from an InfoReader request.
+type Info struct {
 	// Version of the supplied "info"
 	Version uint32
 	// Info, in the given version
@@ -22,29 +23,14 @@ type InfoResponse struct {
 	SupportedVersions []uint32
 }
 
-// Serve returns an InfoReader handler given a "moduleData" filesystem.
-// The fs should have all the required files for the modules in a moduledata/ directory, as one subdirectory per module ID.
+// EmbeddedReader returns an InfoReader handler given a "moduleData" filesystem.
+// The fs should have all the required files for the modules in basedir, as one subdirectory per module ID.
 // Filenames are the version IDs with an .hcl extension added.
-func Serve(moduleData embed.FS) InfoReader {
-	return func(logger hclog.Logger, module string, prefferedVersions []uint32) (resp InfoResponse, err error) {
-		for _, v := range prefferedVersions {
-			fn := fmt.Sprintf("moduledata/%s/%v.hcl", module, v)
-			data, err := moduleData.ReadFile(fn)
-			if err != nil {
-				continue
-			}
+func EmbeddedReader(moduleData embed.FS, basedir string) InfoReader {
+	return func(logger hclog.Logger, module string, prefferedVersions []uint32) (Info, error) {
+		var resp Info
 
-			resp.Version = v
-			resp.Info = map[string][]byte{
-				"info": data,
-			}
-			break
-		}
-		if resp.Version == 0 {
-			logger.Warn("received unsupported module info request", "module", module, "preferred_versions", prefferedVersions)
-		}
-
-		files, err := moduleData.ReadDir(fmt.Sprintf("moduledata/%s", module))
+		files, err := moduleData.ReadDir(filepath.Join(basedir, module))
 		if err != nil {
 			return resp, err
 		}
@@ -58,6 +44,23 @@ func Serve(moduleData embed.FS) InfoReader {
 				continue
 			}
 			resp.SupportedVersions = append(resp.SupportedVersions, uint32(vInt))
+		}
+
+		for _, v := range prefferedVersions {
+			fn := filepath.Join(basedir, module, fmt.Sprintf("%v.hcl", v))
+			data, err := moduleData.ReadFile(fn)
+			if err != nil {
+				continue
+			}
+
+			resp.Version = v
+			resp.Info = map[string][]byte{
+				"info": data,
+			}
+			break
+		}
+		if resp.Version == 0 {
+			logger.Warn("received unsupported module info request", "module", module, "preferred_versions", prefferedVersions)
 		}
 
 		return resp, nil
