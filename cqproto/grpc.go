@@ -110,7 +110,7 @@ func (g GRPCClient) GetModuleInfo(ctx context.Context, request *GetModuleRequest
 	}
 	return &GetModuleResponse{
 		Version:           res.Version,
-		Info:              res.Info,
+		Info:              moduleFilesFromProto(res.Info),
 		SupportedVersions: res.SupportedVersions,
 		Diagnostics:       diagnosticsFromProto("", res.Diagnostics),
 	}, nil
@@ -207,7 +207,7 @@ func (g *GRPCServer) GetModuleInfo(ctx context.Context, request *internal.GetMod
 	}
 	return &internal.GetModuleInfo_Response{
 		Version:           resp.Version,
-		Info:              resp.Info,
+		Info:              moduleFilesToProto(resp.Info),
 		SupportedVersions: resp.SupportedVersions,
 		Diagnostics:       diagnosticsToProto(resp.Diagnostics),
 	}, nil
@@ -426,6 +426,34 @@ func migrationsToProto(in map[string]map[string][]byte) map[string]*internal.Dia
 		ret[k] = &internal.DialectMigration{
 			Migrations: in[k],
 		}
+	}
+	return ret
+}
+
+func moduleFilesFromProto(in map[string]*internal.ModuleFiles) map[string][]*ModuleFile {
+	ret := make(map[string][]*ModuleFile, len(in))
+	for k := range in {
+		for _, f := range in[k].Files {
+			ret[k] = append(ret[k], &ModuleFile{
+				Name:     f.GetName(),
+				Contents: f.GetContents(),
+			})
+		}
+	}
+	return ret
+}
+
+func moduleFilesToProto(in map[string][]*ModuleFile) map[string]*internal.ModuleFiles {
+	ret := make(map[string]*internal.ModuleFiles, len(in))
+	for k := range in {
+		v := &internal.ModuleFiles{}
+		for j := range in[k] {
+			v.Files = append(v.Files, &internal.ModuleFile{
+				Name:     in[k][j].Name,
+				Contents: in[k][j].Contents,
+			})
+		}
+		ret[k] = v
 	}
 	return ret
 }

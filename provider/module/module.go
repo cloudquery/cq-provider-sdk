@@ -2,11 +2,10 @@ package module
 
 import (
 	"embed"
-	"fmt"
 	"path/filepath"
 	"strconv"
-	"strings"
 
+	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -18,43 +17,40 @@ type Info struct {
 	// Version of the supplied "info"
 	Version uint32
 	// Info, in the given version
-	Info map[string][]byte
+	Info map[string][]*cqproto.ModuleFile
 	// All versions supported by the provider, if any
 	SupportedVersions []uint32
 }
 
 // EmbeddedReader returns an InfoReader handler given a "moduleData" filesystem.
 // The fs should have all the required files for the modules in basedir, as one subdirectory per module ID.
-// Filenames are the version IDs with an .hcl extension added.
+// Each subdirectory (for the module ID) should contain one subdirectory per protocol version.
+// Each protocol-version subdirectory can contain multiple files.
+// Example: moduledata/drift/1/file.hcl (where "drift" is the module name and "1" is the protocol version)
 func EmbeddedReader(moduleData embed.FS, basedir string) InfoReader {
 	return func(logger hclog.Logger, module string, prefferedVersions []uint32) (Info, error) {
-		var resp Info
+		var (
+			resp Info
+			err  error
+		)
 
-		files, err := moduleData.ReadDir(filepath.Join(basedir, module))
+		resp.SupportedVersions, err = supportedVersions(moduleData, filepath.Join(basedir, module))
 		if err != nil {
 			return resp, err
 		}
 
-		for _, f := range files {
-			if f.IsDir() {
-				continue
-			}
-			vInt, err := strconv.ParseUint(strings.TrimSuffix(f.Name(), ".hcl"), 10, 32)
-			if err != nil {
-				continue
-			}
-			resp.SupportedVersions = append(resp.SupportedVersions, uint32(vInt))
-		}
-
 		for _, v := range prefferedVersions {
-			fn := filepath.Join(basedir, module, fmt.Sprintf("%v.hcl", v))
-			data, err := moduleData.ReadFile(fn)
+			dir := filepath.Join(basedir, module, strconv.FormatInt(int64(v), 10)) // <basedir>/<module>/<version>/
+			data, err := flatFiles(moduleData, dir, "")
 			if err != nil {
+				return resp, err
+			}
+			if len(data) == 0 {
 				continue
 			}
 
 			resp.Version = v
-			resp.Info = map[string][]byte{
+			resp.Info = map[string][]*cqproto.ModuleFile{
 				"info": data,
 			}
 			break
@@ -65,4 +61,58 @@ func EmbeddedReader(moduleData embed.FS, basedir string) InfoReader {
 
 		return resp, nil
 	}
+}
+
+func supportedVersions(moduleData embed.FS, dir string) ([]uint32, error) {
+	versionDirs, err := moduleData.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	versions := make([]uint32, 0, len(versionDirs))
+	for _, f := range versionDirs {
+		if !f.IsDir() {
+			continue
+		}
+		vInt, err := strconv.ParseUint(f.Name(), 10, 32)
+		if err != nil {
+			continue
+		}
+		versions = append(versions, uint32(vInt))
+	}
+
+	return versions, nil
+}
+
+func flatFiles(moduleData embed.FS, dir, prefix string) ([]*cqproto.ModuleFile, error) {
+	files, err := moduleData.ReadDir(dir)
+	if err != nil {
+		return nil, nil
+	}
+
+	var ret []*cqproto.ModuleFile
+	for _, f := range files {
+		name := filepath.Join(dir, f.Name())
+
+		if !f.IsDir() {
+			data, err := moduleData.ReadFile(name)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, &cqproto.ModuleFile{
+				Name:     filepath.Join(prefix, f.Name()),
+				Contents: data,
+			})
+			continue
+		}
+
+		// recurse and read subdirs
+		sub, err := flatFiles(moduleData, name, f.Name())
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, sub...)
+	}
+
+	return ret, nil
 }

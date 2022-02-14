@@ -134,9 +134,15 @@ type GetModuleRequest struct {
 // GetModuleResponse represents a CloudQuery RPC response of provider's module info for specific provider
 type GetModuleResponse struct {
 	Version           uint32
-	Info              map[string][]byte
+	Info              map[string][]*ModuleFile
 	SupportedVersions []uint32
 	Diagnostics       diag.Diagnostics
+}
+
+// ModuleFile is a file definition inside a ModuleResponse
+type ModuleFile struct {
+	Name     string
+	Contents []byte
 }
 
 // ResourceFetchStatus defines execution status of the resource fetch execution
