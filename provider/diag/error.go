@@ -145,3 +145,15 @@ func WithDetails(detail string, args ...interface{}) BaseErrorOption {
 		}
 	}
 }
+
+// Convert an error to Diagnostics, or return if it's already of type diagnostic(s)
+func FromError(err error, dt DiagnosticType, opts ...BaseErrorOption) Diagnostics {
+	switch d := err.(type) {
+	case Diagnostics:
+		return d
+	case Diagnostic:
+		return Diagnostics{d}
+	default:
+		return Diagnostics{NewBaseError(err, dt, opts...)}
+	}
+}

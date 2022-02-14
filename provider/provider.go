@@ -11,6 +11,7 @@ import (
 
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/module"
 	"github.com/thoas/go-funk"
@@ -242,7 +243,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	return g.Wait()
 }
 
-func (p *Provider) GetProviderModuleInfo(_ context.Context, request *cqproto.GetProviderModuleRequest) (*cqproto.GetModuleResponse, error) {
+func (p *Provider) GetModuleInfo(_ context.Context, request *cqproto.GetModuleRequest) (*cqproto.GetModuleResponse, error) {
 	if p.ModuleInfoReader == nil {
 		return nil, nil
 	}
@@ -251,12 +252,12 @@ func (p *Provider) GetProviderModuleInfo(_ context.Context, request *cqproto.Get
 		return nil, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
 	}
 
-	resp, diags := p.ModuleInfoReader(p.Logger, request.Module, request.PreferredVersions)
+	resp, err := p.ModuleInfoReader(p.Logger, request.Module, request.PreferredVersions)
 	return &cqproto.GetModuleResponse{
 		Version:           resp.Version,
 		Info:              resp.Info,
 		SupportedVersions: resp.SupportedVersions,
-		Diagnostics:       diags,
+		Diagnostics:       diag.FromError(err, diag.INTERNAL),
 	}, nil
 }
 

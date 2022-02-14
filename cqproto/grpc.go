@@ -100,7 +100,7 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 	return fr, nil
 }
 
-func (g GRPCClient) GetModuleInfo(ctx context.Context, request *GetProviderModuleRequest) (*GetModuleResponse, error) {
+func (g GRPCClient) GetModuleInfo(ctx context.Context, request *GetModuleRequest) (*GetModuleResponse, error) {
 	res, err := g.client.GetModuleInfo(ctx, &internal.GetModuleInfo_Request{
 		Module:            request.Module,
 		PreferredVersions: request.PreferredVersions,
@@ -197,8 +197,8 @@ func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 	})
 }
 
-func (g *GRPCServer) GetProviderModuleInfo(ctx context.Context, request *internal.GetModuleInfo_Request) (*internal.GetModuleInfo_Response, error) {
-	resp, err := g.Impl.GetProviderModuleInfo(ctx, &GetProviderModuleRequest{
+func (g *GRPCServer) GetModuleInfo(ctx context.Context, request *internal.GetModuleInfo_Request) (*internal.GetModuleInfo_Response, error) {
+	resp, err := g.Impl.GetModuleInfo(ctx, &GetModuleRequest{
 		Module:            request.Module,
 		PreferredVersions: request.PreferredVersions,
 	})

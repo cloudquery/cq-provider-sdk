@@ -27,7 +27,7 @@ type CQProvider interface {
 	FetchResources(context.Context, *FetchResourcesRequest) (FetchResourcesStream, error)
 
 	// Gets info about specific module config embedded inside provider
-	GetModuleInfo(context.Context, *GetProviderModuleRequest) (*GetModuleResponse, error)
+	GetModuleInfo(context.Context, *GetModuleRequest) (*GetModuleResponse, error)
 }
 
 type CQProviderServer interface {
@@ -47,7 +47,7 @@ type CQProviderServer interface {
 	FetchResources(context.Context, *FetchResourcesRequest, FetchResourcesSender) error
 
 	// Gets info about specific module config embedded inside provider
-	GetProviderModuleInfo(context.Context, *GetProviderModuleRequest) (*GetModuleResponse, error)
+	GetModuleInfo(context.Context, *GetModuleRequest) (*GetModuleResponse, error)
 }
 
 // GetProviderSchemaRequest represents a CloudQuery RPC request for provider's schemas
@@ -125,8 +125,8 @@ type FetchResourcesResponse struct {
 	Summary ResourceFetchSummary
 }
 
-// GetProviderModuleRequest represents a CloudQuery RPC request of provider's module info for specific provider
-type GetProviderModuleRequest struct {
+// GetModuleRequest represents a CloudQuery RPC request of provider's module info for specific provider
+type GetModuleRequest struct {
 	Module            string
 	PreferredVersions []uint32
 }

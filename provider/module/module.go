@@ -6,12 +6,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/hashicorp/go-hclog"
 )
 
 // InfoReader is called when the user executes a module, to get provider supported metadata about the given module
-type InfoReader func(logger hclog.Logger, module string, prefferedVersions []uint32) (resp InfoResponse, diags diag.Diagnostics)
+type InfoReader func(logger hclog.Logger, module string, prefferedVersions []uint32) (resp InfoResponse, err error)
 
 // InfoResponse is what the provider returns from an InfoReader request.
 type InfoResponse struct {
@@ -27,7 +26,7 @@ type InfoResponse struct {
 // The fs should have all the required files for the modules in a moduledata/ directory, as one subdirectory per module ID.
 // Filenames are the version IDs with an .hcl extension added.
 func Serve(moduleData embed.FS) InfoReader {
-	return func(logger hclog.Logger, module string, prefferedVersions []uint32) (resp InfoResponse, diags diag.Diagnostics) {
+	return func(logger hclog.Logger, module string, prefferedVersions []uint32) (resp InfoResponse, err error) {
 		for _, v := range prefferedVersions {
 			fn := fmt.Sprintf("moduledata/%s/%v.hcl", module, v)
 			data, err := moduleData.ReadFile(fn)
@@ -47,7 +46,7 @@ func Serve(moduleData embed.FS) InfoReader {
 
 		files, err := moduleData.ReadDir(fmt.Sprintf("moduledata/%s", module))
 		if err != nil {
-			return resp, diag.Diagnostics{diag.NewBaseError(err, diag.INTERNAL)}
+			return resp, err
 		}
 
 		for _, f := range files {
