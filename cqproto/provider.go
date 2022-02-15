@@ -133,13 +133,18 @@ type GetModuleRequest struct {
 
 // GetModuleResponse represents a CloudQuery RPC response of provider's module info for specific provider
 type GetModuleResponse struct {
-	Version           uint32
-	Info              map[string][]*ModuleFile
-	SupportedVersions []uint32
+	Data              map[uint32]ModuleInfo // version vs Info
+	AvailableVersions []uint32              // all available versions, regardless of being requested in PreferredVersions or not
 	Diagnostics       diag.Diagnostics
 }
 
-// ModuleFile is a file definition inside a ModuleResponse
+// ModuleInfo is info about a module
+type ModuleInfo struct {
+	Files  []*ModuleFile
+	Extras map[string]string
+}
+
+// ModuleFile is a file definition inside ModuleInfo
 type ModuleFile struct {
 	Name     string
 	Contents []byte

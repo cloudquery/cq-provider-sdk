@@ -10,16 +10,14 @@ import (
 )
 
 // InfoReader is called when the user executes a module, to get provider supported metadata about the given module
-type InfoReader func(logger hclog.Logger, module string, prefferedVersions []uint32) (resp Info, err error)
+type InfoReader func(logger hclog.Logger, module string, prefferedVersions []uint32) (res InfoResult, err error)
 
-// Info is what the provider returns from an InfoReader request.
-type Info struct {
-	// Version of the supplied "info"
-	Version uint32
-	// Info, in the given version
-	Info map[string][]*cqproto.ModuleFile
-	// All versions supported by the provider, if any
-	SupportedVersions []uint32
+// InfoResult is what the provider returns from an InfoReader request.
+type InfoResult struct {
+	// Data contains all cqproto.ModuleInfo incarnations in the requested/preferred versions (if any)
+	Data map[uint32]cqproto.ModuleInfo
+	// AvailableVersions is the all available versions supported by the provider (if any)
+	AvailableVersions []uint32
 }
 
 // EmbeddedReader returns an InfoReader handler given a "moduleData" filesystem.
@@ -28,42 +26,44 @@ type Info struct {
 // Each protocol-version subdirectory can contain multiple files.
 // Example: moduledata/drift/1/file.hcl (where "drift" is the module name and "1" is the protocol version)
 func EmbeddedReader(moduleData embed.FS, basedir string) InfoReader {
-	return func(logger hclog.Logger, module string, prefferedVersions []uint32) (Info, error) {
+	return func(logger hclog.Logger, module string, prefferedVersions []uint32) (InfoResult, error) {
 		var (
-			resp Info
-			err  error
+			res InfoResult
+			err error
 		)
 
-		resp.SupportedVersions, err = supportedVersions(moduleData, filepath.Join(basedir, module))
+		res.AvailableVersions, err = availableVersions(moduleData, filepath.Join(basedir, module))
 		if err != nil {
-			return resp, err
+			return res, err
 		}
+
+		res.Data = make(map[uint32]cqproto.ModuleInfo, len(prefferedVersions))
 
 		for _, v := range prefferedVersions {
 			dir := filepath.Join(basedir, module, strconv.FormatInt(int64(v), 10)) // <basedir>/<module>/<version>/
 			data, err := flatFiles(moduleData, dir, "")
 			if err != nil {
-				return resp, err
+				return res, err
 			}
 			if len(data) == 0 {
 				continue
 			}
 
-			resp.Version = v
-			resp.Info = map[string][]*cqproto.ModuleFile{
-				"info": data,
+			inf := cqproto.ModuleInfo{
+				Files: data,
 			}
-			break
+			res.Data[v] = inf
 		}
-		if resp.Version == 0 {
+
+		if len(prefferedVersions) > 0 && len(res.Data) == 0 {
 			logger.Warn("received unsupported module info request", "module", module, "preferred_versions", prefferedVersions)
 		}
 
-		return resp, nil
+		return res, nil
 	}
 }
 
-func supportedVersions(moduleData embed.FS, dir string) ([]uint32, error) {
+func availableVersions(moduleData embed.FS, dir string) ([]uint32, error) {
 	versionDirs, err := moduleData.ReadDir(dir)
 	if err != nil {
 		return nil, err

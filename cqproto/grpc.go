@@ -109,9 +109,8 @@ func (g GRPCClient) GetModuleInfo(ctx context.Context, request *GetModuleRequest
 		return nil, err
 	}
 	return &GetModuleResponse{
-		Version:           res.Version,
-		Info:              moduleFilesFromProto(res.Info),
-		SupportedVersions: res.SupportedVersions,
+		Data:              moduleInfoFromProto(res.Data),
+		AvailableVersions: res.AvailableVersions,
 		Diagnostics:       diagnosticsFromProto("", res.Diagnostics),
 	}, nil
 }
@@ -206,9 +205,8 @@ func (g *GRPCServer) GetModuleInfo(ctx context.Context, request *internal.GetMod
 		return nil, err
 	}
 	return &internal.GetModuleInfo_Response{
-		Version:           resp.Version,
-		Info:              moduleFilesToProto(resp.Info),
-		SupportedVersions: resp.SupportedVersions,
+		Data:              moduleInfoToProto(resp.Data),
+		AvailableVersions: resp.AvailableVersions,
 		Diagnostics:       diagnosticsToProto(resp.Diagnostics),
 	}, nil
 }
@@ -430,30 +428,36 @@ func migrationsToProto(in map[string]map[string][]byte) map[string]*internal.Dia
 	return ret
 }
 
-func moduleFilesFromProto(in map[string]*internal.ModuleFiles) map[string][]*ModuleFile {
-	ret := make(map[string][]*ModuleFile, len(in))
-	for k := range in {
-		for _, f := range in[k].Files {
-			ret[k] = append(ret[k], &ModuleFile{
+func moduleInfoFromProto(in map[uint32]*internal.GetModuleInfo_Response_ModuleInfo) map[uint32]ModuleInfo {
+	ret := make(map[uint32]ModuleInfo, len(in))
+	for ver := range in {
+		v := ModuleInfo{
+			Extras: in[ver].Extras,
+		}
+		for _, f := range in[ver].Files {
+			v.Files = append(v.Files, &ModuleFile{
 				Name:     f.GetName(),
 				Contents: f.GetContents(),
 			})
 		}
+		ret[ver] = v
 	}
 	return ret
 }
 
-func moduleFilesToProto(in map[string][]*ModuleFile) map[string]*internal.ModuleFiles {
-	ret := make(map[string]*internal.ModuleFiles, len(in))
-	for k := range in {
-		v := &internal.ModuleFiles{}
-		for j := range in[k] {
-			v.Files = append(v.Files, &internal.ModuleFile{
-				Name:     in[k][j].Name,
-				Contents: in[k][j].Contents,
+func moduleInfoToProto(in map[uint32]ModuleInfo) map[uint32]*internal.GetModuleInfo_Response_ModuleInfo {
+	ret := make(map[uint32]*internal.GetModuleInfo_Response_ModuleInfo, len(in))
+	for ver, info := range in {
+		v := &internal.GetModuleInfo_Response_ModuleInfo{
+			Extras: in[ver].Extras,
+		}
+		for j := range info.Files {
+			v.Files = append(v.Files, &internal.GetModuleInfo_Response_ModuleInfo_ModuleFile{
+				Name:     in[ver].Files[j].Name,
+				Contents: in[ver].Files[j].Contents,
 			})
 		}
-		ret[k] = v
+		ret[ver] = v
 	}
 	return ret
 }

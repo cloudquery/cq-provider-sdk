@@ -15,42 +15,47 @@ var testdata embed.FS
 func TestEmbeddedReader(t *testing.T) {
 	for _, tc := range []struct {
 		PreferredVersions []uint32
-		ExpectedVersion   uint32
-		ExpectedFilenames []string
+		ExpectedVersions  []uint32
+		ExpectedFilenames map[uint32][]string
 	}{
 		{
 			PreferredVersions: []uint32{2, 1},
-			ExpectedVersion:   2,
-			ExpectedFilenames: []string{"file.hcl"},
+			ExpectedVersions:  []uint32{2, 1},
+			ExpectedFilenames: map[uint32][]string{
+				2: {"file.hcl"},
+				1: {"file1.hcl", "file2.hcl", "testdir/file3.hcl"},
+			},
 		},
 		{
 			PreferredVersions: []uint32{1},
-			ExpectedVersion:   1,
-			ExpectedFilenames: []string{"file1.hcl", "file2.hcl", "testdir/file3.hcl"},
+			ExpectedVersions:  []uint32{1},
+			ExpectedFilenames: map[uint32][]string{
+				1: {"file1.hcl", "file2.hcl", "testdir/file3.hcl"},
+			},
 		},
 		{
 			PreferredVersions: []uint32{3},
-			ExpectedVersion:   0,
 		},
 	} {
 		info, err := EmbeddedReader(testdata, "testdata")(hclog.NewNullLogger(), "testmod", tc.PreferredVersions)
 		assert.NoError(t, err)
 		assert.NotNil(t, info)
 
-		assert.Equal(t, tc.ExpectedVersion, info.Version)
-		assert.EqualValues(t, []uint32{1, 2}, info.SupportedVersions)
+		assert.EqualValues(t, []uint32{1, 2}, info.AvailableVersions)
 
-		if tc.ExpectedVersion == 0 {
+		if len(tc.ExpectedVersions) == 0 {
 			continue
 		}
 
-		assert.NotNil(t, info.Info["info"])
+		assert.Equal(t, len(info.Data), len(tc.ExpectedVersions))
 
-		var fnlist []string
-		for _, f := range info.Info["info"] {
-			fnlist = append(fnlist, f.Name)
+		for v, expected := range tc.ExpectedFilenames {
+			var fnlist []string
+			for _, f := range info.Data[v].Files {
+				fnlist = append(fnlist, f.Name)
+			}
+			sort.Strings(fnlist)
+			assert.Equal(t, expected, fnlist)
 		}
-		sort.Strings(fnlist)
-		assert.Equal(t, tc.ExpectedFilenames, fnlist)
 	}
 }

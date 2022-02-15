@@ -148,20 +148,20 @@ message GetModuleInfo {
     repeated uint32 preferred_versions = 2;
   }
   message Response {
-    uint32 version = 1;
-    map<string, ModuleFiles> info = 2;
-    repeated uint32 supported_versions = 3;
-    repeated Diagnostic diagnostics = 4;
+    map<uint32, ModuleInfo> data = 1;
+    repeated uint32 available_versions = 2;
+    repeated Diagnostic diagnostics = 3;
+
+    message ModuleInfo {
+      repeated ModuleFile files = 1;
+      map<string, string> extras = 2;
+
+      message ModuleFile {
+        string name = 1;
+        bytes contents = 2;
+      }
+    }
   }
-}
-
-message ModuleFiles {
-  repeated ModuleFile files = 1;
-}
-
-message ModuleFile {
-  string name = 1;
-  bytes contents = 2;
 }
 
 // Table is the definition of how a table is defined in a provider

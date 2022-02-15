@@ -254,9 +254,8 @@ func (p *Provider) GetModuleInfo(_ context.Context, request *cqproto.GetModuleRe
 
 	resp, err := p.ModuleInfoReader(p.Logger, request.Module, request.PreferredVersions)
 	return &cqproto.GetModuleResponse{
-		Version:           resp.Version,
-		Info:              resp.Info,
-		SupportedVersions: resp.SupportedVersions,
+		Data:              resp.Data,
+		AvailableVersions: resp.AvailableVersions,
 		Diagnostics:       diag.FromError(err, diag.INTERNAL),
 	}, nil
 }
