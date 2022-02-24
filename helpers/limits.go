@@ -14,5 +14,5 @@ func GetMaxGoRoutines() uint64 {
 		return GO_ROUTINES_PER_GB * 2
 	}
 	gb := float64(totalMemory) / float64(GB_IN_BYTES)
-	return uint64(gb) * GO_ROUTINES_PER_GB
+	return uint64(float64(GO_ROUTINES_PER_GB) * gb)
 }
