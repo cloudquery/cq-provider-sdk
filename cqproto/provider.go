@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudquery/cq-provider-sdk/cqproto/internal"
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 )
@@ -24,6 +25,9 @@ type CQProvider interface {
 	// FetchResources is called when CloudQuery requests to fetch one or more resources from the provider.
 	// The provider reports back status updates on the resources fetching progress.
 	FetchResources(context.Context, *FetchResourcesRequest) (FetchResourcesStream, error)
+
+	// Gets info about specific module config embedded inside provider
+	GetModuleInfo(context.Context, *GetModuleRequest) (*GetModuleResponse, error)
 }
 
 type CQProviderServer interface {
@@ -41,6 +45,9 @@ type CQProviderServer interface {
 	// FetchResources is called when CloudQuery requests to fetch one or more resources from the provider.
 	// The provider reports back status updates on the resources fetching progress.
 	FetchResources(context.Context, *FetchResourcesRequest, FetchResourcesSender) error
+
+	// Gets info about specific module config embedded inside provider
+	GetModuleInfo(context.Context, *GetModuleRequest) (*GetModuleResponse, error)
 }
 
 // GetProviderSchemaRequest represents a CloudQuery RPC request for provider's schemas
@@ -89,6 +96,8 @@ type FetchResourcesRequest struct {
 	PartialFetchingEnabled bool
 	// ParallelFetchingLimit limits parallel resources fetch at a time is more than 0
 	ParallelFetchingLimit uint64
+	// MaxGoroutines specified an approximage maximum number of goroutines that will be spanwd during fetch
+	MaxGoroutines uint64
 }
 
 // FetchResourcesStream represents a CloudQuery RPC stream of fetch updates from the provider
@@ -116,6 +125,31 @@ type FetchResourcesResponse struct {
 	Summary ResourceFetchSummary
 }
 
+// GetModuleRequest represents a CloudQuery RPC request of provider's module info for specific provider
+type GetModuleRequest struct {
+	Module            string
+	PreferredVersions []uint32
+}
+
+// GetModuleResponse represents a CloudQuery RPC response of provider's module info for specific provider
+type GetModuleResponse struct {
+	Data              map[uint32]ModuleInfo // version vs Info
+	AvailableVersions []uint32              // all available versions, regardless of being requested in PreferredVersions or not
+	Diagnostics       diag.Diagnostics
+}
+
+// ModuleInfo is info about a module
+type ModuleInfo struct {
+	Files  []*ModuleFile
+	Extras map[string]string
+}
+
+// ModuleFile is a file definition inside ModuleInfo
+type ModuleFile struct {
+	Name     string
+	Contents []byte
+}
+
 // ResourceFetchStatus defines execution status of the resource fetch execution
 type ResourceFetchStatus int
 
@@ -129,6 +163,14 @@ const (
 	// ResourceFetchCanceled execution was canceled preemptively
 	ResourceFetchCanceled
 )
+
+func (s ResourceFetchStatus) String() string {
+	name, ok := internal.ResourceFetchSummary_Status_name[int32(s)]
+	if !ok {
+		return "UNKNOWN"
+	}
+	return name
+}
 
 // ResourceFetchSummary includes a summarized report of a fetched resource, such as total amount of resources collected,
 // status of the fetch and any diagnostics found while executing fetch on it.
@@ -160,6 +202,7 @@ type ConnectionDetails struct {
 
 type ProviderDiagnostic struct {
 	ResourceName       string
+	ResourceId         []string
 	DiagnosticType     diag.DiagnosticType
 	DiagnosticSeverity diag.Severity
 	Summary            string
@@ -176,9 +219,10 @@ func (p ProviderDiagnostic) Type() diag.DiagnosticType {
 
 func (p ProviderDiagnostic) Description() diag.Description {
 	return diag.Description{
-		Resource: p.ResourceName,
-		Summary:  p.Summary,
-		Detail:   p.Details,
+		Resource:   p.ResourceName,
+		ResourceID: p.ResourceId,
+		Summary:    p.Summary,
+		Detail:     p.Details,
 	}
 }
 

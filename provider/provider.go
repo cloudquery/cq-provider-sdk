@@ -11,7 +11,9 @@ import (
 
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
+	"github.com/cloudquery/cq-provider-sdk/provider/module"
 	"github.com/thoas/go-funk"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
@@ -52,6 +54,8 @@ type Provider struct {
 	// Classifier function may return empty slice if it cannot meaningfully convert the error into diagnostics. In this case
 	// the error will be converted by the SDK into diagnostic at ERROR level and RESOLVING type.
 	ErrorClassifier execution.ErrorClassifier
+	// ModuleInfoReader is called when the user executes a module, to get provider supported metadata about the given module
+	ModuleInfoReader module.InfoReader
 	// Database connection string
 	dbURL string
 	// meta is the provider's client created when configure is called
@@ -85,8 +89,6 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 			%s
 			// list of resources to fetch
 			resources = %s
-			// enables partial fetching, allowing for any failures to not stop full resource pull
-			enable_partial_fetch = true
 		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
 
 	return &cqproto.GetProviderConfigResponse{Config: hclwrite.Format([]byte(data))}, nil
@@ -170,9 +172,18 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	defer conn.Close()
 
 	// limiter used to limit the amount of resources fetched concurrently
-	var limiter *semaphore.Weighted
-	if request.ParallelFetchingLimit > 0 {
-		limiter = semaphore.NewWeighted(int64(request.ParallelFetchingLimit))
+	var goroutinesSem *semaphore.Weighted
+	maxGoroutines := request.MaxGoroutines
+	if maxGoroutines == 0 {
+		maxGoroutines = helpers.GetMaxGoRoutines()
+	}
+	goroutinesSem = semaphore.NewWeighted(helpers.Uint64ToInt64(maxGoroutines))
+
+	// limiter used to limit the amount of resources fetched concurrently
+	var parallelResourceSem *semaphore.Weighted
+	maxParallelFetchingLimit := request.ParallelFetchingLimit
+	if maxParallelFetchingLimit > 0 {
+		parallelResourceSem = semaphore.NewWeighted(helpers.Uint64ToInt64(maxParallelFetchingLimit))
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -184,19 +195,21 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		tableExec := execution.NewTableExecutor(resource, conn, p.Logger, table, p.extraFields, p.ErrorClassifier)
+		tableExec := execution.NewTableExecutor(resource, conn, p.Logger, table, p.extraFields, p.ErrorClassifier, goroutinesSem)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource
 		l.Lock()
 		finishedResources[r] = false
 		l.Unlock()
+		if parallelResourceSem != nil {
+			if err := parallelResourceSem.Acquire(ctx, 1); err != nil {
+				return err
+			}
+		}
 		g.Go(func() error {
-			if limiter != nil {
-				if err := limiter.Acquire(gctx, 1); err != nil {
-					return err
-				}
-				defer limiter.Release(1)
+			if parallelResourceSem != nil {
+				defer parallelResourceSem.Release(1)
 			}
 			resourceCount, diags := tableExec.Resolve(gctx, p.meta)
 			l.Lock()
@@ -227,6 +240,25 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	}
 	return g.Wait()
 }
+
+func (p *Provider) GetModuleInfo(_ context.Context, request *cqproto.GetModuleRequest) (*cqproto.GetModuleResponse, error) {
+	if p.ModuleInfoReader == nil {
+		return nil, nil
+	}
+
+	if p.Logger == nil {
+		return nil, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
+	}
+
+	resp, err := p.ModuleInfoReader(p.Logger, request.Module, request.PreferredVersions)
+	return &cqproto.GetModuleResponse{
+		Data:              resp.Data,
+		AvailableVersions: resp.AvailableVersions,
+		Diagnostics:       diag.FromError(err, diag.INTERNAL),
+	}, nil
+}
+
+var _ cqproto.CQProviderServer = (*Provider)(nil)
 
 func (p *Provider) interpolateAllResources(requestedResources []string) ([]string, error) {
 	if len(requestedResources) != 1 {
