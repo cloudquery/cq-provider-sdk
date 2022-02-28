@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// queryPrimaryKeys lists all tables in the schema $1 which don't have the column $2 in their primary keys. Ignores *_schema_migrations tables.
 const queryPrimaryKeys = `SELECT kcu.table_name, c.constraint_name, ARRAY_AGG(kcu.column_name::text ORDER BY kcu.ordinal_position) AS pk_cols
 FROM information_schema.table_constraints c
 JOIN information_schema.key_column_usage kcu ON kcu.constraint_name = c.constraint_name AND kcu.constraint_schema = c.constraint_schema AND kcu.constraint_name = c.constraint_name
