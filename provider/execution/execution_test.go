@@ -266,7 +266,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 					Err:      "some error",
 					Resource: "error_returning_ignore",
 					Severity: diag.IGNORE,
-					Summary:  "table[simple] resolver ignored error: some error",
+					Summary:  `table "simple" resolver ignored error: some error`,
 					Type:     diag.RESOLVING,
 				},
 			},
