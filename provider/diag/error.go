@@ -151,6 +151,14 @@ func WithDetails(detail string, args ...interface{}) BaseErrorOption {
 	}
 }
 
+func WithError(err error) BaseErrorOption {
+	return func(e *BaseError) {
+		if !e.noOverwrite || e.err == nil {
+			e.err = err
+		}
+	}
+}
+
 // Convert an error to Diagnostics, or return if it's already of type diagnostic(s). nil error returns nil value.
 func FromError(err error, dt DiagnosticType, opts ...BaseErrorOption) Diagnostics {
 	if err == nil {
