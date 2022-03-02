@@ -60,7 +60,12 @@ func (e BaseError) Description() Description {
 	summary := e.summary
 	if e.summary == "" {
 		summary = e.Error()
+	} else if e.err != nil {
+		if es := e.err.Error(); es != summary {
+			summary += ": " + es
+		}
 	}
+
 	return Description{
 		e.resource,
 		e.resourceId,
