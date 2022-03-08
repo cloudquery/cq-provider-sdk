@@ -27,7 +27,7 @@ var (
 			mi := Meta{
 				LastUpdate: time.Now().UTC(),
 			}
-			if s, ok := resource.metadata["cq_fetch_id"].(string); ok { // will it work?
+			if s, ok := resource.metadata["cq_fetch_id"].(string); ok {
 				mi.FetchId = s
 			}
 			b, _ := json.Marshal(mi)
