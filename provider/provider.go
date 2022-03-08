@@ -171,11 +171,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 
 	defer conn.Close()
 
-	ef := p.extraFields
-	if request.ExtraFields != nil {
-		ef = request.ExtraFields
-	}
-
 	// limiter used to limit the amount of resources fetched concurrently
 	var goroutinesSem *semaphore.Weighted
 	maxGoroutines := request.MaxGoroutines
@@ -200,7 +195,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		tableExec := execution.NewTableExecutor(resource, conn, p.Logger, table, ef, p.ErrorClassifier, goroutinesSem)
+		tableExec := execution.NewTableExecutor(resource, conn, p.Logger, table, p.extraFields, request.Metadata, p.ErrorClassifier, goroutinesSem)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource

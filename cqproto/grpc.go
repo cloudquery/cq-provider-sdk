@@ -63,7 +63,7 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 }
 
 func (g GRPCClient) FetchResources(ctx context.Context, request *FetchResourcesRequest) (FetchResourcesStream, error) {
-	fieldsData, err := msgpack.Marshal(request.ExtraFields)
+	md, err := msgpack.Marshal(request.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (g GRPCClient) FetchResources(ctx context.Context, request *FetchResourcesR
 		Resources:             request.Resources,
 		ParallelFetchingLimit: request.ParallelFetchingLimit,
 		MaxGoroutines:         request.MaxGoroutines,
-		ExtraFields:           fieldsData,
+		Metadata:              md,
 	})
 	if err != nil {
 		return nil, err
@@ -172,10 +172,10 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 }
 
 func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, server internal.Provider_FetchResourcesServer) error {
-	var eFields map[string]interface{}
-	if ef := request.GetExtraFields(); ef != nil {
-		eFields = make(map[string]interface{})
-		if err := msgpack.Unmarshal(ef, &eFields); err != nil {
+	var md map[string]interface{}
+	if mdVal := request.GetMetadata(); mdVal != nil {
+		md = make(map[string]interface{})
+		if err := msgpack.Unmarshal(mdVal, &md); err != nil {
 			return err
 		}
 	}
@@ -186,7 +186,7 @@ func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, se
 			Resources:             request.GetResources(),
 			ParallelFetchingLimit: request.ParallelFetchingLimit,
 			MaxGoroutines:         request.MaxGoroutines,
-			ExtraFields:           eFields,
+			Metadata:              md,
 		},
 		&GRPCFetchResourcesServer{server: server},
 	)
