@@ -63,10 +63,16 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 }
 
 func (g GRPCClient) FetchResources(ctx context.Context, request *FetchResourcesRequest) (FetchResourcesStream, error) {
+	fieldsData, err := msgpack.Marshal(request.ExtraFields)
+	if err != nil {
+		return nil, err
+	}
+
 	res, err := g.client.FetchResources(ctx, &internal.FetchResources_Request{
 		Resources:             request.Resources,
 		ParallelFetchingLimit: request.ParallelFetchingLimit,
 		MaxGoroutines:         request.MaxGoroutines,
+		ExtraFields:           fieldsData,
 	})
 	if err != nil {
 		return nil, err
@@ -166,12 +172,21 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 }
 
 func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, server internal.Provider_FetchResourcesServer) error {
+	var eFields map[string]interface{}
+	if ef := request.GetExtraFields(); ef != nil {
+		eFields = make(map[string]interface{})
+		if err := msgpack.Unmarshal(ef, &eFields); err != nil {
+			return err
+		}
+	}
+
 	return g.Impl.FetchResources(
 		server.Context(),
 		&FetchResourcesRequest{
 			Resources:             request.GetResources(),
 			ParallelFetchingLimit: request.ParallelFetchingLimit,
 			MaxGoroutines:         request.MaxGoroutines,
+			ExtraFields:           eFields,
 		},
 		&GRPCFetchResourcesServer{server: server},
 	)

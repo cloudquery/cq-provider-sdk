@@ -98,6 +98,8 @@ type FetchResourcesRequest struct {
 	ParallelFetchingLimit uint64
 	// MaxGoroutines specified an approximage maximum number of goroutines that will be spanwd during fetch
 	MaxGoroutines uint64
+	// Fields to inject to every resource on insert. If non-nil, overrides ConfigureProviderRequest.ExtraFields
+	ExtraFields map[string]interface{}
 }
 
 // FetchResourcesStream represents a CloudQuery RPC stream of fetch updates from the provider

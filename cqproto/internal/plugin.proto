@@ -43,6 +43,8 @@ message FetchResources {
     uint64 parallel_fetching_limit = 3;
     // approximate maximum goroutines spawned during fetch
     uint64 max_goroutines = 4;
+    // Msgpack encoded: Allows to inject & override fields into resource tables, use this carefully to override fields. Overrides ConfigureProvider.Request.extraFields
+    bytes extraFields = 5;
   }
   message Response {
     // map of resources that have finished fetching
