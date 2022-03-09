@@ -197,10 +197,6 @@ func (d TSDBDialect) GetResourceValues(r *Resource) ([]interface{}, error) {
 	return doResourceValues(d, r)
 }
 
-func (d TSDBDialect) DefaultSchema() string {
-	return "history"
-}
-
 func doResourceValues(dialect Dialect, r *Resource) ([]interface{}, error) {
 	values := make([]interface{}, 0)
 	for _, c := range dialect.Columns(r.table) {

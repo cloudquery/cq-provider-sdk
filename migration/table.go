@@ -275,10 +275,6 @@ func (c constraintMigrations) Squash() constraintMigration {
 }
 
 func (m TableCreator) diffConstraints(ctx context.Context, conn *pgxpool.Conn, schemaName string, t *schema.Table) (up, down constraintMigrations, err error) {
-	if ds, ok := m.dialect.(interface{ DefaultSchema() string }); ok {
-		schemaName = ds.DefaultSchema()
-	}
-
 	rows, err := conn.Query(ctx, queryTablePKs, schemaName, t.Name)
 	if err != nil {
 		return nil, nil, err
