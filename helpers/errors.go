@@ -5,7 +5,7 @@ import (
 	"runtime"
 )
 
-// WrapError wraps error with the following string: "error in function_name[filename:line_number]: %w"
+// WrapError wraps error with the following string: "error at function_name[filename:line_number]: %w"
 // if err is nil returns nil
 func WrapError(err error) error {
 	if err != nil {
