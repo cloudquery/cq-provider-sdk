@@ -13,7 +13,7 @@ func WrapError(err error) error {
 		// the error happened, 0 = this function, we don't want that.
 		pc, filename, line, _ := runtime.Caller(1)
 
-		return fmt.Errorf("error in %s[%s:%d] %w", runtime.FuncForPC(pc).Name(), filename, line, err)
+		return fmt.Errorf("error at %s[%s:%d] %w", runtime.FuncForPC(pc).Name(), filename, line, err)
 	}
 	return err
 }
