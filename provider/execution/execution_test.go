@@ -53,6 +53,10 @@ var (
 		return nil
 	}
 
+	returnWrapErrorResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
+		return helpers.WrapError(fmt.Errorf("some error"))
+	}
+
 	panicResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
 		panic("resolver panic")
 	}
@@ -437,6 +441,24 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ExpectedResourceCount: 1,
+		},
+		{
+			Name: "return_wrap_error",
+			Table: &schema.Table{
+				Name:     "simple",
+				Resolver: returnWrapErrorResolver,
+				Columns:  commonColumns,
+			},
+			ErrorExpected: true,
+			ExpectedDiags: []diag.FlatDiag{
+				{
+					Err:      `error in github.com/cloudquery/cq-provider-sdk/provider/execution.glob..func4[/Users/ep/cq-provider-sdk/provider/execution/execution_test.go:57] some error`,
+					Resource: "return_wrap_error",
+					Severity: diag.ERROR,
+					Summary:  `failed to resolve table "simple": error in github.com/cloudquery/cq-provider-sdk/provider/execution.glob..func4[/Users/ep/cq-provider-sdk/provider/execution/execution_test.go:57] some error`,
+					Type:     diag.RESOLVING,
+				},
+			},
 		},
 	}
 
