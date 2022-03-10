@@ -54,7 +54,7 @@ var (
 	}
 
 	returnWrapErrorResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
-		return helpers.WrapError(fmt.Errorf("some error"))
+		return diag.WrapError(fmt.Errorf("some error"))
 	}
 
 	panicResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
