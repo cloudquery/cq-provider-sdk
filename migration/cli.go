@@ -80,7 +80,7 @@ func Run(ctx context.Context, p *provider.Provider, outputPath string) error {
 		*schemaName = "history"
 	}
 
-	if err := GenerateDiff(ctx, hclog.L(), conn, *schemaName, *dialectType, p, *outputPathParam, *prefixParam); err != nil {
+	if err := GenerateDiff(ctx, hclog.L(), conn, *schemaName, *dialectType, p, *outputPathParam, *prefixParam, *fakeTSDB); err != nil {
 		return fmt.Errorf("failed to generate migrations: %w", err)
 	}
 
