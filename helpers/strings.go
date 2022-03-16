@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/spf13/cast"
 )
 
 func FormatSlice(a []string) string {
@@ -25,4 +27,20 @@ func HasDuplicates(resources []string) bool {
 		dups[r] = true
 	}
 	return false
+}
+
+func ToStringSliceE(i interface{}) ([]string, error) {
+	var a []string
+
+	switch v := i.(type) {
+	case *[]string:
+		for _, u := range *v {
+			n := u
+			a = append(a, n)
+			return cast.ToStringSliceE(a)
+		}
+		return a, nil
+	default:
+		return cast.ToStringSliceE(i)
+	}
 }
