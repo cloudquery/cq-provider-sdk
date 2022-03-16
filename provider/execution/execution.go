@@ -101,10 +101,8 @@ func (e TableExecutor) withTable(t *schema.Table) *TableExecutor {
 // doMultiplexResolve resolves table with multiplexed clients appending all diagnostics returned from each multiplex.
 func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.ClientMeta) (uint64, diag.Diagnostics) {
 	var (
-		diagsChan      = make(chan diag.Diagnostics)
-		totalResources uint64
-	)
-	var (
+		diagsChan       = make(chan diag.Diagnostics)
+		totalResources  uint64
 		allDiags        diag.Diagnostics
 		doneClients     = 0
 		numberOfClients = 0
