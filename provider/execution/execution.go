@@ -34,8 +34,10 @@ type TableExecutor struct {
 	Logger hclog.Logger
 	// classifiers
 	classifiers []ErrorClassifier
-	// extraFields to be passed to each created resource in the execution
+	// extraFields to be passed to each created resource in the execution, used in tests.
 	extraFields map[string]interface{}
+	// metadata to be passed to each created resource in the execution, used by cq* resolvers.
+	metadata map[string]interface{}
 	// When the execution started
 	executionStart time.Time
 	// columns of table, this is to reduce calls to sift each time
@@ -45,7 +47,7 @@ type TableExecutor struct {
 }
 
 // NewTableExecutor creates a new TableExecutor for given schema.Table
-func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted) TableExecutor {
+func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted) TableExecutor {
 
 	var classifiers = []ErrorClassifier{defaultErrorClassifier}
 	if classifier != nil {
@@ -60,6 +62,7 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 		Db:             db,
 		Logger:         logger,
 		extraFields:    extraFields,
+		metadata:       metadata,
 		classifiers:    classifiers,
 		executionStart: time.Now().Add(executionJitter),
 		columns:        c,
@@ -97,12 +100,13 @@ func (e TableExecutor) withTable(t *schema.Table) *TableExecutor {
 // doMultiplexResolve resolves table with multiplexed clients appending all diagnostics returned from each multiplex.
 func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.ClientMeta) (uint64, diag.Diagnostics) {
 	var (
-		diagsChan      = make(chan diag.Diagnostics)
+		diagsChan      = make(chan diag.Diagnostics, len(clients))
 		totalResources uint64
 	)
 	var (
-		allDiags    diag.Diagnostics
-		doneClients = 0
+		allDiags        diag.Diagnostics
+		doneClients     = 0
+		numberOfClients = 0
 	)
 	logger := clients[0].Logger()
 	logger.Debug("multiplexing client", "count", len(clients), "table", e.Table.Name)
@@ -112,6 +116,8 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 		if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
 			return totalResources, allDiags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
 		}
+		logger.Debug("creating multiplex client new client")
+		numberOfClients++
 		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics) {
 			defer e.goroutinesSem.Release(1)
 			count, resolveDiags := e.callTableResolve(ctx, c, nil)
@@ -123,8 +129,8 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	for dd := range diagsChan {
 		allDiags = allDiags.Add(dd)
 		doneClients++
-		logger.Debug("multiplexed client finished", "done", doneClients, "total", len(clients), "table", e.Table.Name)
-		if doneClients >= len(clients) {
+		logger.Debug("multiplexed client finished", "done", doneClients, "total", numberOfClients, "table", e.Table.Name)
+		if doneClients >= numberOfClients {
 			break
 		}
 	}
@@ -152,7 +158,7 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 	if parent != nil {
 		return nil
 	}
-	client.Logger().Debug("cleaning table table stale data", "table", e.Table.Name, "last_update", e.executionStart)
+	client.Logger().Debug("cleaning table stale data", "table", e.Table.Name, "last_update", e.executionStart)
 
 	filters := make([]interface{}, 0)
 	for k, v := range e.extraFields {
@@ -161,7 +167,12 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 	if e.Table.DeleteFilter != nil {
 		filters = append(filters, e.Table.DeleteFilter(client, parent)...)
 	}
-	return e.Db.RemoveStaleData(ctx, e.Table, e.executionStart, filters)
+	if err := e.Db.RemoveStaleData(ctx, e.Table, e.executionStart, filters); err != nil {
+		client.Logger().Warn("failed to clean table stale data", "table", e.Table.Name, "last_update", e.executionStart)
+		return err
+	}
+	client.Logger().Debug("cleaned table stale data successfully", "table", e.Table.Name, "last_update", e.executionStart)
+	return nil
 }
 
 // callTableResolve does the actual resolving of the table calling the root table's resolver and for each returned resource resolves its columns and relations.
@@ -194,7 +205,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
 				client.Logger().Warn("ignored an error", "err", err, "table", e.Table.Name)
-				err = diag.NewBaseError(err, diag.RESOLVING, diag.WithSeverity(diag.IGNORE), diag.WithSummary("table[%s] resolver ignored error. Error: %s", e.Table.Name, err))
+				err = diag.NewBaseError(err, diag.RESOLVING, diag.WithSeverity(diag.IGNORE), diag.WithSummary("table %q resolver ignored error", e.Table.Name))
 			}
 			resolverErr = e.handleResolveError(client, parent, err)
 		}
@@ -234,7 +245,7 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 	)
 
 	for _, o := range objects {
-		resource := schema.NewResourceData(e.Db.Dialect(), e.Table, parent, o, e.extraFields, e.executionStart)
+		resource := schema.NewResourceData(e.Db.Dialect(), e.Table, parent, o, e.metadata, e.executionStart)
 		// Before inserting resolve all table column resolvers
 		if err := e.resolveResourceValues(ctx, meta, resource); err != nil {
 			e.Logger.Warn("skipping failed resolved resource", "reason", err.Error())
@@ -299,7 +310,7 @@ func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.Cl
 	defer func() {
 		if r := recover(); r != nil {
 			stack := string(debug.Stack())
-			e.Logger.Error("resolve table recovered from panic", "table", e.Table.Name, "stack", stack)
+			e.Logger.Error("resolve table recovered from panic", "table", e.Table.Name, "panic_msg", r, "stack", stack)
 			diags = fromError(fmt.Errorf("column resolve panic: %s", r), diag.WithResourceName(e.ResourceName), diag.WithSeverity(diag.PANIC),
 				diag.WithSummary("resolve table %q recovered from panic.", e.Table.Name), diag.WithDetails("%s", stack))
 		}

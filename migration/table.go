@@ -3,6 +3,7 @@ package migration
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -16,12 +17,18 @@ import (
 )
 
 const (
-	queryTableColumns   = `SELECT array_agg(column_name::text) AS columns, array_agg(data_type::text) AS types FROM information_schema.columns WHERE table_name = $1 AND table_schema = $2`
+	queryTableColumns   = `SELECT ARRAY_AGG(column_name::text) AS columns, ARRAY_AGG(data_type::text) AS types FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2`
 	addColumnToTable    = `ALTER TABLE IF EXISTS %s ADD COLUMN IF NOT EXISTS %v %v;`
 	dropColumnFromTable = `ALTER TABLE IF EXISTS %s DROP COLUMN IF EXISTS %v;`
 	renameColumnInTable = `-- ALTER TABLE %s RENAME COLUMN %v TO %v; -- uncomment to activate, remove ADD/DROP COLUMN above and below` // Can't have IF EXISTS here
 
+	queryTablePKs           = `SELECT c.constraint_name, ARRAY_AGG(k.column_name::text ORDER BY k.ordinal_position) AS columns FROM information_schema.table_constraints c JOIN information_schema.key_column_usage k ON c.table_catalog=k.table_catalog AND c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.constraint_name=k.constraint_name WHERE c.table_schema=$1 AND c.table_name=$2 AND c.constraint_type='PRIMARY KEY' GROUP BY 1`
+	addPKToTable            = `ALTER TABLE IF EXISTS %s ADD CONSTRAINT %s PRIMARY KEY (%s);`
+	dropConstraintFromTable = `ALTER TABLE IF EXISTS %s DROP CONSTRAINT %s;`
+
 	dropTable = `DROP TABLE IF EXISTS %s;`
+
+	fakeTSDBAssumeColumn = `cq_fetch_date`
 )
 
 // TableCreator handles creation of schema.Table in database as SQL strings
@@ -92,8 +99,9 @@ func (m TableCreator) CreateTableDefinitions(ctx context.Context, t *schema.Tabl
 // Column renames are detected (best effort) and ALTER TABLE RENAME COLUMN statements are generated as comments.
 // Table renames or removals are not detected.
 // FK changes are not detected.
-func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaName string, t, parent *schema.Table) (up, down []string, err error) {
-	rows, err := conn.Query(ctx, queryTableColumns, t.Name, schemaName)
+// if fakeTSDB is set, PKs for existing resources are assumed to have fakeTSDBAssumeColumn (`cq_fetch_date`) as the first part of composite PK.
+func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaName string, t, parent *schema.Table, fakeTSDB bool) (up, down []string, err error) {
+	rows, err := conn.Query(ctx, queryTableColumns, schemaName, t.Name)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -130,6 +138,13 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 	up, down = make([]string, 0, capSize), make([]string, 0, capSize)
 	downLast := make([]string, 0, capSize)
 
+	cUp, cDown, err := m.diffConstraints(ctx, conn, schemaName, t, fakeTSDB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("diffConstraints failed: %w", err)
+	}
+	up = append(up, cUp.Squash().removals...)
+	down = append(down, cDown.Squash().removals...)
+
 	for _, d := range columnsToAdd {
 		m.log.Debug("adding column", "column", d)
 		col := tableColsWithDialect.Get(d)
@@ -137,7 +152,11 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 			m.log.Warn("column missing from table, not adding it", "table", t.Name, "column", d)
 			continue
 		}
+		if fakeTSDB && col.Name == fakeTSDBAssumeColumn {
+			continue
+		}
 		if col.Internal() {
+			m.log.Warn("table missing internal column, not adding it", "table", t.Name, "column", d)
 			continue
 		}
 
@@ -173,9 +192,12 @@ func (m TableCreator) DiffTable(ctx context.Context, conn *pgxpool.Conn, schemaN
 		downLast = append(downLast, fmt.Sprintf(addColumnToTable, strconv.Quote(t.Name), strconv.Quote(d), dbColTypes[d])+notice)
 	}
 
+	up = append(up, cUp.Squash().additions...)
+	down = append(down, cDown.Squash().additions...)
+
 	// Do relation tables
 	for _, r := range t.Relations {
-		if cr, dr, err := m.DiffTable(ctx, conn, schemaName, r, t); err != nil {
+		if cr, dr, err := m.DiffTable(ctx, conn, schemaName, r, t, fakeTSDB); err != nil {
 			return nil, nil, err
 		} else {
 			up = append(up, cr...)
@@ -241,4 +263,87 @@ func findSimilarColumnsWithSameType(setA, setB map[string][]string) map[string]s
 	}
 
 	return ret
+}
+
+type constraintMigration struct {
+	removals  []string
+	additions []string
+}
+
+type constraintMigrations []constraintMigration
+
+func (c constraintMigrations) Squash() constraintMigration {
+	var ret constraintMigration
+	for _, m := range c {
+		ret.additions = append(ret.additions, m.additions...)
+		ret.removals = append(ret.removals, m.removals...)
+	}
+	return ret
+}
+
+func (m TableCreator) diffConstraints(ctx context.Context, conn *pgxpool.Conn, schemaName string, t *schema.Table, fakeTSDB bool) (up, down constraintMigrations, err error) {
+	rows, err := conn.Query(ctx, queryTablePKs, schemaName, t.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var existingPKs []struct {
+		ConstraintName string
+		Columns        []string
+	}
+
+	if err := pgxscan.ScanAll(&existingPKs, rows); err != nil {
+		return nil, nil, err
+	}
+
+	pks := m.dialect.PrimaryKeys(t)
+	if len(pks) == 0 {
+		return nil, nil, fmt.Errorf("dialect returned no primary keys for table")
+	}
+
+	if l := len(existingPKs); l > 1 {
+		return nil, nil, fmt.Errorf("query found more than one PK constraint")
+	} else if l == 0 {
+		return []constraintMigration{
+				{
+					additions: []string{
+						fmt.Sprintf(addPKToTable, t.Name, t.Name+"_pk", strings.Join(pks, ",")),
+					},
+				},
+			}, []constraintMigration{
+				{
+					removals: []string{
+						fmt.Sprintf(dropConstraintFromTable, t.Name, t.Name+"_pk"),
+					},
+				},
+			}, nil
+	}
+
+	if fakeTSDB && existingPKs[0].Columns[0] != fakeTSDBAssumeColumn {
+		existingPKs[0].Columns = append([]string{fakeTSDBAssumeColumn}, existingPKs[0].Columns...)
+	}
+
+	if reflect.DeepEqual(existingPKs[0].Columns, pks) {
+		return nil, nil, nil
+	}
+
+	return []constraintMigration{
+			{
+				removals: []string{
+					fmt.Sprintf(dropConstraintFromTable, t.Name, existingPKs[0].ConstraintName),
+				},
+				additions: []string{
+					fmt.Sprintf(addPKToTable, t.Name, t.Name+"_pk", strings.Join(pks, ",")),
+				},
+			},
+		}, []constraintMigration{
+			{
+				removals: []string{
+					fmt.Sprintf(dropConstraintFromTable, t.Name, t.Name+"_pk"),
+				},
+				additions: []string{
+					fmt.Sprintf(addPKToTable, t.Name, existingPKs[0].ConstraintName, strings.Join(existingPKs[0].Columns, ",")),
+				},
+			},
+		}, nil
 }
