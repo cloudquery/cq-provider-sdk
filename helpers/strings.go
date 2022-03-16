@@ -30,16 +30,9 @@ func HasDuplicates(resources []string) bool {
 }
 
 func ToStringSliceE(i interface{}) ([]string, error) {
-	var a []string
-
 	switch v := i.(type) {
 	case *[]string:
-		for _, u := range *v {
-			n := u
-			a = append(a, n)
-			return cast.ToStringSliceE(a)
-		}
-		return a, nil
+		return cast.ToStringSliceE(*v)
 	default:
 		return cast.ToStringSliceE(i)
 	}
