@@ -114,7 +114,6 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	for _, client := range clients {
 		// we can only limit on a granularity of a top table otherwise we can get deadlock
 		if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
-			allDiags = allDiags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
 			return totalResources, allDiags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
 		}
 		logger.Debug("creating multiplex client new client")
