@@ -300,6 +300,9 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 // saveToStorage copies resource data to source, it has ways of inserting, first it tries the most performant CopyFrom if that does work it bulk inserts,
 // finally it inserts each resource separately, appending errors for each failed resource, only successfully inserted resources are returned
 func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
+	if l := len(resources); l > 0 {
+		e.Logger.Debug("storing resources", "table", resources.TableName(), "count", l)
+	}
 	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
 	if err == nil {
 		return resources, nil
