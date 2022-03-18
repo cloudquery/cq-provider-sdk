@@ -121,6 +121,7 @@ message Diagnostic {
   string resource = 5;
   Diagnostic redacted = 6;
   repeated string resourceId = 7;
+  string accountId = 8;
 }
 
 message DialectMigration {

@@ -1,5 +1,10 @@
 package diag
 
+import (
+	"bytes"
+	"strings"
+)
+
 type Severity int
 
 const (
@@ -52,7 +57,31 @@ type Diagnostic interface {
 type Description struct {
 	Resource   string
 	ResourceID []string
+	AccountID  string
 
 	Summary string
 	Detail  string
+}
+
+// diagLine writes the given Diagnostic as a single line to the given buf
+func diagLine(buf *bytes.Buffer, d Diagnostic) {
+	desc := d.Description()
+	if l := len(desc.ResourceID); l > 0 || desc.AccountID != "" {
+		accountAndResID := make([]string, 0, 2)
+		if desc.AccountID != "" {
+			accountAndResID = append(accountAndResID, desc.AccountID)
+		}
+		if l > 0 {
+			accountAndResID = append(accountAndResID, strings.Join(desc.ResourceID, ","))
+		}
+		buf.WriteString("[")
+		buf.WriteString(strings.Join(accountAndResID, ":"))
+		buf.WriteString("] ")
+	}
+	buf.WriteString(desc.Summary)
+
+	if desc.Detail != "" {
+		buf.WriteString(": ")
+		buf.WriteString(desc.Detail)
+	}
 }

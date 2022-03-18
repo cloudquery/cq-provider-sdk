@@ -3,7 +3,6 @@ package diag
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/hcl/v2"
@@ -12,37 +11,21 @@ import (
 type Diagnostics []Diagnostic
 
 func (diags Diagnostics) Error() string {
-	switch {
-	case len(diags) == 0:
+	switch len(diags) {
+	case 0:
 		// should never happen, since we don't create this wrapper if
 		// there are no diagnostics in the list.
 		return "no errors"
-	case len(diags) == 1:
-		desc := diags[0].Description()
-		var ret bytes.Buffer
-		if len(desc.ResourceID) > 0 {
-			fmt.Fprintf(&ret, "[%s] ", strings.Join(desc.ResourceID, ","))
-		}
-		if desc.Detail == "" {
-			fmt.Fprintf(&ret, "%s", desc.Summary)
-		} else {
-			fmt.Fprintf(&ret, "%s: %s", desc.Summary, desc.Detail)
-		}
+	case 1:
+		ret := &bytes.Buffer{}
+		diagLine(ret, diags[0])
 		return ret.String()
 	default:
-		var ret bytes.Buffer
-		fmt.Fprintf(&ret, "%d problems:\n", len(diags))
+		ret := &bytes.Buffer{}
+		fmt.Fprintf(ret, "%d problems:", len(diags))
 		for _, diag := range diags {
-			desc := diag.Description()
-			fmt.Fprintf(&ret, "\n- ")
-			if len(desc.ResourceID) > 0 {
-				fmt.Fprintf(&ret, "[%s] ", strings.Join(desc.ResourceID, ","))
-			}
-			if desc.Detail == "" {
-				fmt.Fprintf(&ret, "%s", desc.Summary)
-			} else {
-				fmt.Fprintf(&ret, "%s: %s", desc.Summary, desc.Detail)
-			}
+			ret.WriteString("\n- ")
+			diagLine(ret, diag)
 		}
 		return ret.String()
 	}
@@ -110,7 +93,7 @@ func (diags Diagnostics) Squash() Diagnostics {
 			}
 		}
 
-		key := fmt.Sprintf("%s_%s_%d_%d", keygen.Error(), keygen.Description().Resource, keygen.Severity(), keygen.Type())
+		key := fmt.Sprintf("%s_%s_%s_%d_%d", keygen.Error(), keygen.Description().AccountID, keygen.Description().Resource, keygen.Severity(), keygen.Type())
 		if sd, ok := dd[key]; ok {
 			sd.count += CountDiag(d)
 			continue

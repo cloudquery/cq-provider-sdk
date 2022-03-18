@@ -25,28 +25,32 @@ type BaseError struct {
 	// err is the underlying go error this diagnostic wraps. Can be nil
 	err error
 
-	// Resource indicates the resource that failed in the execution
+	// resource indicates the resource that failed in the execution
 	resource string
 
-	// ResourceId indicates the id of the resource that failed in the execution
+	// resourceId indicates the id of the resource that failed in the execution
 	resourceId []string
 
-	// Severity indicates the level of the Diagnostic. Currently, can be set to
+	// accountId indicates the id of the account
+	accountId string
+
+	// severity indicates the level of the Diagnostic. Currently, can be set to
 	// either Error/Warning/Ignore
 	severity Severity
 
+	// severitySet indicates that the value in severity field is valid/set or not
 	severitySet bool
 
-	// Summary is a short description of the problem
+	// summary is a short description of the problem
 	summary string
 
-	// Detail is an optional second message, typically used to communicate a potential fix to the user.
+	// detail is an optional second message, typically used to communicate a potential fix to the user.
 	detail string
 
-	// DiagnosticType indicates the classification family of this diagnostic
+	// diagnosticType indicates the classification family of this diagnostic
 	diagnosticType DiagnosticType
 
-	// if noOverwrite is true, further Options won't overwrite previously set values. Valid for the duration of one "invocation"
+	// noOverwrite if it's true, further Options won't overwrite previously set values. Valid for the duration of one "invocation"
 	noOverwrite bool
 }
 
@@ -87,6 +91,7 @@ func (e BaseError) Description() Description {
 		e.resourceId,
 		summary,
 		e.detail,
+		e.accountId,
 	}
 }
 
@@ -155,6 +160,14 @@ func WithResourceId(id []string) BaseErrorOption {
 	return func(e *BaseError) {
 		if !e.noOverwrite || len(e.resourceId) == 0 {
 			e.resourceId = id
+		}
+	}
+}
+
+func WithAccountId(id string) BaseErrorOption {
+	return func(e *BaseError) {
+		if !e.noOverwrite || e.accountId == "" {
+			e.accountId = id
 		}
 	}
 }

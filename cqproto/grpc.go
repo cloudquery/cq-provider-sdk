@@ -384,6 +384,7 @@ func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
 			Detail:     p.Description().Detail,
 			Resource:   p.Description().Resource,
 			ResourceId: p.Description().ResourceID,
+			AccountId:  p.Description().AccountID,
 		}
 		if rd, ok := p.(diag.Redactable); ok {
 			if r := rd.Redacted(); r != nil {
@@ -394,6 +395,7 @@ func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
 					Detail:     r.Description().Detail,
 					Resource:   r.Description().Resource,
 					ResourceId: r.Description().ResourceID,
+					AccountId:  r.Description().AccountID,
 				}
 			}
 		}
@@ -410,6 +412,7 @@ func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.D
 		pdiag := &ProviderDiagnostic{
 			ResourceName:       resourceName,
 			ResourceId:         p.GetResourceId(),
+			AccountId:          p.GetAccountId(),
 			DiagnosticType:     diag.DiagnosticType(p.GetType()),
 			DiagnosticSeverity: diag.Severity(p.GetSeverity()),
 			Summary:            p.GetSummary(),
@@ -419,6 +422,7 @@ func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.D
 			diagnostics[i] = diag.NewRedactedDiagnostic(pdiag, &ProviderDiagnostic{
 				ResourceName:       resourceName,
 				ResourceId:         r.GetResourceId(),
+				AccountId:          r.GetAccountId(),
 				DiagnosticType:     diag.DiagnosticType(r.GetType()),
 				DiagnosticSeverity: diag.Severity(r.GetSeverity()),
 				Summary:            r.GetSummary(),

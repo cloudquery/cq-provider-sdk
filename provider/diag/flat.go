@@ -5,6 +5,7 @@ type FlatDiag struct {
 	Err         string
 	Resource    string
 	ResourceID  []string
+	AccountID   string
 	Type        DiagnosticType
 	Severity    Severity
 	Summary     string
@@ -17,11 +18,12 @@ func FlattenDiags(dd Diagnostics, skipDescription bool) []FlatDiag {
 	for i, d := range dd {
 		description := d.Description()
 		df[i] = FlatDiag{
-			Err:      d.Error(),
-			Resource: description.Resource,
-			Type:     d.Type(),
-			Severity: d.Severity(),
-			Summary:  description.Summary,
+			Err:       d.Error(),
+			Resource:  description.Resource,
+			Type:      d.Type(),
+			Severity:  d.Severity(),
+			Summary:   description.Summary,
+			AccountID: description.AccountID,
 		}
 		if len(description.ResourceID) > 0 {
 			df[i].ResourceID = description.ResourceID
