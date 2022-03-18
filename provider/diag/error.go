@@ -87,11 +87,11 @@ func (e BaseError) Description() Description {
 	}
 
 	return Description{
-		e.resource,
-		e.resourceId,
-		summary,
-		e.detail,
-		e.accountId,
+		Resource:   e.resource,
+		ResourceID: e.resourceId,
+		AccountID:  e.accountId,
+		Summary:    summary,
+		Detail:     e.detail,
 	}
 }
 
