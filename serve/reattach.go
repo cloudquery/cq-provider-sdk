@@ -60,6 +60,7 @@ func saveProviderReattach(path string, data []byte) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	if _, err := f.Write(data); err != nil {
 		return fmt.Errorf("failed to write CQ_REATTACH_PROVIDERS=%s: %w", path, err)
 	}
