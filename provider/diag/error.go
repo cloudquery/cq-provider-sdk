@@ -127,6 +127,16 @@ func WithSeverity(s Severity) BaseErrorOption {
 	}
 }
 
+func WithOptionalSeverity(s Severity) BaseErrorOption {
+	return func(e *BaseError) {
+		if e.noOverwrite || e.severitySet {
+			return
+		}
+		// we keep as e.severitySet = false
+		e.severity = s
+	}
+}
+
 func WithType(dt DiagnosticType) BaseErrorOption {
 	return func(e *BaseError) {
 		if !e.noOverwrite || dt > e.diagnosticType {
