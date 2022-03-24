@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,8 +62,19 @@ func TestCheckFileStructure(t *testing.T) {
 			t.FailNow()
 		}
 
-		for i, err := range errs {
-			assert.Contains(t, err.Error(), tc.expecterrors[i])
+		matches := 0
+		for _, err := range errs {
+			for _, expected := range tc.expecterrors {
+				if strings.Contains(err.Error(), expected) {
+					matches++
+					break
+				}
+			}
+		}
+		assert.Equal(t, len(tc.expecterrors), matches)
+		if t.Failed() {
+			t.Log(errs)
+			t.FailNow()
 		}
 	}
 }
