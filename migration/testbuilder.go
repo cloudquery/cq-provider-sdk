@@ -219,16 +219,17 @@ func checkFileStructureForDialect(migrationFiles map[string][]byte) []error {
 		if len(fnParts) != 2 {
 			return []error{fmt.Errorf("invalid filename format %q: less than 2 underscores", fn)}
 		}
-		if strings.HasSuffix(fnParts[1], ".up.sql") {
+		switch {
+		case strings.HasSuffix(fnParts[1], ".up.sql"):
 			fileUpDownness[fnParts[0]] |= hasUp
 			version := strings.TrimSuffix(fnParts[1], ".up.sql")
 			if !strings.HasPrefix(version, "v") {
 				return []error{fmt.Errorf("invalid filename format %q: version should start with v", fn)}
 			}
 			versionVsId[version] = append(versionVsId[version], fnParts[0])
-		} else if strings.HasSuffix(fnParts[1], ".down.sql") {
+		case strings.HasSuffix(fnParts[1], ".down.sql"):
 			fileUpDownness[fnParts[0]] |= hasDown
-		} else {
+		default:
 			return []error{fmt.Errorf("invalid filename format %q: neither up or down migration", fn)}
 		}
 	}
@@ -238,11 +239,12 @@ func checkFileStructureForDialect(migrationFiles map[string][]byte) []error {
 		if (flags & hasAll) == hasAll {
 			continue
 		}
-		if (flags & hasUp) > 0 {
+		switch {
+		case (flags & hasUp) > 0:
 			retErrs = append(retErrs, fmt.Errorf("migration id %q is missing down migration", id))
-		} else if (flags & hasDown) > 0 {
+		case (flags & hasDown) > 0:
 			retErrs = append(retErrs, fmt.Errorf("migration id %q is missing up migration", id))
-		} else {
+		default:
 			retErrs = append(retErrs, fmt.Errorf("migration id %q unhandled error", id))
 		}
 	}
