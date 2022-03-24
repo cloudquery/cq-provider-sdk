@@ -2,7 +2,9 @@ package migration
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/cloudquery/cq-provider-sdk/database"
@@ -117,6 +119,10 @@ func doMigrationsTest(t *testing.T, ctx context.Context, dsn string, prov *provi
 	migFiles, err := migrator.ReadMigrationFiles(hclog.L(), prov.Migrations)
 	assert.NoError(t, err)
 
+	t.Run("FileStructure", func(t *testing.T) {
+		checkFileStructure(t, migFiles)
+	})
+
 	mig, err := migrator.New(hclog.L(), dialect, migFiles, dsn, prov.Name)
 	assert.NoError(t, err)
 	if t.Failed() {
@@ -180,4 +186,70 @@ func requireAllPKsToHaveColumn(t *testing.T, ctx context.Context, conn *pgxpool.
 	err := pgxscan.Select(ctx, conn, &res, queryPrimaryKeysTest, schema, column)
 	assert.NoError(t, err)
 	assert.Empty(t, res)
+}
+
+func checkFileStructure(t *testing.T, migrationFiles map[string]map[string][]byte) {
+	t.Parallel()
+	for dialectKey := range migrationFiles {
+		t.Run("dialect:"+dialectKey, func(t *testing.T) {
+			errs := checkFileStructureForDialect(migrationFiles[dialectKey])
+			if len(errs) > 0 {
+				t.Fail()
+				for _, e := range errs {
+					t.Log(e.Error())
+				}
+			}
+		})
+	}
+}
+
+func checkFileStructureForDialect(migrationFiles map[string][]byte) []error {
+	// each file should have an 'up' and a 'down'
+	// each version should be mentioned only once
+	// no rogue files, only <int>_<version>.(up|down).sql
+	const (
+		hasUp   = 1
+		hasDown = 2
+		hasAll  = hasUp | hasDown
+	)
+	fileUpDownness := make(map[string]int)
+	versionVsId := make(map[string][]string)
+	for fn := range migrationFiles {
+		fnParts := strings.SplitN(fn, "_", 2)
+		if len(fnParts) != 2 {
+			return []error{fmt.Errorf("invalid filename format %q: less than 2 underscores", fn)}
+		}
+		if strings.HasSuffix(fnParts[1], ".up.sql") {
+			fileUpDownness[fnParts[0]] |= hasUp
+			version := strings.TrimSuffix(fnParts[1], ".up.sql")
+			if !strings.HasPrefix(version, "v") {
+				return []error{fmt.Errorf("invalid filename format %q: version should start with v", fn)}
+			}
+			versionVsId[version] = append(versionVsId[version], fnParts[0])
+		} else if strings.HasSuffix(fnParts[1], ".down.sql") {
+			fileUpDownness[fnParts[0]] |= hasDown
+		} else {
+			return []error{fmt.Errorf("invalid filename format %q: neither up or down migration", fn)}
+		}
+	}
+
+	var retErrs []error
+	for id, flags := range fileUpDownness {
+		if (flags & hasAll) == hasAll {
+			continue
+		}
+		if (flags & hasUp) > 0 {
+			retErrs = append(retErrs, fmt.Errorf("migration id %q is missing down migration", id))
+		} else if (flags & hasDown) > 0 {
+			retErrs = append(retErrs, fmt.Errorf("migration id %q is missing up migration", id))
+		} else {
+			retErrs = append(retErrs, fmt.Errorf("migration id %q unhandled error", id))
+		}
+	}
+	for version, ids := range versionVsId {
+		if len(ids) > 1 {
+			retErrs = append(retErrs, fmt.Errorf("migration version %q is mentioned in multiple versions: %s", version, strings.Join(ids, ", ")))
+		}
+	}
+	return retErrs
 }
