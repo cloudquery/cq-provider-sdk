@@ -213,7 +213,8 @@ func checkFileStructureForDialect(migrationFiles map[string][]byte) []error {
 		hasAll  = hasUp | hasDown
 	)
 	fileUpDownness := make(map[string]int)
-	versionVsId := make(map[string][]string)
+	versionVsIdUp := make(map[string][]string)
+	versionVsIdDown := make(map[string][]string)
 	for fn := range migrationFiles {
 		fnParts := strings.SplitN(fn, "_", 2)
 		if len(fnParts) != 2 {
@@ -226,9 +227,14 @@ func checkFileStructureForDialect(migrationFiles map[string][]byte) []error {
 			if !strings.HasPrefix(version, "v") {
 				return []error{fmt.Errorf("invalid filename format %q: version should start with v", fn)}
 			}
-			versionVsId[version] = append(versionVsId[version], fnParts[0])
+			versionVsIdUp[version] = append(versionVsIdUp[version], fnParts[0])
 		case strings.HasSuffix(fnParts[1], ".down.sql"):
 			fileUpDownness[fnParts[0]] |= hasDown
+			version := strings.TrimSuffix(fnParts[1], ".down.sql")
+			if !strings.HasPrefix(version, "v") {
+				return []error{fmt.Errorf("invalid filename format %q: version should start with v", fn)}
+			}
+			versionVsIdDown[version] = append(versionVsIdDown[version], fnParts[0])
 		default:
 			return []error{fmt.Errorf("invalid filename format %q: neither up or down migration", fn)}
 		}
@@ -248,9 +254,14 @@ func checkFileStructureForDialect(migrationFiles map[string][]byte) []error {
 			retErrs = append(retErrs, fmt.Errorf("migration id %q unhandled error", id))
 		}
 	}
-	for version, ids := range versionVsId {
+	for version, ids := range versionVsIdUp {
 		if len(ids) > 1 {
-			retErrs = append(retErrs, fmt.Errorf("migration version %q is mentioned in multiple versions: %s", version, strings.Join(ids, ", ")))
+			retErrs = append(retErrs, fmt.Errorf("migration version %q (up) is mentioned in multiple versions: %s", version, strings.Join(ids, ", ")))
+		}
+	}
+	for version, ids := range versionVsIdDown {
+		if len(ids) > 1 {
+			retErrs = append(retErrs, fmt.Errorf("migration version %q (down) is mentioned in multiple versions: %s", version, strings.Join(ids, ", ")))
 		}
 	}
 	return retErrs

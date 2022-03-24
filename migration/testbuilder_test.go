@@ -41,11 +41,15 @@ func TestCheckFileStructure(t *testing.T) {
 		},
 		{
 			filenames:    []string{"1_v1.0.0.up.sql", "1_v1.0.0.down.sql", "2_v1.2.0.up.sql", "2_v1.2.0.down.sql", "3_v1.2.0.up.sql", "3_v1.2.0.down.sql"},
-			expecterrors: []string{"mentioned in multiple versions"},
+			expecterrors: []string{"mentioned in multiple versions", "mentioned in multiple versions"},
 		},
 		{
 			filenames:    []string{"1_v1.0.0.up.sql", "1_v1.0.0.down.sql", "2_v1.2.0.up.sql", "3_v1.2.0.up.sql", "3_v1.2.0.down.sql"},
 			expecterrors: []string{"missing down migration", "mentioned in multiple versions"},
+		},
+		{
+			filenames:    []string{"21_v0.10.12.down.sql", "21_v0.10.12.up.sql", "22_v0.10.14.down.sql", "22_v0.10.14.up.sql", "23_v0.10.14.down.sql", "23_v0.10.15.up.sql"},
+			expecterrors: []string{"is mentioned in multiple versions"},
 		},
 	}
 
