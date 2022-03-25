@@ -189,9 +189,9 @@ func requireAllPKsToHaveColumn(t *testing.T, ctx context.Context, conn *pgxpool.
 }
 
 func checkFileStructure(t *testing.T, migrationFiles map[string]map[string][]byte) {
-	t.Parallel()
 	for dialectKey := range migrationFiles {
 		t.Run("dialect:"+dialectKey, func(t *testing.T) {
+			t.Parallel()
 			errs := checkFileStructureForDialect(migrationFiles[dialectKey])
 			if len(errs) > 0 {
 				t.Fail()
@@ -246,10 +246,10 @@ func checkFileStructureForDialect(migrationFiles map[string][]byte) []error {
 			continue
 		}
 		switch {
-		case (flags & hasUp) > 0:
-			retErrs = append(retErrs, fmt.Errorf("migration id %q is missing down migration", id))
-		case (flags & hasDown) > 0:
+		case (flags & hasUp) == 0:
 			retErrs = append(retErrs, fmt.Errorf("migration id %q is missing up migration", id))
+		case (flags & hasDown) == 0:
+			retErrs = append(retErrs, fmt.Errorf("migration id %q is missing down migration", id))
 		default:
 			retErrs = append(retErrs, fmt.Errorf("migration id %q unhandled error", id))
 		}
