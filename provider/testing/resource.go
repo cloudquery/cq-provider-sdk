@@ -32,7 +32,10 @@ type ResourceTestCase struct {
 	ParallelFetchingLimit uint64
 	// SkipIgnoreInTest flag which detects if schema.Table or schema.Column should be ignored
 	SkipIgnoreInTest bool
+	Verifiers        []Verifier
 }
+
+type Verifier func(t *testing.T, conn pgxscan.Querier)
 
 func init() {
 	_ = faker.SetRandomMapAndSliceMinSize(1)
@@ -67,10 +70,17 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 	if err = fetch(t, &resource); err != nil {
 		t.Fatal(err)
 	}
-	for _, table := range resource.Provider.ResourceMap {
-		verifyNoEmptyColumns(t, table, conn, resource.SkipIgnoreInTest)
-	}
 
+	// if no verifiers specified, use verifyNoEmptyColumns
+	if len(resource.Verifiers) == 0 {
+		for _, table := range resource.Provider.ResourceMap {
+			verifyNoEmptyColumns(t, table, conn, resource.SkipIgnoreInTest)
+		}
+	} else {
+		for _, verifier := range resource.Verifiers {
+			verifier(t, conn)
+		}
+	}
 }
 
 // fetch - fetches resources from the cloud and puts them into database. database config can be specified via DATABASE_URL env variable
