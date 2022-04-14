@@ -50,7 +50,7 @@ func VerifyNoEmptyColumnsExcept(table string, except ...string) Verifier {
 	}
 }
 
-func VerifyOneOf(table string, oneof ...string) Verifier {
+func VerifyAtMostOneOf(table string, oneof ...string) Verifier {
 	return func(t *testing.T, conn pgxscan.Querier) {
 		rows, err := conn.Query(context.Background(), fmt.Sprintf("select * from %s where num_nonnulls(%s) not in (0, 1);",
 			table, strings.Join(oneof, ", ")))
