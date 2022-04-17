@@ -32,10 +32,14 @@ type ResourceTestCase struct {
 	ParallelFetchingLimit uint64
 	// SkipIgnoreInTest flag which detects if schema.Table or schema.Column should be ignored
 	SkipIgnoreInTest bool
-	Verifiers        []Verifier
+	// Verifiers are map from resource name to its verifiers.
+	// If no verifiers specified for resource (resource name is not in key set of map),
+	// non emptiness check of all columns in table and its relations will be performed.
+	Verifiers map[string][]Verifier
 }
 
-type Verifier func(t *testing.T, conn pgxscan.Querier)
+// Verifier verifies tables specified by table schema (main table and its relations).
+type Verifier func(t *testing.T, table *schema.Table, conn pgxscan.Querier, shouldSkipIgnoreInTest bool)
 
 func init() {
 	_ = faker.SetRandomMapAndSliceMinSize(1)
@@ -71,14 +75,14 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 		t.Fatal(err)
 	}
 
-	// if no verifiers specified, use verifyNoEmptyColumns
-	if len(resource.Verifiers) == 0 {
-		for _, table := range resource.Provider.ResourceMap {
+	for resourceName, table := range resource.Provider.ResourceMap {
+		if verifiers, ok := resource.Verifiers[resourceName]; ok {
+			for _, verifier := range verifiers {
+				verifier(t, table, conn, resource.SkipIgnoreInTest)
+			}
+		} else {
+			// fallback to default verification
 			verifyNoEmptyColumns(t, table, conn, resource.SkipIgnoreInTest)
-		}
-	} else {
-		for _, verifier := range resource.Verifiers {
-			verifier(t, conn)
 		}
 	}
 }
