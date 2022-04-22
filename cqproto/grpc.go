@@ -60,7 +60,9 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 	if err != nil {
 		return nil, err
 	}
-	return &ConfigureProviderResponse{res.GetError()}, nil
+	return &ConfigureProviderResponse{
+		Diagnostics: diagnosticsFromProto("", res.Diagnostics),
+	}, nil
 }
 
 func (g GRPCClient) FetchResources(ctx context.Context, request *FetchResourcesRequest) (FetchResourcesStream, error) {
@@ -170,7 +172,10 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 	if err != nil {
 		return nil, err
 	}
-	return &internal.ConfigureProvider_Response{Error: resp.Error}, nil
+	return &internal.ConfigureProvider_Response{
+		Error:       resp.Diagnostics.Error(), // For backwards compatibility
+		Diagnostics: diagnosticsToProto(resp.Diagnostics),
+	}, nil
 }
 
 func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, server internal.Provider_FetchResourcesServer) error {

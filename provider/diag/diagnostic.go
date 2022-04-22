@@ -25,6 +25,8 @@ func (d DiagnosticType) String() string {
 		return "Throttle"
 	case DATABASE:
 		return "Database"
+	case USER:
+		return "User"
 	case UNKNOWN:
 		fallthrough
 	default:
@@ -40,6 +42,7 @@ const (
 	DATABASE
 	SCHEMA
 	INTERNAL
+	USER
 )
 
 type Diagnostic interface {
