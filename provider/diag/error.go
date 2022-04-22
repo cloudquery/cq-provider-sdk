@@ -208,11 +208,15 @@ func Mutate(dd Diagnostics, opts ...BaseErrorOption) Diagnostics {
 		return nil
 	}
 
+	type unwrapper interface {
+		Unwrap() error
+	}
+
 	ret := make(Diagnostics, len(dd))
 	for i, d := range dd {
 		var embeddedErr error
-		if be, ok := d.(*BaseError); ok {
-			embeddedErr = be.Unwrap()
+		if uw, ok := d.(unwrapper); ok {
+			embeddedErr = uw.Unwrap()
 		}
 
 		dsc := d.Description()
