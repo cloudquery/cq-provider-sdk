@@ -97,7 +97,7 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
 	if p.Logger == nil {
 		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diag.FromError(fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name), diag.USER),
+			Diagnostics: diag.FromError(fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name), diag.INTERNAL),
 		}, nil
 	}
 
