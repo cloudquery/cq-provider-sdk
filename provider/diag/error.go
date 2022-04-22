@@ -186,7 +186,7 @@ func WithError(err error) BaseErrorOption {
 	}
 }
 
-// Convert an error to Diagnostics, or return if it's already of type diagnostic(s). nil error returns nil value.
+// FromError converts an error to Diagnostics, or return if it's already of type diagnostic(s). nil error returns nil value.
 func FromError(err error, dt DiagnosticType, opts ...BaseErrorOption) Diagnostics {
 	if err == nil {
 		return nil
@@ -200,4 +200,36 @@ func FromError(err error, dt DiagnosticType, opts ...BaseErrorOption) Diagnostic
 	default:
 		return Diagnostics{NewBaseError(err, dt, opts...)}
 	}
+}
+
+// Mutate generates new Diagnostics (using BaseError) from the given Diagnostics, and applies the given options to each one
+func Mutate(dd Diagnostics, opts ...BaseErrorOption) Diagnostics {
+	if len(dd) == 0 {
+		return nil
+	}
+
+	ret := make(Diagnostics, len(dd))
+	for i, d := range dd {
+		var embeddedErr error
+		if be, ok := d.(*BaseError); ok {
+			embeddedErr = be.Unwrap()
+		}
+
+		dsc := d.Description()
+		be := &BaseError{
+			err:            embeddedErr,
+			resource:       dsc.Resource,
+			resourceId:     dsc.ResourceID,
+			severity:       d.Severity(),
+			severitySet:    true,
+			summary:        dsc.Summary,
+			detail:         dsc.Detail,
+			diagnosticType: d.Type(),
+		}
+		for _, o := range opts {
+			o(be)
+		}
+		ret[i] = be
+	}
+	return ret
 }
