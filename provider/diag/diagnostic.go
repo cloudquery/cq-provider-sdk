@@ -27,6 +27,8 @@ func (d DiagnosticType) String() string {
 		return "Database"
 	case USER:
 		return "User"
+	case INTERNAL:
+		return "Internal"
 	case UNKNOWN:
 		fallthrough
 	default:
