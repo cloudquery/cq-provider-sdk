@@ -172,10 +172,13 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 	if err != nil {
 		return nil, err
 	}
+	if resp.Diagnostics.HasErrors() { // For backwards compatibility
+		err = resp.Diagnostics
+	}
 	return &internal.ConfigureProvider_Response{
-		Error:       resp.Diagnostics.Error(), // For backwards compatibility
+		Error:       resp.Diagnostics.Error(),
 		Diagnostics: diagnosticsToProto(resp.Diagnostics),
-	}, resp.Diagnostics
+	}, err
 }
 
 func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, server internal.Provider_FetchResourcesServer) error {
