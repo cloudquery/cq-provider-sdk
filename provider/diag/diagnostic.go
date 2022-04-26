@@ -28,9 +28,9 @@ func (s Severity) String() string {
 	}
 }
 
-type DiagnosticType int
+type Type int
 
-func (d DiagnosticType) String() string {
+func (d Type) String() string {
 	switch d {
 	case RESOLVING:
 		return "Resolving"
@@ -52,7 +52,7 @@ func (d DiagnosticType) String() string {
 }
 
 const (
-	UNKNOWN DiagnosticType = iota
+	UNKNOWN Type = iota
 	RESOLVING
 	ACCESS
 	THROTTLE
@@ -65,7 +65,7 @@ const (
 type Diagnostic interface {
 	error
 	Severity() Severity
-	Type() DiagnosticType
+	Type() Type
 	Description() Description
 }
 

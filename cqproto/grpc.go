@@ -415,7 +415,7 @@ func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.D
 		pdiag := &ProviderDiagnostic{
 			ResourceName:       resourceName,
 			ResourceId:         p.GetResourceId(),
-			DiagnosticType:     diag.DiagnosticType(p.GetType()),
+			DiagnosticType:     diag.Type(p.GetType()),
 			DiagnosticSeverity: diag.Severity(p.GetSeverity()),
 			Summary:            p.GetSummary(),
 			Details:            p.GetDetail(),
@@ -424,7 +424,7 @@ func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.D
 			diagnostics[i] = diag.NewRedactedDiagnostic(pdiag, &ProviderDiagnostic{
 				ResourceName:       resourceName,
 				ResourceId:         r.GetResourceId(),
-				DiagnosticType:     diag.DiagnosticType(r.GetType()),
+				DiagnosticType:     diag.Type(r.GetType()),
 				DiagnosticSeverity: diag.Severity(r.GetSeverity()),
 				Summary:            r.GetSummary(),
 				Details:            r.GetDetail(),
