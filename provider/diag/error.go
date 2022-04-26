@@ -201,39 +201,3 @@ func FromError(err error, dt Type, opts ...BaseErrorOption) Diagnostics {
 		return Diagnostics{NewBaseError(err, dt, opts...)}
 	}
 }
-
-// Mutate generates new Diagnostics (using BaseError) from the given Diagnostics, and applies the given options to each one
-func Mutate(dd Diagnostics, opts ...BaseErrorOption) Diagnostics {
-	if len(dd) == 0 {
-		return nil
-	}
-
-	type unwrapper interface {
-		Unwrap() error
-	}
-
-	ret := make(Diagnostics, len(dd))
-	for i, d := range dd {
-		var embeddedErr error
-		if uw, ok := d.(unwrapper); ok {
-			embeddedErr = uw.Unwrap()
-		}
-
-		dsc := d.Description()
-		be := &BaseError{
-			err:            embeddedErr,
-			resource:       dsc.Resource,
-			resourceId:     dsc.ResourceID,
-			severity:       d.Severity(),
-			severitySet:    true,
-			summary:        dsc.Summary,
-			detail:         dsc.Detail,
-			diagnosticType: d.Type(),
-		}
-		for _, o := range opts {
-			o(be)
-		}
-		ret[i] = be
-	}
-	return ret
-}
