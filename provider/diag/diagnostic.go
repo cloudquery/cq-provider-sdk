@@ -13,6 +13,21 @@ const (
 	PANIC
 )
 
+func (s Severity) String() string {
+	switch s {
+	case IGNORE:
+		return "Ignore"
+	case WARNING:
+		return "Warning"
+	case ERROR:
+		return "Error"
+	case PANIC:
+		return "Panic"
+	default:
+		return "Unknown"
+	}
+}
+
 type DiagnosticType int
 
 func (d DiagnosticType) String() string {
