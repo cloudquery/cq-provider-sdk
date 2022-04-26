@@ -71,4 +71,19 @@ func CountDiag(d Diagnostic) uint64 {
 	return 1
 }
 
-var _ Countable = (*SquashedDiag)(nil)
+type Unsquashable interface {
+	Unsquash() Diagnostic
+}
+
+func UnsquashDiag(d Diagnostic) Diagnostic {
+	if c, ok := d.(Unsquashable); ok {
+		return c.Unsquash()
+	}
+
+	return d
+}
+
+var (
+	_ Countable    = (*SquashedDiag)(nil)
+	_ Unsquashable = (*SquashedDiag)(nil)
+)
