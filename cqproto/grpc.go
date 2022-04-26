@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
+	"github.com/hashicorp/go-version"
 
 	"github.com/vmihailenco/msgpack/v5"
 
@@ -172,6 +173,14 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 	if err != nil {
 		return nil, err
 	}
+	if resp.Diagnostics.HasErrors() {
+		newConfigureVersion, _ := version.NewVersion("0.23.0")
+		vv, err := version.NewVersion(request.GetCloudqueryVersion())
+		if err == nil && vv.LessThan(newConfigureVersion) {
+			return &internal.ConfigureProvider_Response{}, resp.Diagnostics
+		}
+	}
+
 	return &internal.ConfigureProvider_Response{
 		Error:       resp.Diagnostics.Error(), // For backwards compatibility
 		Diagnostics: diagnosticsToProto(resp.Diagnostics),
