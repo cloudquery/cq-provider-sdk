@@ -87,7 +87,8 @@ func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uin
 		ctx, cancel = context.WithTimeout(ctx, e.timeout)
 		defer cancel()
 	}
-	return e.callTableResolve(ctx, meta.Logger(), meta, nil)
+	logger := meta.Logger().With("table", e.Table.Name, "multiplex", false)
+	return e.callTableResolve(ctx, logger, meta, nil)
 }
 
 // withTable allows to create a new TableExecutor for received *schema.Table
