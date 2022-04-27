@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -87,7 +88,7 @@ func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uin
 		ctx, cancel = context.WithTimeout(ctx, e.timeout)
 		defer cancel()
 	}
-	logger := meta.Logger().With("table", e.Table.Name, "multiplex", false)
+	logger := meta.Logger().With("multiplex", false)
 	return e.callTableResolve(ctx, logger, meta, nil)
 }
 
@@ -99,7 +100,7 @@ func (e TableExecutor) withTable(t *schema.Table) *TableExecutor {
 		ResourceName:   e.ResourceName,
 		Table:          t,
 		Db:             e.Db,
-		Logger:         e.Logger,
+		Logger:         e.Logger.With("table", t.Name),
 		classifiers:    e.classifiers,
 		extraFields:    e.extraFields,
 		executionStart: e.executionStart,
@@ -117,7 +118,7 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 		doneClients     = 0
 		numberOfClients = 0
 	)
-	logger := clients[0].Logger().With("table", e.Table.Name)
+	logger := clients[0].Logger()
 	logger.Debug("multiplexing client", "count", len(clients))
 
 	done := make(chan struct{})
@@ -132,14 +133,20 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 
 	wg := &sync.WaitGroup{}
 	for _, client := range clients {
+		clientID := identifyClient(client)
+		if clientID == "" {
+			clientID = strconv.Itoa(numberOfClients + 1)
+		}
+		clientID = e.Table.Name + ":" + clientID
+
 		// we can only limit on a granularity of a top table otherwise we can get deadlock
-		logger.Debug("trying acquire for new client", "next_id", fmt.Sprintf("%s:%d", e.Table.Name, numberOfClients+1))
+		logger.Debug("trying acquire for new client", "next_id", clientID)
 		if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
 			diagsChan <- ClassifyError(err, diag.WithResourceName(e.ResourceName))
 			break
 		}
 		numberOfClients++
-		clientLogger := logger.With("client_id", fmt.Sprintf("%s:%d", e.Table.Name, numberOfClients))
+		clientLogger := logger.With("client_id", clientID)
 		clientLogger.Debug("creating new multiplex client")
 		wg.Add(1)
 		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics, lgr hclog.Logger) {
@@ -298,7 +305,8 @@ func (e TableExecutor) resolveResources(ctx context.Context, logger hclog.Logger
 		logger.Debug("resolving table relation", "relation", rel.Name)
 		for _, r := range resources {
 			// ignore relation resource count
-			if _, innerDiags := e.withTable(rel).callTableResolve(ctx, logger.With("table", r.TableName()), meta, r); innerDiags.HasDiags() {
+			re := e.withTable(rel)
+			if _, innerDiags := re.callTableResolve(ctx, re.Logger, meta, r); innerDiags.HasDiags() {
 				diags = diags.Add(innerDiags)
 			}
 		}
@@ -445,4 +453,12 @@ func (e TableExecutor) handleResolveError(meta schema.ClientMeta, r *schema.Reso
 	}
 
 	return errAsDiags
+}
+
+func identifyClient(meta schema.ClientMeta) string {
+	ider, ok := meta.(schema.ClientIdentifier)
+	if ok {
+		return ider.Identify()
+	}
+	return ""
 }
