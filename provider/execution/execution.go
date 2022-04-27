@@ -87,7 +87,7 @@ func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uin
 		ctx, cancel = context.WithTimeout(ctx, e.timeout)
 		defer cancel()
 	}
-	return e.callTableResolve(ctx, meta, nil)
+	return e.callTableResolve(ctx, meta.Logger(), meta, nil)
 }
 
 // withTable allows to create a new TableExecutor for received *schema.Table
@@ -116,8 +116,8 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 		doneClients     = 0
 		numberOfClients = 0
 	)
-	logger := clients[0].Logger()
-	logger.Debug("multiplexing client", "count", len(clients), "table", e.Table.Name)
+	logger := clients[0].Logger().With("table", e.Table.Name)
+	logger.Debug("multiplexing client", "count", len(clients))
 
 	done := make(chan struct{})
 	go func() {
@@ -126,20 +126,22 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 			allDiags = allDiags.Add(dd)
 			doneClients++
 		}
-		logger.Debug("multiplexed client finished", "done", doneClients, "total", numberOfClients, "table", e.Table.Name)
+		logger.Debug("multiplexed client finished", "done", doneClients, "total", numberOfClients)
 	}()
 
 	wg := &sync.WaitGroup{}
 	for _, client := range clients {
 		// we can only limit on a granularity of a top table otherwise we can get deadlock
+		logger.Debug("trying acquire for new client", "next_id", numberOfClients+1)
 		if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
 			diagsChan <- ClassifyError(err, diag.WithResourceName(e.ResourceName))
 			break
 		}
-		logger.Debug("creating multiplex client new client")
 		numberOfClients++
+		clientLogger := logger.With("client_id", numberOfClients)
+		clientLogger.Debug("creating new multiplex client")
 		wg.Add(1)
-		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics) {
+		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics, lgr hclog.Logger) {
 			defer e.goroutinesSem.Release(1)
 			defer wg.Done()
 			if e.timeout > 0 {
@@ -147,11 +149,12 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 				ctx, cancel = context.WithTimeout(ctx, e.timeout)
 				defer cancel()
 			}
+			defer lgr.Debug("releasing multiplex client", "ctx_err", ctx.Err())
 
-			count, resolveDiags := e.callTableResolve(ctx, c, nil)
+			count, resolveDiags := e.callTableResolve(ctx, lgr, c, nil)
 			atomic.AddUint64(&totalResources, count)
 			diags <- resolveDiags
-		}(client, diagsChan)
+		}(client, diagsChan, clientLogger)
 	}
 	wg.Wait()
 	close(diagsChan)
@@ -199,7 +202,7 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 }
 
 // callTableResolve does the actual resolving of the table calling the root table's resolver and for each returned resource resolves its columns and relations.
-func (e TableExecutor) callTableResolve(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
+func (e TableExecutor) callTableResolve(ctx context.Context, logger hclog.Logger, client schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
 	// set up all diagnostics to collect from resolving table
 	var diags diag.Diagnostics
 
@@ -219,7 +222,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		defer func() {
 			if r := recover(); r != nil {
 				stack := string(debug.Stack())
-				client.Logger().Error("table resolver recovered from panic", "table", e.Table.Name, "stack", stack)
+				logger.Error("table resolver recovered from panic", "table", e.Table.Name, "stack", stack)
 				resolverErr = diag.NewBaseError(fmt.Errorf("table resolver panic: %s", r), diag.RESOLVING, diag.WithResourceName(e.ResourceName), diag.WithSeverity(diag.PANIC),
 					diag.WithSummary("panic on resource table %q fetch", e.Table.Name), diag.WithDetails("%s", stack))
 			}
@@ -227,7 +230,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		}()
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
-				client.Logger().Debug("ignored an error", "err", err, "table", e.Table.Name)
+				logger.Debug("ignored an error", "err", err, "table", e.Table.Name)
 				err = diag.NewBaseError(err, diag.RESOLVING, diag.WithSeverity(diag.IGNORE), diag.WithSummary("table %q resolver ignored error", e.Table.Name))
 			}
 			resolverErr = e.handleResolveError(client, parent, err)
@@ -250,13 +253,13 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		diags = diags.Add(resolverErr)
 
 		if diag.FromError(resolverErr, diag.INTERNAL).HasErrors() {
-			client.Logger().Error("received resolve resources error", "table", e.Table.Name, "error", resolverErr)
+			logger.Error("received resolve resources error", "table", e.Table.Name, "error", resolverErr)
 			return 0, diags
 		}
 	}
 	// Print only parent resources
 	if parent == nil {
-		client.Logger().Info("fetched successfully", "table", e.Table.Name, "count", nc)
+		logger.Info("fetched successfully", "table", e.Table.Name, "count", nc)
 	}
 	if err := e.cleanupStaleData(ctx, client, parent); err != nil {
 		return nc, diags.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed to cleanup stale data on table %q", e.Table.Name)))
