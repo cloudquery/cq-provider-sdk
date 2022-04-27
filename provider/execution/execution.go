@@ -133,13 +133,13 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	wg := &sync.WaitGroup{}
 	for _, client := range clients {
 		// we can only limit on a granularity of a top table otherwise we can get deadlock
-		logger.Debug("trying acquire for new client", "next_id", numberOfClients+1)
+		logger.Debug("trying acquire for new client", "next_id", fmt.Sprintf("%s:%d", e.Table.Name, numberOfClients+1))
 		if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
 			diagsChan <- ClassifyError(err, diag.WithResourceName(e.ResourceName))
 			break
 		}
 		numberOfClients++
-		clientLogger := logger.With("client_id", numberOfClients)
+		clientLogger := logger.With("client_id", fmt.Sprintf("%s:%d", e.Table.Name, numberOfClients))
 		clientLogger.Debug("creating new multiplex client")
 		wg.Add(1)
 		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics, lgr hclog.Logger) {
