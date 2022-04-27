@@ -166,26 +166,26 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 }
 
 // truncateTable cleans up a table from all data based on it's DeleteFilter
-func (e TableExecutor) truncateTable(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
+func (e TableExecutor) truncateTable(ctx context.Context, logger hclog.Logger, client schema.ClientMeta, parent *schema.Resource) error {
 	if e.Table.DeleteFilter == nil {
 		return nil
 	}
 	if e.Table.AlwaysDelete {
 		// Delete previous fetch
-		client.Logger().Debug("cleaning table previous fetch", "table", e.Table.Name, "always_delete", e.Table.AlwaysDelete)
+		logger.Debug("cleaning table previous fetch", "always_delete", e.Table.AlwaysDelete)
 		return e.Db.Delete(ctx, e.Table, e.Table.DeleteFilter(client, parent))
 	}
-	client.Logger().Debug("skipping table truncate", "table", e.Table.Name)
+	logger.Debug("skipping table truncate")
 	return nil
 }
 
 // cleanupStaleData cleans resources in table that weren't update in the latest table resolve execution
-func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
+func (e TableExecutor) cleanupStaleData(ctx context.Context, logger hclog.Logger, client schema.ClientMeta, parent *schema.Resource) error {
 	// Only clean top level tables
 	if parent != nil {
 		return nil
 	}
-	client.Logger().Debug("cleaning table stale data", "table", e.Table.Name, "last_update", e.executionStart)
+	logger.Debug("cleaning table stale data", "last_update", e.executionStart)
 
 	filters := make([]interface{}, 0)
 	for k, v := range e.extraFields {
@@ -195,10 +195,10 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 		filters = append(filters, e.Table.DeleteFilter(client, parent)...)
 	}
 	if err := e.Db.RemoveStaleData(ctx, e.Table, e.executionStart, filters); err != nil {
-		client.Logger().Warn("failed to clean table stale data", "table", e.Table.Name, "last_update", e.executionStart)
+		logger.Warn("failed to clean table stale data", "last_update", e.executionStart, "err", err)
 		return err
 	}
-	client.Logger().Debug("cleaned table stale data successfully", "table", e.Table.Name, "last_update", e.executionStart)
+	logger.Debug("cleaned table stale data successfully", "last_update", e.executionStart)
 	return nil
 }
 
@@ -211,7 +211,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, logger hclog.Logger
 		return 0, diags.Add(diag.NewBaseError(nil, diag.SCHEMA, diag.WithSeverity(diag.ERROR), diag.WithResourceName(e.ResourceName), diag.WithSummary("table %q missing resolver, make sure table implements the resolver", e.Table.Name)))
 
 	}
-	if err := e.truncateTable(ctx, client, parent); err != nil {
+	if err := e.truncateTable(ctx, logger, client, parent); err != nil {
 		return 0, diags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
 	}
 
@@ -262,7 +262,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, logger hclog.Logger
 	if parent == nil {
 		logger.Info("fetched successfully", "count", nc)
 	}
-	if err := e.cleanupStaleData(ctx, client, parent); err != nil {
+	if err := e.cleanupStaleData(ctx, logger, client, parent); err != nil {
 		return nc, diags.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed to cleanup stale data on table %q", e.Table.Name)))
 	}
 	return nc, diags
@@ -351,7 +351,7 @@ func (e TableExecutor) resolveResourceValues(ctx context.Context, logger hclog.L
 		}
 	}()
 
-	diags = diags.Add(e.resolveColumns(ctx, meta, resource, e.columns[0]))
+	diags = diags.Add(e.resolveColumns(ctx, logger, meta, resource, e.columns[0]))
 	if diags.HasErrors() {
 		return diags
 	}
@@ -372,12 +372,12 @@ func (e TableExecutor) resolveResourceValues(ctx context.Context, logger hclog.L
 }
 
 // resolveColumns resolves each column in the table and adds them to the resource.
-func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) diag.Diagnostics {
+func (e TableExecutor) resolveColumns(ctx context.Context, logger hclog.Logger, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) diag.Diagnostics {
 
 	var diags diag.Diagnostics
 	for _, c := range cols {
 		if c.Resolver != nil {
-			meta.Logger().Trace("using custom column resolver", "column", c.Name, "table", e.Table.Name)
+			logger.Trace("using custom column resolver", "column", c.Name)
 			err := c.Resolver(ctx, meta, resource, c)
 			if err == nil {
 				continue
@@ -404,14 +404,14 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 			}
 			continue
 		}
-		meta.Logger().Trace("resolving column value with path", "column", c.Name, "table", e.Table.Name)
+		logger.Trace("resolving column value with path", "column", c.Name)
 		// base use case: try to get column with CamelCase name
 		v := funk.Get(resource.Item, strcase.ToCamel(c.Name), funk.WithAllowZero())
 		if v == nil {
-			meta.Logger().Trace("using column default value", "column", c.Name, "default", c.Default, "table", e.Table.Name)
+			logger.Trace("using column default value", "column", c.Name, "default", c.Default)
 			v = c.Default
 		}
-		meta.Logger().Trace("setting column value", "column", c.Name, "value", v, "table", e.Table.Name)
+		logger.Trace("setting column value", "column", c.Name, "value", v)
 		if err := resource.Set(c.Name, v); err != nil {
 			diags = diags.Add(fromError(err, diag.WithResourceName(e.ResourceName), diag.WithType(diag.INTERNAL),
 				diag.WithSummary("failed to set resource value for column %s@%s", e.Table.Name, c.Name)))
