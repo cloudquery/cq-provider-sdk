@@ -92,14 +92,14 @@ func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uin
 }
 
 // withTable allows to create a new TableExecutor for received *schema.Table
-func (e TableExecutor) withTable(t *schema.Table) *TableExecutor {
+func (e TableExecutor) withTable(t *schema.Table, kv ...interface{}) *TableExecutor {
 	var c [2]schema.ColumnList
 	c[0], c[1] = e.Db.Dialect().Columns(t).Sift()
 	return &TableExecutor{
 		ResourceName:   e.ResourceName,
 		Table:          t,
 		Db:             e.Db,
-		Logger:         e.Logger.With("table", t.Name),
+		Logger:         e.Logger.With(kv...),
 		classifiers:    e.classifiers,
 		extraFields:    e.extraFields,
 		executionStart: e.executionStart,
@@ -132,8 +132,8 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 		doneClients     = 0
 		numberOfClients = 0
 	)
-	logger := clients[0].Logger()
-	logger.Debug("multiplexing client", "count", len(clients))
+	// initially use client logger here
+	e.Logger.Debug("multiplexing client", "count", len(clients))
 
 	done := make(chan struct{})
 	go func() {
@@ -142,7 +142,7 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 			allDiags = allDiags.Add(dd)
 			doneClients++
 		}
-		logger.Debug("multiplexed client finished", "done", doneClients, "total", numberOfClients)
+		e.Logger.Debug("multiplexed client finished", "done", doneClients, "total", numberOfClients)
 	}()
 
 	wg := &sync.WaitGroup{}
@@ -154,7 +154,7 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 		clientID = e.Table.Name + ":" + clientID
 
 		// we can only limit on a granularity of a top table otherwise we can get deadlock
-		logger.Debug("trying acquire for new client", "next_id", clientID)
+		e.Logger.Debug("trying acquire for new client", "next_id", clientID)
 		if err := e.goroutinesSem.Acquire(ctx, 1); err != nil {
 			diagsChan <- ClassifyError(err, diag.WithResourceName(e.ResourceName))
 			break
@@ -171,7 +171,8 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 				defer cancel()
 			}
 			defer e.Logger.Debug("releasing multiplex client", "ctx_err", ctx.Err())
-
+			// create client execution add all Client's implied Args to execution logger + add its unique client id, so all its execution can be
+			// identified.
 			count, resolveDiags := e.withLogger(append(c.Logger().ImpliedArgs(), "client_id", id)).callTableResolve(ctx, c, nil)
 			atomic.AddUint64(&totalResources, count)
 			diags <- resolveDiags
@@ -181,7 +182,7 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	close(diagsChan)
 	<-done
 
-	logger.Debug("table multiplex resolve completed")
+	e.Logger.Debug("table multiplex resolve completed")
 	return totalResources, allDiags
 }
 

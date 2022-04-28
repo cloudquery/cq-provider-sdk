@@ -622,7 +622,7 @@ func TestTableExecutor_resolveResourceValues(t *testing.T) {
 			r := schema.NewResourceData(storage.Dialect(), tc.Table, nil, tc.ResourceData, tc.MetaData, exec.executionStart)
 			// columns should be resolved from ColumnResolver functions or default functions
 			cl := executionClient{testlog.New(t)}
-			diags := exec.resolveResourceValues(context.Background(), cl.Logger(), cl, r)
+			diags := exec.resolveResourceValues(context.Background(), cl, r)
 			if tc.ExpectedDiags != nil {
 				require.True(t, diags.HasDiags())
 				if tc.ExpectedDiags != nil {
