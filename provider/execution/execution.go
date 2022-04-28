@@ -88,8 +88,7 @@ func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uin
 		ctx, cancel = context.WithTimeout(ctx, e.timeout)
 		defer cancel()
 	}
-	logger := meta.Logger().With("multiplex", false)
-	return e.callTableResolve(ctx, logger, meta, nil)
+	return e.withLogger(append(meta.Logger().ImpliedArgs(), "multiplex", false)...).callTableResolve(ctx, meta, nil)
 }
 
 // withTable allows to create a new TableExecutor for received *schema.Table
@@ -107,6 +106,21 @@ func (e TableExecutor) withTable(t *schema.Table) *TableExecutor {
 		columns:        c,
 		goroutinesSem:  e.goroutinesSem,
 	}
+}
+
+func (e TableExecutor) withLogger(kv ...interface{}) *TableExecutor {
+	return &TableExecutor{
+		ResourceName:   e.ResourceName,
+		Table:          e.Table,
+		Db:             e.Db,
+		Logger:         e.Logger.With(kv...),
+		classifiers:    e.classifiers,
+		extraFields:    e.extraFields,
+		executionStart: e.executionStart,
+		columns:        e.columns,
+		goroutinesSem:  e.goroutinesSem,
+	}
+
 }
 
 // doMultiplexResolve resolves table with multiplexed clients appending all diagnostics returned from each multiplex.
@@ -146,10 +160,9 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 			break
 		}
 		numberOfClients++
-		clientLogger := logger.With("client_id", clientID)
-		clientLogger.Debug("creating new multiplex client")
+		e.Logger.Debug("creating new multiplex client", "client_id", clientID)
 		wg.Add(1)
-		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics, lgr hclog.Logger) {
+		go func(c schema.ClientMeta, diags chan<- diag.Diagnostics, id string) {
 			defer e.goroutinesSem.Release(1)
 			defer wg.Done()
 			if e.timeout > 0 {
@@ -157,12 +170,12 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 				ctx, cancel = context.WithTimeout(ctx, e.timeout)
 				defer cancel()
 			}
-			defer lgr.Debug("releasing multiplex client", "ctx_err", ctx.Err())
+			defer e.Logger.Debug("releasing multiplex client", "ctx_err", ctx.Err())
 
-			count, resolveDiags := e.callTableResolve(ctx, lgr, c, nil)
+			count, resolveDiags := e.withLogger(append(c.Logger().ImpliedArgs(), "client_id", id)).callTableResolve(ctx, c, nil)
 			atomic.AddUint64(&totalResources, count)
 			diags <- resolveDiags
-		}(client, diagsChan, clientLogger)
+		}(client, diagsChan, clientID)
 	}
 	wg.Wait()
 	close(diagsChan)
@@ -173,26 +186,26 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 }
 
 // truncateTable cleans up a table from all data based on it's DeleteFilter
-func (e TableExecutor) truncateTable(ctx context.Context, logger hclog.Logger, client schema.ClientMeta, parent *schema.Resource) error {
+func (e TableExecutor) truncateTable(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
 	if e.Table.DeleteFilter == nil {
 		return nil
 	}
 	if e.Table.AlwaysDelete {
 		// Delete previous fetch
-		logger.Debug("cleaning table previous fetch", "always_delete", e.Table.AlwaysDelete)
+		e.Logger.Debug("cleaning table previous fetch", "always_delete", e.Table.AlwaysDelete)
 		return e.Db.Delete(ctx, e.Table, e.Table.DeleteFilter(client, parent))
 	}
-	logger.Debug("skipping table truncate")
+	e.Logger.Debug("skipping table truncate")
 	return nil
 }
 
 // cleanupStaleData cleans resources in table that weren't update in the latest table resolve execution
-func (e TableExecutor) cleanupStaleData(ctx context.Context, logger hclog.Logger, client schema.ClientMeta, parent *schema.Resource) error {
+func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
 	// Only clean top level tables
 	if parent != nil {
 		return nil
 	}
-	logger.Debug("cleaning table stale data", "last_update", e.executionStart)
+	e.Logger.Debug("cleaning table stale data", "last_update", e.executionStart)
 
 	filters := make([]interface{}, 0)
 	for k, v := range e.extraFields {
@@ -202,15 +215,15 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, logger hclog.Logger
 		filters = append(filters, e.Table.DeleteFilter(client, parent)...)
 	}
 	if err := e.Db.RemoveStaleData(ctx, e.Table, e.executionStart, filters); err != nil {
-		logger.Warn("failed to clean table stale data", "last_update", e.executionStart, "err", err)
+		e.Logger.Warn("failed to clean table stale data", "last_update", e.executionStart, "err", err)
 		return err
 	}
-	logger.Debug("cleaned table stale data successfully", "last_update", e.executionStart)
+	e.Logger.Debug("cleaned table stale data successfully", "last_update", e.executionStart)
 	return nil
 }
 
 // callTableResolve does the actual resolving of the table calling the root table's resolver and for each returned resource resolves its columns and relations.
-func (e TableExecutor) callTableResolve(ctx context.Context, logger hclog.Logger, client schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
+func (e TableExecutor) callTableResolve(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
 	// set up all diagnostics to collect from resolving table
 	var diags diag.Diagnostics
 
@@ -218,7 +231,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, logger hclog.Logger
 		return 0, diags.Add(diag.NewBaseError(nil, diag.SCHEMA, diag.WithSeverity(diag.ERROR), diag.WithResourceName(e.ResourceName), diag.WithSummary("table %q missing resolver, make sure table implements the resolver", e.Table.Name)))
 
 	}
-	if err := e.truncateTable(ctx, logger, client, parent); err != nil {
+	if err := e.truncateTable(ctx, client, parent); err != nil {
 		return 0, diags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
 	}
 
@@ -230,7 +243,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, logger hclog.Logger
 		defer func() {
 			if r := recover(); r != nil {
 				stack := string(debug.Stack())
-				logger.Error("table resolver recovered from panic", "stack", stack)
+				e.Logger.Error("table resolver recovered from panic", "stack", stack)
 				resolverErr = diag.NewBaseError(fmt.Errorf("table resolver panic: %s", r), diag.RESOLVING, diag.WithResourceName(e.ResourceName), diag.WithSeverity(diag.PANIC),
 					diag.WithSummary("panic on resource table %q fetch", e.Table.Name), diag.WithDetails("%s", stack))
 			}
@@ -238,7 +251,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, logger hclog.Logger
 		}()
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
 			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
-				logger.Debug("ignored an error", "err", err)
+				e.Logger.Debug("ignored an error", "err", err)
 				err = diag.NewBaseError(err, diag.RESOLVING, diag.WithSeverity(diag.IGNORE), diag.WithSummary("table %q resolver ignored error", e.Table.Name))
 			}
 			resolverErr = e.handleResolveError(client, parent, err)
@@ -251,7 +264,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, logger hclog.Logger
 		if len(objects) == 0 {
 			continue
 		}
-		resolvedCount, dd := e.resolveResources(ctx, logger, client, parent, objects)
+		resolvedCount, dd := e.resolveResources(ctx, client, parent, objects)
 		// append any diags from resolve resources
 		diags = diags.Add(dd)
 		nc += resolvedCount
@@ -261,22 +274,22 @@ func (e TableExecutor) callTableResolve(ctx context.Context, logger hclog.Logger
 		diags = diags.Add(resolverErr)
 
 		if diag.FromError(resolverErr, diag.INTERNAL).HasErrors() {
-			logger.Error("received resolve resources error", "error", resolverErr)
+			e.Logger.Error("received resolve resources error", "error", resolverErr)
 			return 0, diags
 		}
 	}
 	// Print only parent resources
 	if parent == nil {
-		logger.Info("fetched successfully", "count", nc)
+		e.Logger.Info("fetched successfully", "count", nc)
 	}
-	if err := e.cleanupStaleData(ctx, logger, client, parent); err != nil {
+	if err := e.cleanupStaleData(ctx, client, parent); err != nil {
 		return nc, diags.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed to cleanup stale data on table %q", e.Table.Name)))
 	}
 	return nc, diags
 }
 
 // resolveResources resolves a list of resource objects inserting them into the database and resolving their relations based on the table.
-func (e TableExecutor) resolveResources(ctx context.Context, logger hclog.Logger, meta schema.ClientMeta, parent *schema.Resource, objects []interface{}) (uint64, diag.Diagnostics) {
+func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, objects []interface{}) (uint64, diag.Diagnostics) {
 	var (
 		resources = make(schema.Resources, 0, len(objects))
 		diags     diag.Diagnostics
@@ -285,10 +298,10 @@ func (e TableExecutor) resolveResources(ctx context.Context, logger hclog.Logger
 	for _, o := range objects {
 		resource := schema.NewResourceData(e.Db.Dialect(), e.Table, parent, o, e.metadata, e.executionStart)
 		// Before inserting resolve all table column resolvers
-		resolveDiags := e.resolveResourceValues(ctx, logger, meta, resource)
+		resolveDiags := e.resolveResourceValues(ctx, meta, resource)
 		diags = diags.Add(resolveDiags)
 		if resolveDiags.HasErrors() {
-			logger.Warn("skipping failed resolved resource", "reason", resolveDiags.Error())
+			e.Logger.Warn("skipping failed resolved resource", "reason", resolveDiags.Error())
 			continue
 		}
 		resources = append(resources, resource)
@@ -296,17 +309,16 @@ func (e TableExecutor) resolveResources(ctx context.Context, logger hclog.Logger
 
 	// only top level tables should cascade
 	shouldCascade := parent == nil
-	resources, dbDiags := e.saveToStorage(ctx, logger, resources, shouldCascade)
+	resources, dbDiags := e.saveToStorage(ctx, resources, shouldCascade)
 	diags = diags.Add(dbDiags)
 	totalCount := uint64(len(resources))
 
 	// Finally, resolve relations of each resource
 	for _, rel := range e.Table.Relations {
-		logger.Debug("resolving table relation", "relation", rel.Name)
+		e.Logger.Debug("resolving table relation", "relation", rel.Name)
 		for _, r := range resources {
 			// ignore relation resource count
-			re := e.withTable(rel)
-			if _, innerDiags := re.callTableResolve(ctx, re.Logger, meta, r); innerDiags.HasDiags() {
+			if _, innerDiags := e.withTable(rel).callTableResolve(ctx, meta, r); innerDiags.HasDiags() {
 				diags = diags.Add(innerDiags)
 			}
 		}
@@ -316,29 +328,29 @@ func (e TableExecutor) resolveResources(ctx context.Context, logger hclog.Logger
 
 // saveToStorage copies resource data to source, it has ways of inserting, first it tries the most performant CopyFrom if that does work it bulk inserts,
 // finally it inserts each resource separately, appending errors for each failed resource, only successfully inserted resources are returned
-func (e TableExecutor) saveToStorage(ctx context.Context, logger hclog.Logger, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
+func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
 	if l := len(resources); l > 0 {
-		logger.Debug("storing resources", "count", l)
+		e.Logger.Debug("storing resources", "count", l)
 	}
 	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
 	if err == nil {
 		return resources, nil
 	}
-	logger.Warn("failed copy-from to db", "error", err)
+	e.Logger.Warn("failed copy-from to db", "error", err)
 
 	// fallback insert, copy from sometimes does problems, so we fall back with bulk insert
 	err = e.Db.Insert(ctx, e.Table, resources)
 	if err == nil {
 		return resources, nil
 	}
-	logger.Error("failed insert to db", "error", err)
+	e.Logger.Error("failed insert to db", "error", err)
 	// Setup diags, adding first diagnostic that bulk insert failed
 	diags := diag.Diagnostics{}.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed bulk insert on table %q", e.Table.Name)))
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
 	partialFetchResources := make(schema.Resources, 0)
 	for id := range resources {
 		if err := e.Db.Insert(ctx, e.Table, schema.Resources{resources[id]}); err != nil {
-			logger.Error("failed to insert resource into db", "error", err, "resource_keys", resources[id].PrimaryKeyValues())
+			e.Logger.Error("failed to insert resource into db", "error", err, "resource_keys", resources[id].PrimaryKeyValues())
 			diags = diags.Add(ClassifyError(err, diag.WithType(diag.DATABASE)))
 			continue
 		}
@@ -349,17 +361,17 @@ func (e TableExecutor) saveToStorage(ctx context.Context, logger hclog.Logger, r
 }
 
 // resolveResourceValues does the actual resolve of all the columns of table for said resource.
-func (e TableExecutor) resolveResourceValues(ctx context.Context, logger hclog.Logger, meta schema.ClientMeta, resource *schema.Resource) (diags diag.Diagnostics) {
+func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) (diags diag.Diagnostics) {
 	defer func() {
 		if r := recover(); r != nil {
 			stack := string(debug.Stack())
-			logger.Error("resolve table recovered from panic", "panic_msg", r, "stack", stack)
+			e.Logger.Error("resolve table recovered from panic", "panic_msg", r, "stack", stack)
 			diags = fromError(fmt.Errorf("column resolve panic: %s", r), diag.WithResourceName(e.ResourceName), diag.WithSeverity(diag.PANIC),
 				diag.WithSummary("resolve table %q recovered from panic", e.Table.Name), diag.WithDetails("%s", stack))
 		}
 	}()
 
-	diags = diags.Add(e.resolveColumns(ctx, logger, meta, resource, e.columns[0]))
+	diags = diags.Add(e.resolveColumns(ctx, meta, resource, e.columns[0]))
 	if diags.HasErrors() {
 		return diags
 	}
@@ -380,12 +392,12 @@ func (e TableExecutor) resolveResourceValues(ctx context.Context, logger hclog.L
 }
 
 // resolveColumns resolves each column in the table and adds them to the resource.
-func (e TableExecutor) resolveColumns(ctx context.Context, logger hclog.Logger, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) diag.Diagnostics {
+func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) diag.Diagnostics {
 
 	var diags diag.Diagnostics
 	for _, c := range cols {
 		if c.Resolver != nil {
-			logger.Trace("using custom column resolver", "column", c.Name)
+			e.Logger.Trace("using custom column resolver", "column", c.Name)
 			err := c.Resolver(ctx, meta, resource, c)
 			if err == nil {
 				continue
@@ -412,14 +424,14 @@ func (e TableExecutor) resolveColumns(ctx context.Context, logger hclog.Logger, 
 			}
 			continue
 		}
-		logger.Trace("resolving column value with path", "column", c.Name)
+		e.Logger.Trace("resolving column value with path", "column", c.Name)
 		// base use case: try to get column with CamelCase name
 		v := funk.Get(resource.Item, strcase.ToCamel(c.Name), funk.WithAllowZero())
 		if v == nil {
-			logger.Trace("using column default value", "column", c.Name, "default", c.Default)
+			e.Logger.Trace("using column default value", "column", c.Name, "default", c.Default)
 			v = c.Default
 		}
-		logger.Trace("setting column value", "column", c.Name, "value", v)
+		e.Logger.Trace("setting column value", "column", c.Name, "value", v)
 		if err := resource.Set(c.Name, v); err != nil {
 			diags = diags.Add(fromError(err, diag.WithResourceName(e.ResourceName), diag.WithType(diag.INTERNAL),
 				diag.WithSummary("failed to set resource value for column %s@%s", e.Table.Name, c.Name)))
