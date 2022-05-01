@@ -265,7 +265,9 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 		if len(objects) == 0 {
 			continue
 		}
+		e.Logger.Debug("received resources from resolver", "count", len(objects))
 		resolvedCount, dd := e.resolveResources(ctx, client, parent, objects)
+		e.Logger.Debug("resolved resources", "original_count", len(objects), "resolved_count", resolvedCount)
 		// append any diags from resolve resources
 		diags = diags.Add(dd)
 		nc += resolvedCount
@@ -311,6 +313,7 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 	// only top level tables should cascade
 	shouldCascade := parent == nil
 	resources, dbDiags := e.saveToStorage(ctx, resources, shouldCascade)
+	e.Logger.Debug("saved resources to storage", "resources", len(resources))
 	diags = diags.Add(dbDiags)
 	totalCount := uint64(len(resources))
 
@@ -323,6 +326,7 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 				diags = diags.Add(innerDiags)
 			}
 		}
+		e.Logger.Debug("finished resolving table relation", "relation", rel.Name)
 	}
 	return totalCount, diags
 }
