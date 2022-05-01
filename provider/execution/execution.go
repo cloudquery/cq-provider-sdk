@@ -173,7 +173,7 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 			defer e.Logger.Debug("releasing multiplex client", "ctx_err", ctx.Err())
 			// create client execution add all Client's implied Args to execution logger + add its unique client id, so all its execution can be
 			// identified.
-			count, resolveDiags := e.withLogger(append(c.Logger().ImpliedArgs(), "client_id", id)).callTableResolve(ctx, c, nil)
+			count, resolveDiags := e.withLogger(append(c.Logger().ImpliedArgs(), "client_id", id)...).callTableResolve(ctx, c, nil)
 			atomic.AddUint64(&totalResources, count)
 			diags <- resolveDiags
 		}(client, diagsChan, clientID)
