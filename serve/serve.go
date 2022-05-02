@@ -8,6 +8,8 @@ import (
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/provider"
+	"github.com/cloudquery/cq-provider-sdk/stats"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
@@ -47,6 +49,8 @@ type Options struct {
 }
 
 func Serve(opts *Options) {
+	defer stats.Flush()
+
 	if opts.Name == "" {
 		panic("missing provider name")
 	}
@@ -81,6 +85,7 @@ func Serve(opts *Options) {
 		if os.Getenv("CQ_PROVIDER_DEBUG_TRACE_LOG") == "1" {
 			opts.Logger.SetLevel(hclog.Trace)
 		}
+		stats.Start(opts.Logger)
 		if err := Debug(context.Background(), opts.Name, opts); err != nil {
 			panic(fmt.Errorf("failed to run debug: %w", err))
 		}
@@ -94,6 +99,8 @@ func Serve(opts *Options) {
 			JSONFormat: true,
 		})
 	}
+
+	stats.Start(opts.Logger)
 
 	serve(opts)
 }
