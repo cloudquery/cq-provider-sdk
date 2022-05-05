@@ -397,11 +397,8 @@ func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.Cl
 }
 
 // resolveColumns resolves each column in the table and adds them to the resource.
-func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) diag.Diagnostics {
-	var (
-		diags diag.Diagnostics
-		col   string
-	)
+func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource, cols []schema.Column) (diags diag.Diagnostics) {
+	var col string
 
 	defer func() {
 		if r := recover(); r != nil {
