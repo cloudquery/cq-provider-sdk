@@ -150,6 +150,19 @@ func (r Resource) getColumnByName(column string) *Column {
 	return nil
 }
 
+func (rr Resources) Duplicates() []uuid.UUID {
+	occurred := map[uuid.UUID]bool{}
+	duplicates := []uuid.UUID{}
+	for e := range rr {
+		if occurred[rr[e].Id()] {
+			duplicates = append(duplicates, rr[e].Id())
+		} else {
+			occurred[rr[e].Id()] = true
+		}
+	}
+	return duplicates
+}
+
 func (rr Resources) GetIds() []uuid.UUID {
 	rids := make([]uuid.UUID, len(rr))
 	for i, r := range rr {
