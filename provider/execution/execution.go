@@ -346,7 +346,7 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 
 	dupes := resources.Duplicates()
 	if len(dupes) > 0 {
-		diags.Add(fromError(err, diag.WithType(diag.RESOLVING), diag.WithSummary("resolved data contains duplicates %q", resources.TableName())))
+		diags = diags.Add(fromError(err, diag.WithType(diag.RESOLVING), diag.WithSummary("resolved data contains duplicates %q", resources.TableName())))
 	}
 
 	// fallback insert, copy from sometimes does problems, so we fall back with bulk insert
@@ -356,7 +356,7 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	}
 	e.Logger.Error("failed insert to db", "error", err)
 	// Setup diags, adding first diagnostic that bulk insert failed
-	diags.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed bulk insert on table %q", e.Table.Name)))
+	diags = diags.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed bulk insert on table %q", e.Table.Name)))
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
 	partialFetchResources := make(schema.Resources, 0)
 	for id := range resources {
