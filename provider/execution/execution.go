@@ -334,6 +334,7 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 // saveToStorage copies resource data to source, it has ways of inserting, first it tries the most performant CopyFrom if that does work it bulk inserts,
 // finally it inserts each resource separately, appending errors for each failed resource, only successfully inserted resources are returned
 func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
+	var diags diag.Diagnostics
 	if l := len(resources); l > 0 {
 		e.Logger.Debug("storing resources", "count", l)
 	}
@@ -343,6 +344,11 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	}
 	e.Logger.Warn("failed copy-from to db", "error", err)
 
+	dupes := resources.Duplicates()
+	if len(dupes) > 0 {
+		diags.Add(fromError(err, diag.WithType(diag.RESOLVING), diag.WithSummary("resolved data contains duplicates %q", resources.TableName())))
+	}
+
 	// fallback insert, copy from sometimes does problems, so we fall back with bulk insert
 	err = e.Db.Insert(ctx, e.Table, resources)
 	if err == nil {
@@ -350,7 +356,7 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	}
 	e.Logger.Error("failed insert to db", "error", err)
 	// Setup diags, adding first diagnostic that bulk insert failed
-	diags := diag.Diagnostics{}.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed bulk insert on table %q", e.Table.Name)))
+	diags.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed bulk insert on table %q", e.Table.Name)))
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
 	partialFetchResources := make(schema.Resources, 0)
 	for id := range resources {
