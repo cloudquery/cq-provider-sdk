@@ -12,10 +12,12 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+	"github.com/cloudquery/cq-provider-sdk/stats"
+	s "github.com/segmentio/stats/v4"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
 	"github.com/modern-go/reflect2"
-	"github.com/segmentio/stats/v4"
 	"github.com/thoas/go-funk"
 	"golang.org/x/sync/semaphore"
 )
@@ -209,7 +211,7 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 
 // callTableResolve does the actual resolving of the table calling the root table's resolver and for each returned resource resolves its columns and relations.
 func (e TableExecutor) callTableResolve(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
-	clock := stats.DefaultEngine.Clock("callTableResolve", stats.Tag{Name: "table", Value: e.Table.Name})
+	clock := stats.NewClockWithObserve("callTableResolve", s.Tag{Name: "table", Value: e.Table.Name})
 	defer clock.Stop()
 
 	// set up all diagnostics to collect from resolving table
