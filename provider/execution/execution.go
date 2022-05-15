@@ -211,7 +211,7 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 
 // callTableResolve does the actual resolving of the table calling the root table's resolver and for each returned resource resolves its columns and relations.
 func (e TableExecutor) callTableResolve(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
-	clock := stats.NewClockWithObserve("callTableResolve", s.Tag{Name: "table", Value: e.Table.Name})
+	clock := stats.NewClockWithObserve("callTableResolve", s.Tag{Name: "client_id", Value: identifyClient(client)}, s.Tag{Name: "table", Value: e.Table.Name})
 	defer clock.Stop()
 
 	// set up all diagnostics to collect from resolving table

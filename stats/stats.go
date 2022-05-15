@@ -1,35 +1,36 @@
 package stats
 
 import (
+	"context"
 	"strings"
 	"time"
 
+	"github.com/elliotchance/orderedmap"
 	"github.com/hashicorp/go-hclog"
 	"github.com/segmentio/stats/v4"
 )
 
 type Measure struct {
-	id    string
-	value stats.Value
-	stamp bool
-	time  time.Time
+	id       string
+	duration time.Duration
+	stamp    bool
+	time     time.Time
 }
 
 type Stat struct {
 	Start    time.Time
-	Duration int64
+	Duration time.Duration
 }
 
 type LogHandler struct {
 	logger   hclog.Logger
 	measures chan Measure
-	stats    map[string]Stat
+	stats    *orderedmap.OrderedMap
 }
 
 func NewClockWithObserve(name string, tags ...stats.Tag) *stats.Clock {
-	now := time.Now()
-	cl := stats.DefaultEngine.ClockAt(name, now, tags...)
-	stats.DefaultEngine.Observe(name, now, tags...)
+	cl := stats.DefaultEngine.ClockAt(name, time.Now(), tags...)
+	stats.DefaultEngine.Observe(name, time.Duration(0), tags...)
 	return cl
 }
 
@@ -51,35 +52,70 @@ func meta(name string, tags []stats.Tag) (string, bool) {
 
 func (h *LogHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
 	for _, m := range measures {
-		id, stamp := meta(m.Name, m.Tags)
-		h.measures <- Measure{id: id, value: m.Fields[0].Value, time: time, stamp: stamp}
+		id, stamp := meta(m.Fields[0].Name, m.Tags)
+		h.measures <- Measure{id: id, duration: m.Fields[0].Value.Duration(), time: time, stamp: stamp}
 	}
 }
 
 func (h *LogHandler) Flush() {
-	for m := range h.measures {
-		if m.stamp {
-			if m.stamp {
-				item := h.stats[m.id]
-				item.Duration = m.value.Int()
-			} else {
-				h.stats[m.id] = Stat{Start: m.time}
-			}
+	pending := make([]Measure, 0)
+	hasItems := true
+	for hasItems {
+		select {
+		case m := <-h.measures:
+			pending = append(pending, m)
+		default:
+			hasItems = false
 		}
+	}
+
+	for _, m := range pending {
+		if m.stamp {
+			item, ok := h.stats.Get(m.id)
+			if ok {
+				h.stats.Set(m.id, Stat{Start: item.(Stat).Start, Duration: m.duration})
+			}
+		} else {
+			h.stats.Set(m.id, Stat{Start: m.time, Duration: 0})
+		}
+	}
+
+	durationReported := make([]string, 0)
+	for el := h.stats.Front(); el != nil; el = el.Next() {
+		id := el.Key
+		stat := el.Value.(Stat)
+		if stat.Duration == 0 {
+			h.logger.Debug("heartbeat", "id", id, "running_for", time.Since(stat.Start).Round(time.Second).String())
+		} else {
+			durationReported = append(durationReported, id.(string))
+			h.logger.Debug("heartbeat", "id", id, "duration", stat.Duration.Round(time.Second).String())
+		}
+	}
+
+	for _, id := range durationReported {
+		h.stats.Delete(id)
 	}
 }
 
+const BUFFER_SIZE = 100
+
 func newHandler(logger hclog.Logger) stats.Handler {
-	return &LogHandler{logger: logger, measures: make(chan Measure), stats: make(map[string]Stat)}
+	return &LogHandler{logger: logger, measures: make(chan Measure, BUFFER_SIZE), stats: orderedmap.NewOrderedMap()}
 }
 
-func Start(logger hclog.Logger) {
+func Start(ctx context.Context, logger hclog.Logger) {
 	stats.DefaultEngine.Prefix = ""
 	stats.Register(newHandler(logger))
 
 	go func() {
-		for range time.Tick(time.Second * 30) {
-			stats.Flush()
+		ticker := time.NewTicker(time.Second * 30)
+		for range ticker.C {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				stats.Flush()
+			}
 		}
 	}()
 }

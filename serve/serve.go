@@ -85,7 +85,6 @@ func Serve(opts *Options) {
 		if os.Getenv("CQ_PROVIDER_DEBUG_TRACE_LOG") == "1" {
 			opts.Logger.SetLevel(hclog.Trace)
 		}
-		stats.Start(opts.Logger)
 		if err := Debug(context.Background(), opts.Name, opts); err != nil {
 			panic(fmt.Errorf("failed to run debug: %w", err))
 		}
@@ -100,8 +99,7 @@ func Serve(opts *Options) {
 		})
 	}
 
-	stats.Start(opts.Logger)
-
+	stats.Start(context.Background(), opts.Logger)
 	serve(opts)
 }
 
