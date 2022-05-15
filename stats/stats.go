@@ -58,25 +58,20 @@ func (h *LogHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
 }
 
 func (h *LogHandler) Flush() {
-	pending := make([]Measure, 0)
 	hasItems := true
 	for hasItems {
 		select {
 		case m := <-h.measures:
-			pending = append(pending, m)
+			if m.stamp {
+				item, ok := h.stats.Get(m.id)
+				if ok {
+					h.stats.Set(m.id, Stat{Start: item.(Stat).Start, Duration: m.duration})
+				}
+			} else {
+				h.stats.Set(m.id, Stat{Start: m.time, Duration: 0})
+			}
 		default:
 			hasItems = false
-		}
-	}
-
-	for _, m := range pending {
-		if m.stamp {
-			item, ok := h.stats.Get(m.id)
-			if ok {
-				h.stats.Set(m.id, Stat{Start: item.(Stat).Start, Duration: m.duration})
-			}
-		} else {
-			h.stats.Set(m.id, Stat{Start: m.time, Duration: 0})
 		}
 	}
 
