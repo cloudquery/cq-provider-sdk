@@ -43,7 +43,7 @@ func DebugServe(ctx context.Context, opts *Options) (ReattachConfig, <-chan stru
 		CloseCh:          closeCh,
 	}
 
-	stats.Start(ctx, opts.Logger)
+	stats.Start(ctx, &stats.Options{Logger: opts.Logger})
 	go serve(opts)
 
 	var config *plugin.ReattachConfig

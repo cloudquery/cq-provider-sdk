@@ -3,6 +3,7 @@ package stats
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/elliotchance/orderedmap"
@@ -26,6 +27,13 @@ type LogHandler struct {
 	logger   hclog.Logger
 	measures chan Measure
 	stats    *orderedmap.OrderedMap
+	mu       sync.Mutex
+}
+
+type Options struct {
+	Logger  hclog.Logger
+	Tick    time.Duration
+	Handler stats.Handler
 }
 
 func NewClockWithObserve(name string, tags ...stats.Tag) *stats.Clock {
@@ -58,6 +66,9 @@ func (h *LogHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
 }
 
 func (h *LogHandler) Flush() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	hasItems := true
 	for hasItems {
 		select {
@@ -98,12 +109,21 @@ func newHandler(logger hclog.Logger) stats.Handler {
 	return &LogHandler{logger: logger, measures: make(chan Measure, BUFFER_SIZE), stats: orderedmap.NewOrderedMap()}
 }
 
-func Start(ctx context.Context, logger hclog.Logger) {
+func Start(ctx context.Context, opts *Options) {
 	stats.DefaultEngine.Prefix = ""
-	stats.Register(newHandler(logger))
+
+	if opts.Tick == 0 {
+		opts.Tick = time.Second * 30
+	}
+
+	if opts.Handler == nil {
+		opts.Handler = newHandler(opts.Logger)
+	}
+
+	stats.Register(opts.Handler)
 
 	go func() {
-		ticker := time.NewTicker(time.Second * 30)
+		ticker := time.NewTicker(opts.Tick)
 		for range ticker.C {
 			select {
 			case <-ctx.Done():
