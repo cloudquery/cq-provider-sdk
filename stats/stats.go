@@ -113,7 +113,7 @@ func Start(ctx context.Context, opts *Options) {
 	stats.DefaultEngine.Prefix = ""
 
 	if opts.Tick == 0 {
-		opts.Tick = time.Second * 30
+		opts.Tick = time.Minute
 	}
 
 	if opts.Handler == nil {
