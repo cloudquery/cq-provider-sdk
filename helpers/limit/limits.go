@@ -4,8 +4,10 @@ import (
 	"github.com/pbnjay/memory"
 )
 
-const gbInBytes int = 1024 * 1024 * 1024
-const goroutinesPerGB float64 = 250000
+const (
+	gbInBytes       int     = 1024 * 1024 * 1024
+	goroutinesPerGB float64 = 250000
+)
 
 func GetMaxGoRoutines() uint64 {
 	limit := calculateGoRoutines(getMemory())
