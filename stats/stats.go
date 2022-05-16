@@ -11,21 +11,23 @@ import (
 	"github.com/segmentio/stats/v4"
 )
 
-type Measure struct {
+const bufferSize = 100
+
+type measure struct {
 	id       string
 	duration time.Duration
 	stamp    bool
 	time     time.Time
 }
 
-type Stat struct {
+type stat struct {
 	Start    time.Time
 	Duration time.Duration
 }
 
-type LogHandler struct {
+type logHandler struct {
 	logger   hclog.Logger
-	measures chan Measure
+	measures chan measure
 	stats    *orderedmap.OrderedMap
 	mu       sync.Mutex
 }
@@ -58,14 +60,14 @@ func meta(name string, tags []stats.Tag) (string, bool) {
 	return strings.Join(s, ":"), stamp
 }
 
-func (h *LogHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
+func (h *logHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
 	for _, m := range measures {
 		id, stamp := meta(m.Fields[0].Name, m.Tags)
-		h.measures <- Measure{id: id, duration: m.Fields[0].Value.Duration(), time: time, stamp: stamp}
+		h.measures <- measure{id: id, duration: m.Fields[0].Value.Duration(), time: time, stamp: stamp}
 	}
 }
 
-func (h *LogHandler) Flush() {
+func (h *logHandler) Flush() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -76,10 +78,10 @@ func (h *LogHandler) Flush() {
 			if m.stamp {
 				item, ok := h.stats.Get(m.id)
 				if ok {
-					h.stats.Set(m.id, Stat{Start: item.(Stat).Start, Duration: m.duration})
+					h.stats.Set(m.id, stat{Start: item.(stat).Start, Duration: m.duration})
 				}
 			} else {
-				h.stats.Set(m.id, Stat{Start: m.time, Duration: 0})
+				h.stats.Set(m.id, stat{Start: m.time, Duration: 0})
 			}
 		default:
 			hasItems = false
@@ -89,7 +91,7 @@ func (h *LogHandler) Flush() {
 	durationReported := make([]string, 0)
 	for el := h.stats.Front(); el != nil; el = el.Next() {
 		id := el.Key
-		stat := el.Value.(Stat)
+		stat := el.Value.(stat)
 		if stat.Duration == 0 {
 			h.logger.Debug("heartbeat", "id", id, "running_for", time.Since(stat.Start).Round(time.Second).String())
 		} else {
@@ -101,12 +103,6 @@ func (h *LogHandler) Flush() {
 	for _, id := range durationReported {
 		h.stats.Delete(id)
 	}
-}
-
-const BUFFER_SIZE = 100
-
-func newHandler(logger hclog.Logger) stats.Handler {
-	return &LogHandler{logger: logger, measures: make(chan Measure, BUFFER_SIZE), stats: orderedmap.NewOrderedMap()}
 }
 
 func Start(ctx context.Context, opts *Options) {
@@ -137,4 +133,8 @@ func Start(ctx context.Context, opts *Options) {
 
 func Flush() {
 	stats.Flush()
+}
+
+func newHandler(logger hclog.Logger) stats.Handler {
+	return &logHandler{logger: logger, measures: make(chan measure, bufferSize), stats: orderedmap.NewOrderedMap()}
 }
