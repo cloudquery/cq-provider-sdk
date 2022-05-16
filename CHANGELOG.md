@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### :spider: Fixed
 -->
 
+### [0.9.4](https://github.com/cloudquery/cq-provider-sdk/compare/v0.9.3...v0.9.4) (2022-05-16)
+
+
+### Bug Fixes
+
+* Added json marshaling for []*struct -> json ([#248](https://github.com/cloudquery/cq-provider-sdk/issues/248)) ([bcbc3fa](https://github.com/cloudquery/cq-provider-sdk/commit/bcbc3fa176ecee33c686f5b13a801a319e3948f7))
+* **deps:** Update hashstructure ([#252](https://github.com/cloudquery/cq-provider-sdk/issues/252)) ([be60d74](https://github.com/cloudquery/cq-provider-sdk/commit/be60d7430a62f4b1d328c05b193ce55dd01c6fd1))
+* Int64 to int automatic conversion added ([#242](https://github.com/cloudquery/cq-provider-sdk/issues/242)) ([4c80f07](https://github.com/cloudquery/cq-provider-sdk/commit/4c80f07e45033f2537bb4995225f40ec5533f270))
+* Race condition ([#255](https://github.com/cloudquery/cq-provider-sdk/issues/255)) ([2f32536](https://github.com/cloudquery/cq-provider-sdk/commit/2f32536a5f6f60d330c5ede61304dccc98594a81))
+
 ## [v0.6.1] - 2022-01-03
 
 ### :gear: Changed
