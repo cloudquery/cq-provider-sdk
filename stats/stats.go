@@ -11,7 +11,9 @@ import (
 	"github.com/segmentio/stats/v4"
 )
 
-const bufferSize = 100
+const (
+	bufferSize = 100
+)
 
 type measure struct {
 	id       string
@@ -39,6 +41,8 @@ type Options struct {
 }
 
 func NewClockWithObserve(name string, tags ...stats.Tag) *stats.Clock {
+	// The default clock doesn't send a measurement on start (only on stop)
+	// We want both on start AND stop, so we wrap the ClockAt method
 	cl := stats.DefaultEngine.ClockAt(name, time.Now(), tags...)
 	stats.DefaultEngine.Observe(name, time.Duration(0), tags...)
 	return cl
@@ -60,6 +64,7 @@ func meta(name string, tags []stats.Tag) (string, bool) {
 	return strings.Join(s, ":"), stamp
 }
 
+// This is executed in the context of the calling method
 func (h *logHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
 	for _, m := range measures {
 		id, stamp := meta(m.Fields[0].Name, m.Tags)
@@ -67,6 +72,7 @@ func (h *logHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
 	}
 }
 
+// This is executed in the context of the tick go routine
 func (h *logHandler) Flush() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
