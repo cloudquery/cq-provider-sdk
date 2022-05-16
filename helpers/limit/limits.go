@@ -29,5 +29,4 @@ func calculateGoRoutines(totalMemory uint64) uint64 {
 		return uint64(goroutinesPerGB * 2)
 	}
 	return uint64(goroutinesPerGB * float64(totalMemory) / float64(gbInBytes))
-
 }
