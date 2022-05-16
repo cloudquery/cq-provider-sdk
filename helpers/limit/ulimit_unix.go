@@ -9,5 +9,5 @@ import (
 func getUlimit() (uint64, error) {
 	var rLimit syscall.Rlimit
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
-	return uint64(rLimit), err
+	return rLimit.Max, err
 }
