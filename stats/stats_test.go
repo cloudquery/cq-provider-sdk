@@ -49,7 +49,7 @@ func TestLogHandler(t *testing.T) {
 
 	logger := hclog.NewNullLogger()
 	handler := newHandler(logger)
-	Start(ctx, &Options{Logger: logger, Tick: time.Hour, Handler: handler})
+	Start(ctx, logger, WithTick(time.Hour), WithHandler(handler))
 
 	clock1 := NewClockWithObserve("withStop", stats.Tag{Name: "table", Value: "table1"})
 	NewClockWithObserve("withoutStop", stats.Tag{Name: "table", Value: "table2"})

@@ -99,7 +99,7 @@ func Serve(opts *Options) {
 		})
 	}
 
-	stats.Start(context.Background(), &stats.Options{Logger: opts.Logger})
+	stats.Start(context.Background(), opts.Logger)
 	serve(opts)
 }
 

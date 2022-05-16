@@ -119,15 +119,12 @@ func (h *logHandler) Flush() {
 	}
 }
 
-func Start(ctx context.Context, opts *Options) {
+func Start(ctx context.Context, logger hclog.Logger, options ...func(*Options)) {
 	stats.DefaultEngine.Prefix = ""
 
-	if opts.Tick == 0 {
-		opts.Tick = time.Minute
-	}
-
-	if opts.Handler == nil {
-		opts.Handler = newHandler(opts.Logger)
+	opts := &Options{Tick: time.Minute, Handler: newHandler(logger)}
+	for _, o := range options {
+		o(opts)
 	}
 
 	stats.Register(opts.Handler)
@@ -143,6 +140,18 @@ func Start(ctx context.Context, opts *Options) {
 			}
 		}
 	}()
+}
+
+func WithTick(tick time.Duration) func(*Options) {
+	return func(opts *Options) {
+		opts.Tick = tick
+	}
+}
+
+func WithHandler(handler stats.Handler) func(*Options) {
+	return func(opts *Options) {
+		opts.Handler = handler
+	}
 }
 
 func Flush() {
