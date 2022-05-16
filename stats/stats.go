@@ -35,9 +35,8 @@ type logHandler struct {
 }
 
 type Options struct {
-	Logger  hclog.Logger
-	Tick    time.Duration
-	Handler stats.Handler
+	tick    time.Duration
+	handler stats.Handler
 }
 
 func NewClockWithObserve(name string, tags ...stats.Tag) *stats.Clock {
@@ -122,15 +121,15 @@ func (h *logHandler) Flush() {
 func Start(ctx context.Context, logger hclog.Logger, options ...func(*Options)) {
 	stats.DefaultEngine.Prefix = ""
 
-	opts := &Options{Tick: time.Minute, Handler: newHandler(logger)}
+	opts := &Options{tick: time.Minute, handler: newHandler(logger)}
 	for _, o := range options {
 		o(opts)
 	}
 
-	stats.Register(opts.Handler)
+	stats.Register(opts.handler)
 
 	go func() {
-		ticker := time.NewTicker(opts.Tick)
+		ticker := time.NewTicker(opts.tick)
 		for range ticker.C {
 			select {
 			case <-ctx.Done():
@@ -144,13 +143,13 @@ func Start(ctx context.Context, logger hclog.Logger, options ...func(*Options)) 
 
 func WithTick(tick time.Duration) func(*Options) {
 	return func(opts *Options) {
-		opts.Tick = tick
+		opts.tick = tick
 	}
 }
 
 func WithHandler(handler stats.Handler) func(*Options) {
 	return func(opts *Options) {
-		opts.Handler = handler
+		opts.handler = handler
 	}
 }
 
