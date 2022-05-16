@@ -53,8 +53,8 @@ func meta(name string, tags []stats.Tag) (string, bool) {
 	var s []string
 	s = append(s, name)
 	for _, t := range tags {
-		// stamp is added on clock.Stop()
-		// we want that both clock.Start() and clock.Stop() have the same map id
+		// stamp is added on `clock.Stop()`
+		// we want that both `clock.Start()` and `clock.Stop()` have the same map id
 		if t.Name != "stamp" {
 			s = append(s, t.Name, t.Value)
 		} else {
@@ -65,6 +65,10 @@ func meta(name string, tags []stats.Tag) (string, bool) {
 }
 
 // This is executed in the context of the calling method
+// We would like to keep track of still running operations, and completed operations durations
+// HandleMeasures can be called by `NewClockWithObserve` which indicates a "start" of an operation
+// Or by `clock.Stop` which indicates a "stop" of an operation
+// We pass the measurements to a channel and periodically aggregate the data and print a hearbeat log
 func (h *logHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
 	for _, m := range measures {
 		id, stamp := meta(m.Fields[0].Name, m.Tags)
@@ -81,6 +85,7 @@ func (h *logHandler) Flush() {
 	for hasItems {
 		select {
 		case m := <-h.measures:
+			// We group start and stop measurements. Stop means `clock.Stop` was called for the operation
 			if m.stamp {
 				item, ok := h.stats.Get(m.id)
 				if ok {
@@ -99,8 +104,11 @@ func (h *logHandler) Flush() {
 		id := el.Key
 		stat := el.Value.(stat)
 		if stat.Duration == 0 {
+			// `clock.Stop` was not called, so the operation is still running
+			// We log the duration since the start of the operation
 			h.logger.Debug("heartbeat", "id", id, "running_for", time.Since(stat.Start).Round(time.Second).String())
 		} else {
+			// `clock.Stop` was called, so we log the total duration and remove the operation from future logs
 			durationReported = append(durationReported, id.(string))
 			h.logger.Debug("heartbeat", "id", id, "duration", stat.Duration.Round(time.Second).String())
 		}
