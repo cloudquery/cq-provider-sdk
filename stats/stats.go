@@ -28,10 +28,10 @@ type stat struct {
 }
 
 type logHandler struct {
-	logger   hclog.Logger
-	measures chan measure
-	stats    *orderedmap.OrderedMap
-	mu       sync.Mutex
+	logger            hclog.Logger
+	measures          chan measure
+	trackedOperations *orderedmap.OrderedMap
+	mu                sync.Mutex
 }
 
 type Options struct {
@@ -87,12 +87,12 @@ func (h *logHandler) Flush() {
 		case m := <-h.measures:
 			// We group start and stop measurements. Stop means `clock.Stop` was called for the operation
 			if m.stamp {
-				item, ok := h.stats.Get(m.id)
+				item, ok := h.trackedOperations.Get(m.id)
 				if ok {
-					h.stats.Set(m.id, stat{Start: item.(stat).Start, Duration: m.duration})
+					h.trackedOperations.Set(m.id, stat{Start: item.(stat).Start, Duration: m.duration})
 				}
 			} else {
-				h.stats.Set(m.id, stat{Start: m.time, Duration: 0})
+				h.trackedOperations.Set(m.id, stat{Start: m.time, Duration: 0})
 			}
 		default:
 			hasItems = false
@@ -100,7 +100,7 @@ func (h *logHandler) Flush() {
 	}
 
 	durationReported := make([]string, 0)
-	for el := h.stats.Front(); el != nil; el = el.Next() {
+	for el := h.trackedOperations.Front(); el != nil; el = el.Next() {
 		id := el.Key
 		stat := el.Value.(stat)
 		if stat.Duration == 0 {
@@ -115,7 +115,7 @@ func (h *logHandler) Flush() {
 	}
 
 	for _, id := range durationReported {
-		h.stats.Delete(id)
+		h.trackedOperations.Delete(id)
 	}
 }
 
@@ -159,5 +159,5 @@ func Flush() {
 }
 
 func newHandler(logger hclog.Logger) stats.Handler {
-	return &logHandler{logger: logger, measures: make(chan measure, bufferSize), stats: orderedmap.NewOrderedMap()}
+	return &logHandler{logger: logger, measures: make(chan measure, bufferSize), trackedOperations: orderedmap.NewOrderedMap()}
 }

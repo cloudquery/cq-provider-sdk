@@ -56,15 +56,15 @@ func TestLogHandler(t *testing.T) {
 	Flush()
 
 	logHandler := handler.(*logHandler)
-	assert.Len(t, logHandler.stats.Keys(), 2)
-	assert.EqualValues(t, "withStop:table:table1", logHandler.stats.Keys()[0])
-	assert.EqualValues(t, "withoutStop:table:table2", logHandler.stats.Keys()[1])
+	assert.Len(t, logHandler.trackedOperations.Keys(), 2)
+	assert.EqualValues(t, "withStop:table:table1", logHandler.trackedOperations.Keys()[0])
+	assert.EqualValues(t, "withoutStop:table:table2", logHandler.trackedOperations.Keys()[1])
 	clock1.Stop()
 
 	Flush()
 
-	assert.Len(t, logHandler.stats.Keys(), 1)
-	assert.EqualValues(t, "withoutStop:table:table2", logHandler.stats.Keys()[0])
+	assert.Len(t, logHandler.trackedOperations.Keys(), 1)
+	assert.EqualValues(t, "withoutStop:table:table2", logHandler.trackedOperations.Keys()[0])
 
 	cancel()
 
