@@ -12,9 +12,9 @@ import (
 )
 
 type stat struct {
-	Start    time.Time
-	Duration time.Duration
-	Stopped  bool
+	start    time.Time
+	duration time.Duration
+	stopped  bool
 }
 
 type durationLogger struct {
@@ -49,15 +49,17 @@ func (h *durationLogger) HandleMeasures(time time.Time, measures ...stats.Measur
 		if stamp {
 			item, ok := h.trackedOperations.Get(id)
 			if ok {
-				h.trackedOperations.Set(id, stat{Start: item.(stat).Start, Duration: m.Fields[0].Value.Duration(), Stopped: true})
+				h.trackedOperations.Set(id, stat{start: item.(stat).start, duration: m.Fields[0].Value.Duration(), stopped: true})
 			}
 		} else {
-			h.trackedOperations.Set(id, stat{Start: time, Duration: 0, Stopped: false})
+			h.trackedOperations.Set(id, stat{start: time, duration: 0, stopped: false})
 		}
 	}
 }
 
 // This is executed in the context of the tick go routine
+// We reported all stopped operations onces with their duration
+// Still running operations are reported on each tick, until they finish
 func (h *durationLogger) Flush() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -66,14 +68,14 @@ func (h *durationLogger) Flush() {
 	for el := h.trackedOperations.Front(); el != nil; el = el.Next() {
 		id := el.Key
 		stat := el.Value.(stat)
-		if stat.Stopped {
+		if stat.stopped {
 			// `clock.Stop` was called, so we log the total duration and remove the operation from future logs
 			durationReported = append(durationReported, id.(string))
-			h.logger.Debug("heartbeat", "id", id, "duration", stat.Duration.Round(time.Second).String())
+			h.logger.Debug("heartbeat", "id", id, "duration", stat.duration.Round(time.Second).String())
 		} else {
 			// `clock.Stop` was not called, so the operation is still running
 			// We log the duration since the start of the operation
-			h.logger.Debug("heartbeat", "id", id, "running_for", time.Since(stat.Start).Round(time.Second).String())
+			h.logger.Debug("heartbeat", "id", id, "running_for", time.Since(stat.start).Round(time.Second).String())
 		}
 	}
 
@@ -133,6 +135,7 @@ func getMeasurementDetails(name string, tags []stats.Tag) (string, bool) {
 	for _, t := range tags {
 		// stamp is added on `clock.Stop()`
 		// we want that both `clock.Start()` and `clock.Stop()` have the same map id
+		// `clock.Stop()` adds a tag named `stamp` so we don't add it to the id
 		if t.Name != "stamp" {
 			s = append(s, t.Name, t.Value)
 		} else {
