@@ -16,7 +16,7 @@ type stat struct {
 	Duration time.Duration
 }
 
-type logHandler struct {
+type durationLogger struct {
 	logger            hclog.Logger
 	trackedOperations *orderedmap.OrderedMap
 	mu                sync.Mutex
@@ -40,7 +40,7 @@ func NewClockWithObserve(name string, tags ...stats.Tag) *stats.Clock {
 // HandleMeasures can be called by `NewClockWithObserve` which indicates a "start" of an operation
 // Or by `clock.Stop` which indicates a "stop" of an operation
 // We pass the measurements to a channel and periodically aggregate the data and print a hearbeat log
-func (h *logHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
+func (h *durationLogger) HandleMeasures(time time.Time, measures ...stats.Measure) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for _, m := range measures {
@@ -57,7 +57,7 @@ func (h *logHandler) HandleMeasures(time time.Time, measures ...stats.Measure) {
 }
 
 // This is executed in the context of the tick go routine
-func (h *logHandler) Flush() {
+func (h *durationLogger) Flush() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -122,7 +122,7 @@ func Flush() {
 }
 
 func newHandler(logger hclog.Logger) stats.Handler {
-	return &logHandler{logger: logger, trackedOperations: orderedmap.NewOrderedMap()}
+	return &durationLogger{logger: logger, trackedOperations: orderedmap.NewOrderedMap()}
 }
 
 func meta(name string, tags []stats.Tag) (string, bool) {

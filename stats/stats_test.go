@@ -55,7 +55,7 @@ func TestLogHandler(t *testing.T) {
 	NewClockWithObserve("withoutStop", stats.Tag{Name: "table", Value: "table2"})
 	Flush()
 
-	logHandler := handler.(*logHandler)
+	logHandler := handler.(*durationLogger)
 	assert.Len(t, logHandler.trackedOperations.Keys(), 2)
 	assert.EqualValues(t, "withStop:table:table1", logHandler.trackedOperations.Keys()[0])
 	assert.EqualValues(t, "withoutStop:table:table2", logHandler.trackedOperations.Keys()[1])
