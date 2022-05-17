@@ -14,6 +14,7 @@ import (
 type stat struct {
 	Start    time.Time
 	Duration time.Duration
+	Stopped  bool
 }
 
 type durationLogger struct {
@@ -48,10 +49,10 @@ func (h *durationLogger) HandleMeasures(time time.Time, measures ...stats.Measur
 		if stamp {
 			item, ok := h.trackedOperations.Get(id)
 			if ok {
-				h.trackedOperations.Set(id, stat{Start: item.(stat).Start, Duration: m.Fields[0].Value.Duration()})
+				h.trackedOperations.Set(id, stat{Start: item.(stat).Start, Duration: m.Fields[0].Value.Duration(), Stopped: true})
 			}
 		} else {
-			h.trackedOperations.Set(id, stat{Start: time, Duration: 0})
+			h.trackedOperations.Set(id, stat{Start: time, Duration: 0, Stopped: false})
 		}
 	}
 }
@@ -65,14 +66,14 @@ func (h *durationLogger) Flush() {
 	for el := h.trackedOperations.Front(); el != nil; el = el.Next() {
 		id := el.Key
 		stat := el.Value.(stat)
-		if stat.Duration == 0 {
-			// `clock.Stop` was not called, so the operation is still running
-			// We log the duration since the start of the operation
-			h.logger.Debug("heartbeat", "id", id, "running_for", time.Since(stat.Start).Round(time.Second).String())
-		} else {
+		if stat.Stopped {
 			// `clock.Stop` was called, so we log the total duration and remove the operation from future logs
 			durationReported = append(durationReported, id.(string))
 			h.logger.Debug("heartbeat", "id", id, "duration", stat.Duration.Round(time.Second).String())
+		} else {
+			// `clock.Stop` was not called, so the operation is still running
+			// We log the duration since the start of the operation
+			h.logger.Debug("heartbeat", "id", id, "running_for", time.Since(stat.Start).Round(time.Second).String())
 		}
 	}
 
