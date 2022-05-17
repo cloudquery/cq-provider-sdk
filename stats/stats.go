@@ -61,7 +61,7 @@ func (h *logHandler) Flush() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	durationReported := make([]string, 0)
+	var durationReported []string
 	for el := h.trackedOperations.Front(); el != nil; el = el.Next() {
 		id := el.Key
 		stat := el.Value.(stat)
