@@ -44,7 +44,7 @@ func (h *durationLogger) HandleMeasures(time time.Time, measures ...stats.Measur
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for _, m := range measures {
-		id, stamp := meta(m.Fields[0].Name, m.Tags)
+		id, stamp := getMeasurementDetails(m.Fields[0].Name, m.Tags)
 		if stamp {
 			item, ok := h.trackedOperations.Get(id)
 			if ok {
@@ -125,7 +125,7 @@ func newHandler(logger hclog.Logger) stats.Handler {
 	return &durationLogger{logger: logger, trackedOperations: orderedmap.NewOrderedMap()}
 }
 
-func meta(name string, tags []stats.Tag) (string, bool) {
+func getMeasurementDetails(name string, tags []stats.Tag) (string, bool) {
 	var stamp = false
 	s := make([]string, 1, len(tags))
 	s = append(s, name)

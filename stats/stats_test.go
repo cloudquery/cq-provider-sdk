@@ -37,7 +37,7 @@ func Test_meta(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			id, stamp := meta(tt.args.name, tt.args.tags)
+			id, stamp := getMeasurementDetails(tt.args.name, tt.args.tags)
 			assert.EqualValues(t, tt.want.id, id)
 			assert.EqualValues(t, tt.want.stamp, stamp)
 		})
