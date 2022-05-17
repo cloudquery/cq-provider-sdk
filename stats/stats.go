@@ -126,7 +126,7 @@ func newHandler(logger hclog.Logger) stats.Handler {
 
 func meta(name string, tags []stats.Tag) (string, bool) {
 	var stamp = false
-	s := make([]string, 0, len(tags))
+	s := make([]string, 1, len(tags))
 	s = append(s, name)
 	for _, t := range tags {
 		// stamp is added on `clock.Stop()`
