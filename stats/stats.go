@@ -35,22 +35,6 @@ func NewClockWithObserve(name string, tags ...stats.Tag) *stats.Clock {
 	return cl
 }
 
-func meta(name string, tags []stats.Tag) (string, bool) {
-	var stamp = false
-	var s []string
-	s = append(s, name)
-	for _, t := range tags {
-		// stamp is added on `clock.Stop()`
-		// we want that both `clock.Start()` and `clock.Stop()` have the same map id
-		if t.Name != "stamp" {
-			s = append(s, t.Name, t.Value)
-		} else {
-			stamp = true
-		}
-	}
-	return strings.Join(s, ":"), stamp
-}
-
 // This is executed in the context of the calling method
 // We would like to keep track of still running operations, and completed operations durations
 // HandleMeasures can be called by `NewClockWithObserve` which indicates a "start" of an operation
@@ -138,4 +122,20 @@ func Flush() {
 
 func newHandler(logger hclog.Logger) stats.Handler {
 	return &logHandler{logger: logger, trackedOperations: orderedmap.NewOrderedMap()}
+}
+
+func meta(name string, tags []stats.Tag) (string, bool) {
+	var stamp = false
+	var s []string
+	s = append(s, name)
+	for _, t := range tags {
+		// stamp is added on `clock.Stop()`
+		// we want that both `clock.Start()` and `clock.Stop()` have the same map id
+		if t.Name != "stamp" {
+			s = append(s, t.Name, t.Value)
+		} else {
+			stamp = true
+		}
+	}
+	return strings.Join(s, ":"), stamp
 }
