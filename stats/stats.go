@@ -93,11 +93,12 @@ func Start(ctx context.Context, logger hclog.Logger, options ...func(*Options)) 
 
 	go func() {
 		ticker := time.NewTicker(opts.tick)
-		for range ticker.C {
+		defer ticker.Stop()
+		for {
 			select {
 			case <-ctx.Done():
 				return
-			default:
+			case <-ticker.C:
 				stats.Flush()
 			}
 		}
