@@ -52,7 +52,7 @@ func (h *durationLogger) HandleMeasures(time time.Time, measures ...stats.Measur
 				h.trackedOperations.Set(id, stat{start: item.(stat).start, duration: m.Fields[0].Value.Duration(), stopped: true})
 			}
 		} else {
-			h.trackedOperations.Set(id, stat{start: time, duration: 0, stopped: false})
+			h.trackedOperations.Set(id, stat{start: time})
 		}
 	}
 }
