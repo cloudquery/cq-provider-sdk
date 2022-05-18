@@ -272,6 +272,7 @@ func tableFromProto(v *internal.Table) *schema.Table {
 		Columns:     cols,
 		Relations:   rels,
 		Options:     opts,
+		Serial:      v.GetSerial(),
 	}
 }
 
@@ -325,6 +326,7 @@ func tableToProto(in *schema.Table) *internal.Table {
 		Options: &internal.TableCreationOptions{
 			PrimaryKeys: in.Options.PrimaryKeys,
 		},
+		Serial: in.Serial,
 	}
 }
 

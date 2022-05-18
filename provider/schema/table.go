@@ -2,6 +2,8 @@ package schema
 
 import (
 	"context"
+	"sort"
+	"strings"
 )
 
 // TableResolver is the main entry point when a table fetch is called.
@@ -52,6 +54,9 @@ type Table struct {
 	// Global tables are usually the same regardless of the provider fetch configuration. Global table data gets fetched
 	// and doesn't produce PK conflict errors instead data is replaced
 	Global bool
+
+	// Serial is used to force a signature change, which forces new table creation and cascading removal of old table and relations
+	Serial string
 }
 
 func (t Table) Column(name string) *Column {
@@ -67,4 +72,36 @@ func (t Table) Column(name string) *Column {
 type TableCreationOptions struct {
 	// List of columns to set as primary keys. If this is empty, a random unique ID is generated.
 	PrimaryKeys []string
+}
+
+func (tco TableCreationOptions) signature() string {
+	return strings.Join(tco.PrimaryKeys, ";")
+}
+
+// Signature returns a comparable string about the structure of the table (columns, options, relations)
+func (t Table) Signature() string {
+	const sdkSignatureSerial = "" // Change this to force a change across all providers
+
+	sigs := make([]string, 1, len(t.Relations))
+	sigs[0] = strings.Join([]string{
+		"t:" + sdkSignatureSerial,
+		t.Serial,
+		t.Name,
+		t.Columns.signature(),
+		t.Options.signature(),
+	}, ",")
+
+	relNames := make([]string, len(t.Relations))
+	relVsTable := make(map[string]*Table, len(t.Relations))
+	for i := range t.Relations {
+		relNames[i] = t.Relations[i].Name
+		relVsTable[t.Relations[i].Name] = t.Relations[i]
+	}
+	sort.Strings(relNames)
+
+	for _, t := range relNames {
+		sigs = append(sigs, relVsTable[t].Signature())
+	}
+
+	return strings.Join(sigs, "\n")
 }

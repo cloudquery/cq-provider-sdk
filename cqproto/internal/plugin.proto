@@ -172,6 +172,7 @@ message Table {
   repeated Column columns = 3;
   repeated Table relations = 4;
   optional TableCreationOptions options = 5;
+  string serial = 6;
 }
 
 message Column {
