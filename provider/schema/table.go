@@ -82,14 +82,14 @@ func (tco TableCreationOptions) signature() string {
 func (t Table) Signature() string {
 	const sdkSignatureSerial = "" // Change this to force a change across all providers
 
-	sigs := make([]string, 1, len(t.Relations))
-	sigs[0] = strings.Join([]string{
+	sigs := make([]string, 0, len(t.Relations)+1)
+	sigs = append(sigs, strings.Join([]string{
 		"t:" + sdkSignatureSerial,
 		t.Serial,
 		t.Name,
 		t.Columns.signature(),
 		t.Options.signature(),
-	}, ",")
+	}, ","))
 
 	relNames := make([]string, len(t.Relations))
 	relVsTable := make(map[string]*Table, len(t.Relations))
@@ -104,4 +104,12 @@ func (t Table) Signature() string {
 	}
 
 	return strings.Join(sigs, "\n")
+}
+
+func (t Table) TableNames() []string {
+	ret := []string{t.Name}
+	for _, rel := range t.Relations {
+		ret = append(ret, rel.TableNames()...)
+	}
+	return ret
 }
