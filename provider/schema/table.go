@@ -2,6 +2,8 @@ package schema
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -79,15 +81,37 @@ func (tco TableCreationOptions) signature() string {
 }
 
 // Signature returns a comparable string about the structure of the table (columns, options, relations)
-func (t Table) Signature() string {
+func (t Table) Signature(d Dialect) string {
 	const sdkSignatureSerial = "" // Change this to force a change across all providers
 
+	sigs := append(
+		[]string{
+			"sdk:" + sdkSignatureSerial,
+		},
+		t.signature(d, nil)...,
+	)
+
+	h := sha256.New()
+	h.Write([]byte(strings.Join(sigs, "\n")))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func (t Table) TableNames() []string {
+	ret := []string{t.Name}
+	for _, rel := range t.Relations {
+		ret = append(ret, rel.TableNames()...)
+	}
+	return ret
+}
+
+func (t Table) signature(d Dialect, parent *Table) []string {
 	sigs := make([]string, 0, len(t.Relations)+1)
 	sigs = append(sigs, strings.Join([]string{
-		"t:" + sdkSignatureSerial,
-		t.Serial,
+		"t:" + t.Serial,
 		t.Name,
-		t.Columns.signature(),
+		d.Columns(&t).signature(),
+		strings.Join(d.PrimaryKeys(&t), ";"),
+		strings.Join(d.Constraints(&t, parent), "|"),
 		t.Options.signature(),
 	}, ","))
 
@@ -99,17 +123,9 @@ func (t Table) Signature() string {
 	}
 	sort.Strings(relNames)
 
-	for _, t := range relNames {
-		sigs = append(sigs, relVsTable[t].Signature())
+	for _, rel := range relNames {
+		sigs = append(sigs, relVsTable[rel].signature(d, &t)...)
 	}
 
-	return strings.Join(sigs, "\n")
-}
-
-func (t Table) TableNames() []string {
-	ret := []string{t.Name}
-	for _, rel := range t.Relations {
-		ret = append(ret, rel.TableNames()...)
-	}
-	return ret
+	return sigs
 }
