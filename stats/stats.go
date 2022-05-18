@@ -71,7 +71,7 @@ func (h *durationLogger) Flush() {
 		if stat.stopped {
 			// `clock.Stop` was called, so we log the total duration and remove the operation from future logs
 			durationReported = append(durationReported, id.(string))
-			h.logger.Debug("heartbeat", "id", id, "duration", stat.duration.Round(time.Second).String())
+			h.logger.Debug("heartbeat", "id", id, "duration", int64(stat.duration.Round(time.Second).Seconds()))
 		} else {
 			// `clock.Stop` was not called, so the operation is still running
 			// We log the duration since the start of the operation
