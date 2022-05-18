@@ -72,11 +72,11 @@ func (h *durationLogger) Flush() {
 		if stat.stopped {
 			// `clock.Stop` was called, so we log the total duration and remove the operation from future logs
 			durationReported = append(durationReported, id.(string))
-			h.logger.Debug("heartbeat", "id", id, "duration", printSeconds(stat.duration))
+			h.logger.Debug("heartbeat", "id", id, "duration", formatSeconds(stat.duration))
 		} else {
 			// `clock.Stop` was not called, so the operation is still running
 			// We log the duration since the start of the operation
-			h.logger.Debug("heartbeat", "id", id, "running_for", printSeconds(time.Since(stat.start)))
+			h.logger.Debug("heartbeat", "id", id, "running_for", formatSeconds(time.Since(stat.start)))
 		}
 	}
 
@@ -146,6 +146,6 @@ func getMeasurementDetails(name string, tags []stats.Tag) (string, bool) {
 	return strings.Join(s, ":"), stamp
 }
 
-func printSeconds(duration time.Duration) string {
+func formatSeconds(duration time.Duration) string {
 	return fmt.Sprintf("%ds", int64(duration.Seconds()))
 }
