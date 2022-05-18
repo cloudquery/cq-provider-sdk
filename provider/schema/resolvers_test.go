@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/helpers"
-
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 )

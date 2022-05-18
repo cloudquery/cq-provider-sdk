@@ -4,13 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
-
-	"github.com/vmihailenco/msgpack/v5"
-
 	"github.com/cloudquery/cq-provider-sdk/cqproto/internal"
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/hashicorp/go-plugin"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 type GRPCClient struct {

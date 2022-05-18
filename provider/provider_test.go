@@ -6,19 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/execution"
-
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
-
-	"github.com/cloudquery/cq-provider-sdk/provider/schema/mock"
-	"github.com/golang/mock/gomock"
-
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
-	"github.com/cloudquery/faker/v3"
-	"github.com/hashicorp/go-hclog"
-
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
+	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-
+	"github.com/cloudquery/cq-provider-sdk/provider/schema/mock"
+	"github.com/cloudquery/faker/v3"
+	"github.com/golang/mock/gomock"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
 

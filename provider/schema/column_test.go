@@ -8,11 +8,9 @@ import (
 	"time"
 
 	"github.com/cloudquery/faker/v3"
-
-	"github.com/thoas/go-funk"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/thoas/go-funk"
 )
 
 type validateFixture struct {

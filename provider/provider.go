@@ -9,23 +9,20 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cloudquery/cq-provider-sdk/helpers/limit"
-
+	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/database"
+	"github.com/cloudquery/cq-provider-sdk/helpers"
+	"github.com/cloudquery/cq-provider-sdk/helpers/limit"
 	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/module"
-	"github.com/thoas/go-funk"
-
-	"github.com/cloudquery/cq-provider-sdk/cqproto"
-	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-
 	"github.com/creasty/defaults"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/hcl/v2/hclsimple"
 	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/thoas/go-funk"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )

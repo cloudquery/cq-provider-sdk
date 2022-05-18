@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-
 	"github.com/jackc/pgx/v4"
 	"github.com/stretchr/testify/mock"
 )

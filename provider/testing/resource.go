@@ -8,13 +8,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/execution"
-
 	sq "github.com/Masterminds/squirrel"
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration"
 	"github.com/cloudquery/cq-provider-sdk/provider"
+	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/testlog"
 	"github.com/cloudquery/faker/v3"

@@ -12,12 +12,11 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-	"golang.org/x/sync/semaphore"
-
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
 	"github.com/modern-go/reflect2"
 	"github.com/thoas/go-funk"
+	"golang.org/x/sync/semaphore"
 )
 
 // executionJitter adds a -1 minute to execution of fetch, so if a user fetches only 1 resources and it finishes

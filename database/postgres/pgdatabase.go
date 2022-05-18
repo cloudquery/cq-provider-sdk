@@ -8,12 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
-
 	sq "github.com/Masterminds/squirrel"
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-
 	"github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	"github.com/hashicorp/go-hclog"

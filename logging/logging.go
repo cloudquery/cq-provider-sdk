@@ -1,9 +1,9 @@
 package logging
 
 import (
-	"github.com/hashicorp/go-hclog"
-
 	"os"
+
+	"github.com/hashicorp/go-hclog"
 )
 
 // New creates a new hclog logger

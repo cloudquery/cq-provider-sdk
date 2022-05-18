@@ -8,7 +8,6 @@ import (
 
 	"github.com/cloudquery/cq-provider-sdk/database/dsn"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/hashicorp/go-hclog"

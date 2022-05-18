@@ -7,19 +7,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/cloudquery/cq-provider-sdk/helpers/limit"
-
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/testlog"
-	"golang.org/x/sync/semaphore"
-
-	"github.com/aws/smithy-go/ptr"
 	"github.com/creasty/defaults"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 )
 
 type ExecutionTestCase struct {
