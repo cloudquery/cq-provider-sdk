@@ -80,7 +80,8 @@ func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uin
 
 	if e.Table.Multiplex != nil {
 		clients = e.Table.Multiplex(meta)
-	} else {
+	}
+	if len(clients) == 0 {
 		clients = append(clients, meta)
 	}
 
