@@ -36,6 +36,8 @@ type TableExecutor struct {
 	Logger hclog.Logger
 	// classifiers
 	classifiers []ErrorClassifier
+	// extraFields to be passed to each created resource in the execution, used in tests.
+	extraFields map[string]interface{}
 	// metadata to be passed to each created resource in the execution, used by cq* resolvers.
 	metadata map[string]interface{}
 	// When the execution started
@@ -49,7 +51,7 @@ type TableExecutor struct {
 }
 
 // NewTableExecutor creates a new TableExecutor for given schema.Table
-func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted, timeout time.Duration) TableExecutor {
+func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted, timeout time.Duration) TableExecutor {
 	var classifiers = []ErrorClassifier{defaultErrorClassifier}
 	if classifier != nil {
 		classifiers = append([]ErrorClassifier{classifier}, classifiers...)
@@ -62,6 +64,7 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 		Table:          table,
 		Db:             db,
 		Logger:         logger,
+		extraFields:    extraFields,
 		metadata:       metadata,
 		classifiers:    classifiers,
 		executionStart: time.Now().Add(executionJitter),
@@ -186,12 +189,15 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 	if parent != nil {
 		return nil
 	}
-	if e.Table.DeleteFilter == nil {
-		return nil
-	}
-
 	e.Logger.Debug("cleaning table stale data", "last_update", e.executionStart)
-	filters := e.Table.DeleteFilter(client, parent)
+
+	filters := make([]interface{}, 0)
+	for k, v := range e.extraFields {
+		filters = append(filters, k, v)
+	}
+	if e.Table.DeleteFilter != nil {
+		filters = append(filters, e.Table.DeleteFilter(client, parent)...)
+	}
 	if err := e.Db.RemoveStaleData(ctx, e.Table, e.executionStart, filters); err != nil {
 		e.Logger.Warn("failed to clean table stale data", "last_update", e.executionStart, "err", err)
 		return err
@@ -314,11 +320,12 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	if l := len(resources); l > 0 {
 		e.Logger.Debug("storing resources", "count", l)
 	}
-	err := e.Db.CopyFrom(ctx, resources, shouldCascade)
-	if err == nil {
-		return resources, nil
-	}
-	e.Logger.Warn("failed copy-from to db", "error", err)
+	//err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
+	//if err == nil {
+	//	return resources, nil
+	//}
+	//e.Logger.Warn("failed copy-from to db", "error", err)
+	var err error
 
 	// fallback insert, copy from sometimes does problems, so we fall back with bulk insert
 	err = e.Db.Insert(ctx, e.Table, resources)

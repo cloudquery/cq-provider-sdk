@@ -21,13 +21,13 @@ func (_m *DatabaseMock) Close() {
 	_m.Called()
 }
 
-// CopyFrom provides a mock function with given fields: ctx, resources, shouldCascade
-func (_m *DatabaseMock) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool) error {
-	ret := _m.Called(ctx, resources, shouldCascade)
+// CopyFrom provides a mock function with given fields: ctx, resources, shouldCascade, CascadeDeleteFilters
+func (_m *DatabaseMock) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error {
+	ret := _m.Called(ctx, resources, shouldCascade, CascadeDeleteFilters)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, schema.Resources, bool) error); ok {
-		r0 = rf(ctx, resources, shouldCascade)
+	if rf, ok := ret.Get(0).(func(context.Context, schema.Resources, bool, map[string]interface{}) error); ok {
+		r0 = rf(ctx, resources, shouldCascade, CascadeDeleteFilters)
 	} else {
 		r0 = ret.Error(0)
 	}

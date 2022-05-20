@@ -94,7 +94,7 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 }
 
 // CopyFrom copies all resources from []*Resource
-func (p PgDatabase) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool) error {
+func (p PgDatabase) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool, cascadeDeleteFilters map[string]interface{}) error {
 	if len(resources) == 0 {
 		return nil
 	}
@@ -105,6 +105,9 @@ func (p PgDatabase) CopyFrom(ctx context.Context, resources schema.Resources, sh
 	}, func(tx pgx.Tx) error {
 		if shouldCascade {
 			q := goqu.Dialect("postgres").Delete(resources.TableName()).Where(goqu.Ex{"cq_id": resources.GetIds()})
+			for k, v := range cascadeDeleteFilters {
+				q = q.Where(goqu.Ex{k: goqu.Op{"eq": v}})
+			}
 			sql, args, err := q.Prepared(true).ToSQL()
 			if err != nil {
 				return err

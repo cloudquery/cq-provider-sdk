@@ -51,17 +51,17 @@ func (mr *MockStorageMockRecorder) Close() *gomock.Call {
 }
 
 // CopyFrom mocks base method.
-func (m *MockStorage) CopyFrom(arg0 context.Context, arg1 schema.Resources, arg2 bool) error {
+func (m *MockStorage) CopyFrom(arg0 context.Context, arg1 schema.Resources, arg2 bool, arg3 map[string]interface{}) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CopyFrom", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "CopyFrom", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CopyFrom indicates an expected call of CopyFrom.
-func (mr *MockStorageMockRecorder) CopyFrom(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) CopyFrom(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CopyFrom", reflect.TypeOf((*MockStorage)(nil).CopyFrom), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CopyFrom", reflect.TypeOf((*MockStorage)(nil).CopyFrom), arg0, arg1, arg2, arg3)
 }
 
 // Delete mocks base method.

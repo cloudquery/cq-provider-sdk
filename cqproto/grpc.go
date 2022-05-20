@@ -44,13 +44,18 @@ func (g GRPCClient) GetProviderConfig(ctx context.Context, _ *GetProviderConfigR
 }
 
 func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigureProviderRequest) (*ConfigureProviderResponse, error) {
+	fieldsData, err := msgpack.Marshal(request.ExtraFields)
+	if err != nil {
+		return nil, err
+	}
 	res, err := g.client.ConfigureProvider(ctx, &internal.ConfigureProvider_Request{
 		CloudqueryVersion: request.CloudQueryVersion,
 		Connection: &internal.ConnectionDetails{
 			Type: internal.ConnectionType_POSTGRES,
 			Dsn:  request.Connection.DSN,
 		},
-		Config: request.Config,
+		Config:      request.Config,
+		ExtraFields: fieldsData,
 	})
 	if err != nil {
 		return nil, err
@@ -149,13 +154,20 @@ func (g *GRPCServer) GetProviderConfig(ctx context.Context, _ *internal.GetProvi
 }
 
 func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.ConfigureProvider_Request) (*internal.ConfigureProvider_Response, error) {
+	var eFields = make(map[string]interface{})
+	if request.GetExtraFields() != nil {
+		if err := msgpack.Unmarshal(request.GetExtraFields(), &eFields); err != nil {
+			return nil, err
+		}
+	}
 	resp, err := g.Impl.ConfigureProvider(ctx, &ConfigureProviderRequest{
 		CloudQueryVersion: request.GetCloudqueryVersion(),
 		Connection: ConnectionDetails{
 			Type: string(request.Connection.GetType()),
 			DSN:  request.Connection.GetDsn(),
 		},
-		Config: request.Config,
+		Config:      request.Config,
+		ExtraFields: eFields,
 	})
 	if err != nil {
 		return nil, err
