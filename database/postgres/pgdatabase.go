@@ -50,12 +50,6 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 		return nil
 	}
 
-	if shouldCascade {
-		if err := deleteResourceByCQId(ctx, p.pool, resources, cascadeDeleteFilters); err != nil {
-			return err
-		}
-	}
-
 	// It is safe to assume that all resources have the same columns
 	cols := quoteColumns(resources.ColumnNames())
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
@@ -83,10 +77,25 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 	if err != nil {
 		return diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name), diag.WithSummary("bad insert SQL statement created"), diag.WithDetails("SQL statement %q is invalid", s))
 	}
-	_, err = p.pool.Exec(ctx, s, args...)
+
+	err = p.pool.BeginTxFunc(ctx, pgx.TxOptions{
+		IsoLevel:       pgx.ReadCommitted,
+		AccessMode:     pgx.ReadWrite,
+		DeferrableMode: pgx.Deferrable,
+	}, func(tx pgx.Tx) error {
+		if shouldCascade {
+			if err := deleteResourceByCQId(ctx, tx, resources, cascadeDeleteFilters); err != nil {
+				return err
+			}
+		}
+
+		_, err := tx.Exec(ctx, s, args...)
+		return err
+	})
 	if err == nil {
 		return nil
 	}
+
 	if pgErr, ok := err.(*pgconn.PgError); ok {
 		// This should rarely occur, but if it occurs we want to print the SQL to debug it further
 		if pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
