@@ -52,7 +52,6 @@ type TableExecutor struct {
 
 // NewTableExecutor creates a new TableExecutor for given schema.Table
 func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted, timeout time.Duration) TableExecutor {
-
 	var classifiers = []ErrorClassifier{defaultErrorClassifier}
 	if classifier != nil {
 		classifiers = append([]ErrorClassifier{classifier}, classifiers...)
@@ -77,50 +76,33 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 
 // Resolve is the root function of table executor which starts an execution of a Table resolving it, and it's relations.
 func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uint64, diag.Diagnostics) {
+	var clients []schema.ClientMeta
+
 	if e.Table.Multiplex != nil {
-		if clients := e.Table.Multiplex(meta); len(clients) > 0 {
-			return e.doMultiplexResolve(ctx, clients)
-		}
+		clients = e.Table.Multiplex(meta)
+	} else {
+		clients = append(clients, meta)
 	}
 
-	if e.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, e.timeout)
-		defer cancel()
-	}
-	return e.withLogger(append(meta.Logger().ImpliedArgs(), "multiplex", false)...).callTableResolve(ctx, meta, nil)
+	return e.doMultiplexResolve(ctx, clients)
 }
 
 // withTable allows to create a new TableExecutor for received *schema.Table
 func (e TableExecutor) withTable(t *schema.Table, kv ...interface{}) *TableExecutor {
 	var c [2]schema.ColumnList
 	c[0], c[1] = e.Db.Dialect().Columns(t).Sift()
-	return &TableExecutor{
-		ResourceName:   e.ResourceName,
-		Table:          t,
-		Db:             e.Db,
-		Logger:         e.Logger.With(kv...),
-		classifiers:    e.classifiers,
-		extraFields:    e.extraFields,
-		executionStart: e.executionStart,
-		columns:        c,
-		goroutinesSem:  e.goroutinesSem,
-	}
+	cpy := e
+	cpy.Table = t
+	cpy.Logger = cpy.Logger.With(kv...)
+	cpy.columns = c
+
+	return &cpy
 }
 
 func (e TableExecutor) withLogger(kv ...interface{}) *TableExecutor {
-	return &TableExecutor{
-		ResourceName:   e.ResourceName,
-		Table:          e.Table,
-		Db:             e.Db,
-		Logger:         e.Logger.With(kv...),
-		classifiers:    e.classifiers,
-		extraFields:    e.extraFields,
-		executionStart: e.executionStart,
-		columns:        e.columns,
-		goroutinesSem:  e.goroutinesSem,
-	}
-
+	cpy := e
+	cpy.Logger = cpy.Logger.With(kv...)
+	return &cpy
 }
 
 // doMultiplexResolve resolves table with multiplexed clients appending all diagnostics returned from each multiplex.
@@ -299,8 +281,8 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 		diags     diag.Diagnostics
 	)
 
-	for _, o := range objects {
-		resource := schema.NewResourceData(e.Db.Dialect(), e.Table, parent, o, e.metadata, e.executionStart)
+	for i := range objects {
+		resource := schema.NewResourceData(e.Db.Dialect(), e.Table, parent, objects[i], e.metadata, e.executionStart)
 		// Before inserting resolve all table column resolvers
 		resolveDiags := e.resolveResourceValues(ctx, meta, resource)
 		diags = diags.Add(resolveDiags)
@@ -338,11 +320,12 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	if l := len(resources); l > 0 {
 		e.Logger.Debug("storing resources", "count", l)
 	}
-	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
-	if err == nil {
-		return resources, nil
-	}
-	e.Logger.Warn("failed copy-from to db", "error", err)
+	//err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
+	//if err == nil {
+	//	return resources, nil
+	//}
+	//e.Logger.Warn("failed copy-from to db", "error", err)
+	var err error
 
 	// fallback insert, copy from sometimes does problems, so we fall back with bulk insert
 	err = e.Db.Insert(ctx, e.Table, resources)
