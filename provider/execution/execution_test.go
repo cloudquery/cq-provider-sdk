@@ -23,9 +23,8 @@ import (
 )
 
 type ExecutionTestCase struct {
-	Name        string
-	Table       *schema.Table
-	ExtraFields map[string]interface{}
+	Name  string
+	Table *schema.Table
 
 	SetupStorage          func(t *testing.T) Storage
 	ExpectedResourceCount uint64
@@ -530,7 +529,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				storage = tc.SetupStorage(t)
 			}
 			limiter := semaphore.NewWeighted(int64(limit.GetMaxGoRoutines()))
-			exec := NewTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, tc.ExtraFields, nil, nil, limiter, 10*time.Second)
+			exec := NewTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, nil, nil, limiter, 10*time.Second)
 			count, diags := exec.Resolve(context.Background(), executionClient)
 			assert.Equal(t, tc.ExpectedResourceCount, count)
 			if tc.ErrorExpected {
@@ -649,7 +648,7 @@ func TestTableExecutor_resolveResourceValues(t *testing.T) {
 				storage = tc.SetupStorage(t)
 			}
 			limiter := semaphore.NewWeighted(int64(limit.GetMaxGoRoutines()))
-			exec := NewTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, nil, nil, nil, limiter, 0)
+			exec := NewTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, nil, nil, limiter, 0)
 
 			r := schema.NewResourceData(storage.Dialect(), tc.Table, nil, tc.ResourceData, tc.MetaData, exec.executionStart)
 			// columns should be resolved from ColumnResolver functions or default functions

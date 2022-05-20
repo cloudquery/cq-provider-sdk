@@ -62,8 +62,6 @@ type Provider struct {
 	dbURL string
 	// meta is the provider's client created when configure is called
 	meta schema.ClientMeta
-	// Add extra fields to all resources, these fields don't show up in documentation and are used for internal CQ testing.
-	extraFields map[string]interface{}
 	// storageCreator creates a database based on requested engine
 	storageCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (execution.Storage, error)
 }
@@ -121,7 +119,6 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 		}
 	}
 
-	p.extraFields = request.ExtraFields
 	p.dbURL = request.Connection.DSN
 	providerConfig := p.Config()
 	if err := defaults.Set(providerConfig); err != nil {
@@ -211,7 +208,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		tableExec := execution.NewTableExecutor(resource, conn, p.Logger.With("table", table.Name), table, p.extraFields, request.Metadata, p.ErrorClassifier, goroutinesSem, request.Timeout)
+		tableExec := execution.NewTableExecutor(resource, conn, p.Logger.With("table", table.Name), table, request.Metadata, p.ErrorClassifier, goroutinesSem, request.Timeout)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource

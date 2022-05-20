@@ -273,8 +273,7 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:      nil,
-		ExtraFields: nil,
+		Config: nil,
 	})
 	assert.Equal(t, "provider unitest logger not defined, make sure to run it with serve", resp.Diagnostics.Error())
 	assert.NoError(t, err)
@@ -285,8 +284,7 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:      nil,
-		ExtraFields: nil,
+		Config: nil,
 	})
 	assert.True(t, resp.Diagnostics.HasErrors())
 	assert.Equal(t, "test error", resp.Diagnostics.Error())
@@ -313,8 +311,7 @@ func TestProvider_FetchResources(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:      nil,
-		ExtraFields: nil,
+		Config: nil,
 	})
 	ctrl := gomock.NewController(t)
 	var fetchCases = []FetchResourceTableTest{
@@ -440,8 +437,7 @@ func TestProvider_FetchResourcesParallelLimit(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:      nil,
-		ExtraFields: nil,
+		Config: nil,
 	})
 	assert.False(t, resp.Diagnostics.HasDiags())
 	assert.NoError(t, err)

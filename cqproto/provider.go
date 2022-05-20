@@ -79,8 +79,6 @@ type ConfigureProviderRequest struct {
 	Connection ConnectionDetails
 	// Config is the configuration the user supplied for the provider
 	Config []byte
-	// Fields to inject to every resource on insert
-	ExtraFields map[string]interface{}
 }
 
 type ConfigureProviderResponse struct {

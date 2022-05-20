@@ -16,7 +16,7 @@ type Storage interface {
 	Insert(ctx context.Context, t *schema.Table, instance schema.Resources) error
 	Delete(ctx context.Context, t *schema.Table, kvFilters []interface{}) error
 	RemoveStaleData(ctx context.Context, t *schema.Table, executionStart time.Time, kvFilters []interface{}) error
-	CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error
+	CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool) error
 	Close()
 	Dialect() schema.Dialect
 }
