@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -13,8 +14,9 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
-	"github.com/cloudquery/cq-provider-sdk/provider/module"
 	"github.com/thoas/go-funk"
+	"github.com/xeipuuv/gojsonschema"
+	"gopkg.in/yaml.v3"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/helpers"
@@ -22,8 +24,6 @@ import (
 
 	"github.com/creasty/defaults"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/hcl/v2/hclsimple"
-	"github.com/hashicorp/hcl/v2/hclwrite"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -46,6 +46,8 @@ type Provider struct {
 	ResourceMap map[string]*schema.Table
 	// Configuration decoded from configure request
 	Config func() Config
+	// ConfigSchema is the json schema validation for the config
+	ConfigSchema string
 	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger hclog.Logger
 	// Migrations embedded and passed by the provider to upgrade between versions
@@ -54,8 +56,7 @@ type Provider struct {
 	// Classifier function may return empty slice if it cannot meaningfully convert the error into diagnostics. In this case
 	// the error will be converted by the SDK into diagnostic at ERROR level and RESOLVING type.
 	ErrorClassifier execution.ErrorClassifier
-	// ModuleInfoReader is called when the user executes a module, to get provider supported metadata about the given module
-	ModuleInfoReader module.InfoReader
+
 	// Database connection string
 	dbURL string
 	// meta is the provider's client created when configure is called
@@ -64,6 +65,21 @@ type Provider struct {
 	extraFields map[string]interface{}
 	// storageCreator creates a database based on requested engine
 	storageCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (execution.Storage, error)
+}
+
+func UnmarshalConfig(data []byte, schema []byte, c interface{}) (*gojsonschema.Result, error) {
+	err := yaml.Unmarshal(data, c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	schemaLoader := gojsonschema.NewBytesLoader(schema)
+	documentLoader := gojsonschema.NewGoLoader(c)
+	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate config: %w", err)
+	}
+	return result, nil
 }
 
 func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
@@ -84,14 +100,13 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.GetProviderConfigResponse{}, err
 	}
-	data := fmt.Sprintf(`
-		provider "%s" {
-			%s
-			// list of resources to fetch
-			resources = %s
-		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
 
-	return &cqproto.GetProviderConfigResponse{Config: hclwrite.Format([]byte(data))}, nil
+	out, err := yaml.Marshal(providerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal provider config: %w", err)
+	}
+
+	return &cqproto.GetProviderConfigResponse{Config: out}, nil
 }
 
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
@@ -130,15 +145,19 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	// if we received an empty config we notify in log and only use defaults.
 	if len(request.Config) == 0 {
 		p.Logger.Info("Received empty configuration, using only defaults")
-	} else if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
-		p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)
-		// this part will be deprecated.
-		if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
-			p.Logger.Error("Failed to load configuration.", "error", err)
-			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diag.FromError(err, diag.USER),
-			}, nil
-		}
+	}
+
+	result, err := UnmarshalConfig(request.Config, []byte(p.ConfigSchema), providerConfig)
+	if err != nil {
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diag.FromError(err, diag.INTERNAL),
+		}, nil
+	}
+
+	if !result.Valid() {
+		return &cqproto.ConfigureProviderResponse{
+			ValidationResult: result,
+		}, nil
 	}
 
 	client, diags := p.Configure(p.Logger, providerConfig)
@@ -161,6 +180,7 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	return &cqproto.ConfigureProviderResponse{
 		Diagnostics: diags,
 	}, nil
+
 }
 
 func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchResourcesRequest, sender cqproto.FetchResourcesSender) error {
@@ -255,21 +275,20 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	return g.Wait()
 }
 
-func (p *Provider) GetModuleInfo(_ context.Context, request *cqproto.GetModuleRequest) (*cqproto.GetModuleResponse, error) {
-	if p.ModuleInfoReader == nil {
-		return nil, nil
+func (p *Provider) TrasformTerraformResource(ctx context.Context, request *cqproto.TransformTerraformResourceRequest) (*cqproto.TransformTerraformResourceResponse, error) {
+	if p.meta == nil {
+		return nil, fmt.Errorf("provider client is not configured (Hint: Try upgrading cloudquery)")
 	}
 
-	if p.Logger == nil {
-		return nil, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
+	tfResources := map[string]interface{}{}
+
+	if err := json.Unmarshal(request.Resources, &tfResources); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal terraform resources: %w", err)
 	}
 
-	resp, err := p.ModuleInfoReader(p.Logger, request.Module, request.PreferredVersions)
-	return &cqproto.GetModuleResponse{
-		Data:              resp.Data,
-		AvailableVersions: resp.AvailableVersions,
-		Diagnostics:       diag.FromError(err, diag.INTERNAL),
-	}, nil
+	for tfname, resource := range tfResources {
+
+	}
 }
 
 var _ cqproto.CQProviderServer = (*Provider)(nil)

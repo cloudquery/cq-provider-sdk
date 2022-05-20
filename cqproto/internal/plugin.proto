@@ -11,8 +11,8 @@ service Provider {
   rpc ConfigureProvider(ConfigureProvider.Request) returns (ConfigureProvider.Response);
   // Fetch Provider Resources
   rpc FetchResources(FetchResources.Request) returns (stream FetchResources.Response);
-  // Gets info about specific module config embedded inside provider
-  rpc GetModuleInfo(GetModuleInfo.Request) returns (GetModuleInfo.Response);
+  // TrasformTerraformResource gets list of resources to transform and push into the database
+  rpc TrasformTerraformResource(TrasformTerraformResource.Request) returns (TrasformTerraformResource.Response);
 }
 
 
@@ -30,9 +30,18 @@ message ConfigureProvider {
   message Response {
     string error = 1;
     repeated Diagnostic diagnostics = 2;
+    bytes validationResult = 3;
   }
 }
 
+message TrasformTerraformResource {
+  message Request {
+    bytes resources = 1;
+  }
+  message Response {
+    string error = 1;
+  }
+}
 
 message FetchResources {
   message Request {
@@ -147,27 +156,6 @@ message GetProviderConfig {
   }
 }
 
-message GetModuleInfo {
-  message Request {
-    string module = 1;
-    repeated uint32 preferred_versions = 2;
-  }
-  message Response {
-    map<uint32, ModuleInfo> data = 1;
-    repeated uint32 available_versions = 2;
-    repeated Diagnostic diagnostics = 3;
-
-    message ModuleInfo {
-      repeated ModuleFile files = 1;
-      map<string, string> extras = 2;
-
-      message ModuleFile {
-        string name = 1;
-        bytes contents = 2;
-      }
-    }
-  }
-}
 
 // Table is the definition of how a table is defined in a provider
 message Table {

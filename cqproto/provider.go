@@ -9,6 +9,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/cqproto/internal"
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 type CQProvider interface {
@@ -27,8 +28,8 @@ type CQProvider interface {
 	// The provider reports back status updates on the resources fetching progress.
 	FetchResources(context.Context, *FetchResourcesRequest) (FetchResourcesStream, error)
 
-	// Gets info about specific module config embedded inside provider
-	GetModuleInfo(context.Context, *GetModuleRequest) (*GetModuleResponse, error)
+	// TrasformTerraformResource to transform one or more terraform resources from plan or state json to CloudQuery schema
+	TrasformTerraformResource(context.Context, *TransformTerraformResourceRequest) (*TransformTerraformResourceResponse, error)
 }
 
 type CQProviderServer interface {
@@ -47,8 +48,8 @@ type CQProviderServer interface {
 	// The provider reports back status updates on the resources fetching progress.
 	FetchResources(context.Context, *FetchResourcesRequest, FetchResourcesSender) error
 
-	// Gets info about specific module config embedded inside provider
-	GetModuleInfo(context.Context, *GetModuleRequest) (*GetModuleResponse, error)
+	// TrasformTerraformResource to transform one or more terraform resources from plan or state json to CloudQuery schema
+	TrasformTerraformResource(context.Context, *TransformTerraformResourceRequest) (*TransformTerraformResourceResponse, error)
 }
 
 // GetProviderSchemaRequest represents a CloudQuery RPC request for provider's schemas
@@ -87,6 +88,9 @@ type ConfigureProviderResponse struct {
 	// Diagnostics about the configure action. If includes ERROR severity, operation is aborted.
 	// The error can be either from malformed configuration or failure to setup
 	Diagnostics diag.Diagnostics
+
+	// ValidationResult contains errors from unmarhsaling the config sent by the user
+	ValidationResult *gojsonschema.Result
 }
 
 // FetchResourcesRequest represents a CloudQuery RPC request of one or more resources
@@ -128,31 +132,6 @@ type FetchResourcesResponse struct {
 	PartialFetchFailedResources []*FailedResourceFetch
 	// fetch summary of resource that finished execution
 	Summary ResourceFetchSummary
-}
-
-// GetModuleRequest represents a CloudQuery RPC request of provider's module info for specific provider
-type GetModuleRequest struct {
-	Module            string
-	PreferredVersions []uint32
-}
-
-// GetModuleResponse represents a CloudQuery RPC response of provider's module info for specific provider
-type GetModuleResponse struct {
-	Data              map[uint32]ModuleInfo // version vs Info
-	AvailableVersions []uint32              // all available versions, regardless of being requested in PreferredVersions or not
-	Diagnostics       diag.Diagnostics
-}
-
-// ModuleInfo is info about a module
-type ModuleInfo struct {
-	Files  []*ModuleFile
-	Extras map[string]string
-}
-
-// ModuleFile is a file definition inside ModuleInfo
-type ModuleFile struct {
-	Name     string
-	Contents []byte
 }
 
 // ResourceFetchStatus defines execution status of the resource fetch execution
@@ -236,3 +215,20 @@ func (p ProviderDiagnostic) Error() string {
 }
 
 var _ diag.Diagnostic = (*ProviderDiagnostic)(nil)
+
+// TransformTerraformResourceRequest represents a CloudQuery RPC request of one or more terraform resources to convert
+// and push to PostgresSQL db.
+type TransformTerraformResourceRequest struct {
+	// List of resources to fetch
+	Resources []byte
+}
+
+// TransformTerraformResourceRequest represents a CloudQuery RPC request of one or more terraform resources to convert
+// and push to PostgresSQL db.
+type TransformTerraformResourceResponse struct {
+	// List of resources to fetch
+	Resources []byte
+
+	// Error
+	Error string
+}

@@ -1,10 +1,14 @@
 package cqproto
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
+	"fmt"
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
+	"github.com/xeipuuv/gojsonschema"
 
 	"github.com/vmihailenco/msgpack/v5"
 
@@ -60,8 +64,25 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 	if err != nil {
 		return nil, err
 	}
+	validationResult := gojsonschema.Result{}
+	dec := gob.NewDecoder(bytes.NewBuffer(res.ValidationResult))
+	if err := dec.Decode(&validationResult); err != nil {
+		return nil, fmt.Errorf("failed to decode validation result: %v", err)
+	}
+
 	return &ConfigureProviderResponse{
-		Diagnostics: diagnosticsFromProto("", res.Diagnostics),
+		Diagnostics:      diagnosticsFromProto("", res.Diagnostics),
+		ValidationResult: &validationResult,
+	}, nil
+}
+
+func (g GRPCClient) TrasformTerraformResource(ctx context.Context, _ *TransformTerraformResourceRequest) (*TransformTerraformResourceResponse, error) {
+	res, err := g.client.TrasformTerraformResource(ctx, &internal.TrasformTerraformResource_Request{})
+	if err != nil {
+		return nil, err
+	}
+	return &TransformTerraformResourceResponse{
+		Error: res.GetError(),
 	}, nil
 }
 
@@ -108,21 +129,6 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 		}
 	}
 	return fr, nil
-}
-
-func (g GRPCClient) GetModuleInfo(ctx context.Context, request *GetModuleRequest) (*GetModuleResponse, error) {
-	res, err := g.client.GetModuleInfo(ctx, &internal.GetModuleInfo_Request{
-		Module:            request.Module,
-		PreferredVersions: request.PreferredVersions,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &GetModuleResponse{
-		Data:              moduleInfoFromProto(res.Data),
-		AvailableVersions: res.AvailableVersions,
-		Diagnostics:       diagnosticsFromProto("", res.Diagnostics),
-	}, nil
 }
 
 type GRPCServer struct {
@@ -172,9 +178,16 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 	if err != nil {
 		return nil, err
 	}
+	var network bytes.Buffer
+	enc := gob.NewEncoder(&network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode validation result: %v", err)
+	}
+	enc.Encode(resp.ValidationResult)
 	return &internal.ConfigureProvider_Response{
-		Error:       resp.Diagnostics.Error(), // For backwards compatibility
-		Diagnostics: diagnosticsToProto(resp.Diagnostics),
+		Error:            resp.Diagnostics.Error(), // For backwards compatibility
+		Diagnostics:      diagnosticsToProto(resp.Diagnostics),
+		ValidationResult: network.Bytes(),
 	}, nil
 }
 
@@ -200,6 +213,19 @@ func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, se
 	)
 }
 
+func (g GRPCServer) TrasformTerraformResource(ctx context.Context, request *internal.TrasformTerraformResource_Request) (*internal.TrasformTerraformResource_Response, error) {
+	res, err := g.Impl.TrasformTerraformResource(ctx, &TransformTerraformResourceRequest{
+		Resources: request.Resources,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &internal.TrasformTerraformResource_Response{
+		Error: res.Error,
+	}, nil
+}
+
 type GRPCFetchResourcesServer struct {
 	server internal.Provider_FetchResourcesServer
 }
@@ -217,25 +243,6 @@ func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 			Diagnostics:   diagnosticsToProto(response.Summary.Diagnostics),
 		},
 	})
-}
-
-func (g *GRPCServer) GetModuleInfo(ctx context.Context, request *internal.GetModuleInfo_Request) (*internal.GetModuleInfo_Response, error) {
-	resp, err := g.Impl.GetModuleInfo(ctx, &GetModuleRequest{
-		Module:            request.Module,
-		PreferredVersions: request.PreferredVersions,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if resp == nil {
-		return &internal.GetModuleInfo_Response{}, nil
-	}
-
-	return &internal.GetModuleInfo_Response{
-		Data:              moduleInfoToProto(resp.Data),
-		AvailableVersions: resp.AvailableVersions,
-		Diagnostics:       diagnosticsToProto(resp.Diagnostics),
-	}, nil
 }
 
 func tablesFromProto(in map[string]*internal.Table) map[string]*schema.Table {
@@ -451,40 +458,6 @@ func migrationsToProto(in map[string]map[string][]byte) map[string]*internal.Dia
 		ret[k] = &internal.DialectMigration{
 			Migrations: in[k],
 		}
-	}
-	return ret
-}
-
-func moduleInfoFromProto(in map[uint32]*internal.GetModuleInfo_Response_ModuleInfo) map[uint32]ModuleInfo {
-	ret := make(map[uint32]ModuleInfo, len(in))
-	for ver := range in {
-		v := ModuleInfo{
-			Extras: in[ver].Extras,
-		}
-		for _, f := range in[ver].Files {
-			v.Files = append(v.Files, &ModuleFile{
-				Name:     f.GetName(),
-				Contents: f.GetContents(),
-			})
-		}
-		ret[ver] = v
-	}
-	return ret
-}
-
-func moduleInfoToProto(in map[uint32]ModuleInfo) map[uint32]*internal.GetModuleInfo_Response_ModuleInfo {
-	ret := make(map[uint32]*internal.GetModuleInfo_Response_ModuleInfo, len(in))
-	for ver, info := range in {
-		v := &internal.GetModuleInfo_Response_ModuleInfo{
-			Extras: in[ver].Extras,
-		}
-		for j := range info.Files {
-			v.Files = append(v.Files, &internal.GetModuleInfo_Response_ModuleInfo_ModuleFile{
-				Name:     in[ver].Files[j].Name,
-				Contents: in[ver].Files[j].Contents,
-			})
-		}
-		ret[ver] = v
 	}
 	return ret
 }

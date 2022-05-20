@@ -13,6 +13,8 @@ import (
 //
 type TableResolver func(ctx context.Context, meta ClientMeta, parent *Resource, res chan<- interface{}) error
 
+type TerraformResolver func(ctx context.Context, parent *Resource, tfState map[string]interface{}, res chan<- interface{}) error
+
 // IgnoreErrorFunc checks if returned error from table resolver should be ignored.
 type IgnoreErrorFunc func(err error) bool
 
@@ -21,6 +23,8 @@ type RowResolver func(ctx context.Context, meta ClientMeta, resource *Resource) 
 type Table struct {
 	// Name of table
 	Name string
+	// TerraformResourceName is the name of the resource in the terraform state
+	TerraformResourceName string
 	// table description
 	Description string
 	// Columns are the set of fields that are part of this table
@@ -42,6 +46,9 @@ type Table struct {
 	// AlwaysDelete will always delete table data on fetch regardless if delete is disabled on run,
 	// use this only in specific cases, if you are unsure contact the CloudQuery Team.
 	AlwaysDelete bool
+
+	// TerraformResolver will get a terraform state and transform it into the same schema
+	TerraformResolver TerraformResolver
 
 	// IgnoreInTests is used to exclude a table from integration tests.
 	// By default, integration tests fetch all resources from cloudquery's test account, and verifY all tables
