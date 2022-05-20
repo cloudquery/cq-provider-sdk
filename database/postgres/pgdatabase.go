@@ -45,10 +45,17 @@ func NewPgDatabase(ctx context.Context, logger hclog.Logger, dsn string, sd sche
 var _ execution.Storage = (*PgDatabase)(nil)
 
 // Insert inserts all resources to given table, table and resources are assumed from same table.
-func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schema.Resources) error {
+func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schema.Resources, shouldCascade bool, cascadeDeleteFilters map[string]interface{}) error {
 	if len(resources) == 0 {
 		return nil
 	}
+
+	if shouldCascade {
+		if err := deleteResourceByCQId(ctx, p.pool, resources, cascadeDeleteFilters); err != nil {
+			return err
+		}
+	}
+
 	// It is safe to assume that all resources have the same columns
 	cols := quoteColumns(resources.ColumnNames())
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
@@ -104,16 +111,7 @@ func (p PgDatabase) CopyFrom(ctx context.Context, resources schema.Resources, sh
 		DeferrableMode: pgx.Deferrable,
 	}, func(tx pgx.Tx) error {
 		if shouldCascade {
-			q := goqu.Dialect("postgres").Delete(resources.TableName()).Where(goqu.Ex{"cq_id": resources.GetIds()})
-			for k, v := range cascadeDeleteFilters {
-				q = q.Where(goqu.Ex{k: goqu.Op{"eq": v}})
-			}
-			sql, args, err := q.Prepared(true).ToSQL()
-			if err != nil {
-				return err
-			}
-			_, err = tx.Exec(ctx, sql, args...)
-			if err != nil {
+			if err := deleteResourceByCQId(ctx, tx, resources, cascadeDeleteFilters); err != nil {
 				return err
 			}
 		}
@@ -220,4 +218,21 @@ func quoteColumns(columns []string) []string {
 		ret[i] = strconv.Quote(v)
 	}
 	return ret
+}
+
+type execer interface {
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+}
+
+func deleteResourceByCQId(ctx context.Context, db execer, resources schema.Resources, cascadeDeleteFilters map[string]interface{}) error {
+	q := goqu.Dialect("postgres").Delete(resources.TableName()).Where(goqu.Ex{"cq_id": resources.GetIds()})
+	for k, v := range cascadeDeleteFilters {
+		q = q.Where(goqu.Ex{k: goqu.Op{"eq": v}})
+	}
+	sql, args, err := q.Prepared(true).ToSQL()
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(ctx, sql, args...)
+	return err
 }
