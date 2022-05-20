@@ -161,8 +161,12 @@ type Column struct {
 	IgnoreError IgnoreErrorFunc
 	// Creation options allow modifying how column is defined when table is created
 	CreationOptions ColumnCreationOptions
-	// IgnoreInTests if true this skips this column in tests as sometimes it might be hard
-	// to create a reproducible test environment with this column being non nill. For example various error columns and so on
+
+	// IgnoreInTests is used to skip verifying the column is non-nil in integration tests.
+	// By default, integration tests perform a fetch for all resources in cloudquery's test account, and
+	// verify all columns are non-nil.
+	// If IgnoreInTests is true, verification is skipped for this column.
+	// Used when it is hard to create a reproducible environment with this column being non-nil (e.g. various error columns).
 	IgnoreInTests bool
 
 	// internal is true if this column is managed by the SDK
@@ -202,7 +206,7 @@ func (c Column) checkType(v interface{}) bool {
 	case uint16, int32, *int32:
 		return c.Type == TypeInt
 	case int, *int, uint32, *uint32, int64, *int64:
-		return c.Type == TypeBigInt
+		return c.Type == TypeBigInt || c.Type == TypeInt
 	case []byte:
 		if c.Type == TypeUUID {
 			if _, err := uuid.FromBytes(val); err != nil {
@@ -268,7 +272,7 @@ func (c Column) checkType(v interface{}) bool {
 			if c.Type == TypeIntArray && reflect.Int == itemKind {
 				return true
 			}
-			if c.Type == TypeJSON && reflect.Struct == itemKind {
+			if c.Type == TypeJSON && (reflect.Struct == itemKind || reflect.Ptr == itemKind) {
 				return true
 			}
 			if c.Type == TypeUUIDArray && reflect2.TypeOf(v).String() == "uuid.UUID" || reflect2.TypeOf(v).String() == "*uuid.UUID" {

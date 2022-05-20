@@ -3,6 +3,7 @@ package diag
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/hashicorp/errwrap"
@@ -50,7 +51,7 @@ func (diags Diagnostics) Error() string {
 
 func (diags Diagnostics) HasErrors() bool {
 	for _, d := range diags {
-		if d.Severity() == ERROR {
+		if d.Severity() >= ERROR {
 			return true
 		}
 	}
@@ -110,7 +111,7 @@ func (diags Diagnostics) Squash() Diagnostics {
 			}
 		}
 
-		key := fmt.Sprintf("%s_%s_%d_%d", keygen.Error(), keygen.Description().Resource, keygen.Severity(), keygen.Type())
+		key := fmt.Sprintf("%s_%s_%s_%d_%d", reflect.ValueOf(keygen).Type().String(), keygen.Error(), keygen.Description().Resource, keygen.Severity(), keygen.Type())
 		if sd, ok := dd[key]; ok {
 			sd.count += CountDiag(d)
 			continue
@@ -122,23 +123,30 @@ func (diags Diagnostics) Squash() Diagnostics {
 		dd[key] = nsd
 		sdd = append(sdd, nsd)
 	}
+
 	return sdd
 }
 
 func (diags Diagnostics) Warnings() uint64 {
-	return diags.CountBySeverity(WARNING)
+	return diags.CountBySeverity(WARNING, false)
 }
 
 func (diags Diagnostics) Errors() uint64 {
-	return diags.CountBySeverity(ERROR)
+	return diags.CountBySeverity(ERROR, false) + diags.CountBySeverity(PANIC, false)
 }
 
-func (diags Diagnostics) CountBySeverity(sev Severity) uint64 {
+// CountBySeverity returns number of diagnostics of the given severity. If includeSquashed is false, squashed diags are counted as a single diag.
+func (diags Diagnostics) CountBySeverity(sev Severity, includeSquashed bool) uint64 {
 	var count uint64 = 0
 
 	for _, d := range diags {
-		if d.Severity() == sev {
+		if d.Severity() != sev {
+			continue
+		}
+		if includeSquashed {
 			count += CountDiag(d)
+		} else {
+			count++
 		}
 	}
 	return count

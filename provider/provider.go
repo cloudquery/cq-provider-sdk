@@ -9,6 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cloudquery/cq-provider-sdk/helpers/limit"
+
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration/migrator"
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
@@ -41,7 +43,7 @@ type Provider struct {
 	// Version of the provider
 	Version string
 	// Configure the provider and return context
-	Configure func(hclog.Logger, interface{}) (schema.ClientMeta, error)
+	Configure func(hclog.Logger, interface{}) (schema.ClientMeta, diag.Diagnostics)
 	// ResourceMap is all resources supported by this plugin
 	ResourceMap map[string]*schema.Table
 	// Configuration decoded from configure request
@@ -96,12 +98,16 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
 	if p.Logger == nil {
-		return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s logger not defined, make sure to run it with serve", p.Name)}, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diag.FromError(fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name), diag.INTERNAL),
+		}, nil
 	}
 
 	if p.meta != nil {
 		if !IsDebug() {
-			return &cqproto.ConfigureProviderResponse{Error: fmt.Sprintf("provider %s was already configured", p.Name)}, fmt.Errorf("provider %s was already configured", p.Name)
+			return &cqproto.ConfigureProviderResponse{
+				Diagnostics: diag.FromError(fmt.Errorf("provider %s was already configured", p.Name), diag.INTERNAL),
+			}, nil
 		}
 
 		p.Logger.Info("Reconfiguring provider: Previous configuration has been reset.")
@@ -119,7 +125,9 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	p.dbURL = request.Connection.DSN
 	providerConfig := p.Config()
 	if err := defaults.Set(providerConfig); err != nil {
-		return &cqproto.ConfigureProviderResponse{}, err
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diag.FromError(err, diag.INTERNAL),
+		}, nil
 	}
 	// if we received an empty config we notify in log and only use defaults.
 	if len(request.Config) == 0 {
@@ -129,29 +137,37 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 		// this part will be deprecated.
 		if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
 			p.Logger.Error("Failed to load configuration.", "error", err)
-			return &cqproto.ConfigureProviderResponse{}, err
+			return &cqproto.ConfigureProviderResponse{
+				Diagnostics: diag.FromError(err, diag.USER),
+			}, nil
 		}
 	}
 
-	client, err := p.Configure(p.Logger, providerConfig)
-	if err != nil {
-		return &cqproto.ConfigureProviderResponse{}, err
+	client, diags := p.Configure(p.Logger, providerConfig)
+	if diags.HasErrors() {
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diags,
+		}, nil
 	}
 
 	tables := make(map[string]string)
 	for r, t := range p.ResourceMap {
 		if err := getTableDuplicates(r, t, tables); err != nil {
-			return &cqproto.ConfigureProviderResponse{}, err
+			return &cqproto.ConfigureProviderResponse{
+				Diagnostics: diags.Add(diag.FromError(err, diag.INTERNAL)),
+			}, nil
 		}
 	}
 
 	p.meta = client
-	return &cqproto.ConfigureProviderResponse{}, nil
+	return &cqproto.ConfigureProviderResponse{
+		Diagnostics: diags,
+	}, nil
 }
 
 func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchResourcesRequest, sender cqproto.FetchResourcesSender) error {
 	if p.meta == nil {
-		return fmt.Errorf("provider client is not configured, call ConfigureProvider first")
+		return fmt.Errorf("provider client is not configured (Hint: Try upgrading cloudquery)")
 	}
 
 	if helpers.HasDuplicates(request.Resources) {
@@ -175,7 +191,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	var goroutinesSem *semaphore.Weighted
 	maxGoroutines := request.MaxGoroutines
 	if maxGoroutines == 0 {
-		maxGoroutines = helpers.GetMaxGoRoutines()
+		maxGoroutines = limit.GetMaxGoRoutines()
 	}
 	goroutinesSem = semaphore.NewWeighted(helpers.Uint64ToInt64(maxGoroutines))
 
@@ -195,7 +211,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		tableExec := execution.NewTableExecutor(resource, conn, p.Logger, table, p.extraFields, request.Metadata, p.ErrorClassifier, goroutinesSem)
+		tableExec := execution.NewTableExecutor(resource, conn, p.Logger.With("table", table.Name), table, p.extraFields, request.Metadata, p.ErrorClassifier, goroutinesSem, request.Timeout)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource

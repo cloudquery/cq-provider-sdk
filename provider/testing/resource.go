@@ -30,7 +30,16 @@ type ResourceTestCase struct {
 	NotParallel bool
 	// ParallelFetchingLimit limits parallel resources fetch at a time
 	ParallelFetchingLimit uint64
+	// SkipIgnoreInTest flag which detects if schema.Table or schema.Column should be ignored
+	SkipIgnoreInTest bool
+	// Verifiers are map from resource name to its verifiers.
+	// If no verifiers specified for resource (resource name is not in key set of map),
+	// non emptiness check of all columns in table and its relations will be performed.
+	Verifiers map[string][]Verifier
 }
+
+// Verifier verifies tables specified by table schema (main table and its relations).
+type Verifier func(t *testing.T, table *schema.Table, conn pgxscan.Querier, shouldSkipIgnoreInTest bool)
 
 func init() {
 	_ = faker.SetRandomMapAndSliceMinSize(1)
@@ -65,29 +74,42 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 	if err = fetch(t, &resource); err != nil {
 		t.Fatal(err)
 	}
-	for _, table := range resource.Provider.ResourceMap {
-		verifyNoEmptyColumns(t, table, conn)
-	}
 
+	for resourceName, table := range resource.Provider.ResourceMap {
+		if verifiers, ok := resource.Verifiers[resourceName]; ok {
+			for _, verifier := range verifiers {
+				verifier(t, table, conn, resource.SkipIgnoreInTest)
+			}
+		} else {
+			// fallback to default verification
+			verifyNoEmptyColumns(t, table, conn, resource.SkipIgnoreInTest)
+		}
+	}
 }
 
 // fetch - fetches resources from the cloud and puts them into database. database config can be specified via DATABASE_URL env variable
 func fetch(t *testing.T, resource *ResourceTestCase) error {
 	t.Helper()
 	resourceNames := make([]string, 0, len(resource.Provider.ResourceMap))
-	for name := range resource.Provider.ResourceMap {
+	for name, table := range resource.Provider.ResourceMap {
+		if table.IgnoreInTests {
+			t.Logf("skipping resource: %s in tests", name)
+			continue
+		}
 		resourceNames = append(resourceNames, name)
 	}
 
 	t.Logf("fetch resources %v", resourceNames)
 
-	if _, err := resource.Provider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
+	if resp, err := resource.Provider.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
 		CloudQueryVersion: "",
 		Connection: cqproto.ConnectionDetails{DSN: getEnv("DATABASE_URL",
 			"host=localhost user=postgres password=pass DB.name=postgres port=5432")},
 		Config: []byte(resource.Config),
 	}); err != nil {
 		return err
+	} else if resp != nil && resp.Diagnostics.HasErrors() {
+		return resp.Diagnostics
 	}
 
 	var resourceSender = &testResourceSender{
@@ -111,11 +133,12 @@ func fetch(t *testing.T, resource *ResourceTestCase) error {
 	return nil
 }
 
-func verifyNoEmptyColumns(t *testing.T, table *schema.Table, conn pgxscan.Querier) {
+func verifyNoEmptyColumns(t *testing.T, table *schema.Table, conn pgxscan.Querier, shouldSkipIgnoreInTest bool) {
 	t.Helper()
 	t.Run(table.Name, func(t *testing.T) {
 		t.Helper()
-		if table.IgnoreInTests {
+
+		if !shouldSkipIgnoreInTest && table.IgnoreInTests {
 			t.Skipf("table %s marked as IgnoreInTest. Skipping...", table.Name)
 		}
 		s := sq.StatementBuilder.
@@ -139,7 +162,7 @@ func verifyNoEmptyColumns(t *testing.T, table *schema.Table, conn pgxscan.Querie
 		nilColumns := map[string]bool{}
 		// mark all columns as nil
 		for _, c := range table.Columns {
-			if !c.IgnoreInTests {
+			if shouldSkipIgnoreInTest || !c.IgnoreInTests {
 				nilColumns[c.Name] = true
 			}
 		}
@@ -164,7 +187,7 @@ func verifyNoEmptyColumns(t *testing.T, table *schema.Table, conn pgxscan.Querie
 			t.Errorf("found nil column in table %s. columns=%s", table.Name, strings.Join(nilColumnsArr, ","))
 		}
 		for _, childTable := range table.Relations {
-			verifyNoEmptyColumns(t, childTable, conn)
+			verifyNoEmptyColumns(t, childTable, conn, shouldSkipIgnoreInTest)
 		}
 	})
 }

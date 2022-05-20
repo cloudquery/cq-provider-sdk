@@ -2,6 +2,7 @@ package cqproto
 
 import (
 	"context"
+	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 
@@ -59,7 +60,9 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 	if err != nil {
 		return nil, err
 	}
-	return &ConfigureProviderResponse{res.GetError()}, nil
+	return &ConfigureProviderResponse{
+		Diagnostics: diagnosticsFromProto("", res.Diagnostics),
+	}, nil
 }
 
 func (g GRPCClient) FetchResources(ctx context.Context, request *FetchResourcesRequest) (FetchResourcesStream, error) {
@@ -72,6 +75,7 @@ func (g GRPCClient) FetchResources(ctx context.Context, request *FetchResourcesR
 		Resources:             request.Resources,
 		ParallelFetchingLimit: request.ParallelFetchingLimit,
 		MaxGoroutines:         request.MaxGoroutines,
+		Timeout:               int64(request.Timeout.Seconds()),
 		Metadata:              md,
 	})
 	if err != nil {
@@ -168,7 +172,10 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 	if err != nil {
 		return nil, err
 	}
-	return &internal.ConfigureProvider_Response{Error: resp.Error}, nil
+	return &internal.ConfigureProvider_Response{
+		Error:       resp.Diagnostics.Error(), // For backwards compatibility
+		Diagnostics: diagnosticsToProto(resp.Diagnostics),
+	}, nil
 }
 
 func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, server internal.Provider_FetchResourcesServer) error {
@@ -187,6 +194,7 @@ func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, se
 			ParallelFetchingLimit: request.ParallelFetchingLimit,
 			MaxGoroutines:         request.MaxGoroutines,
 			Metadata:              md,
+			Timeout:               time.Duration(request.GetTimeout()) * time.Second,
 		},
 		&GRPCFetchResourcesServer{server: server},
 	)
@@ -407,7 +415,7 @@ func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.D
 		pdiag := &ProviderDiagnostic{
 			ResourceName:       resourceName,
 			ResourceId:         p.GetResourceId(),
-			DiagnosticType:     diag.DiagnosticType(p.GetType()),
+			DiagnosticType:     diag.Type(p.GetType()),
 			DiagnosticSeverity: diag.Severity(p.GetSeverity()),
 			Summary:            p.GetSummary(),
 			Details:            p.GetDetail(),
@@ -416,7 +424,7 @@ func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.D
 			diagnostics[i] = diag.NewRedactedDiagnostic(pdiag, &ProviderDiagnostic{
 				ResourceName:       resourceName,
 				ResourceId:         r.GetResourceId(),
-				DiagnosticType:     diag.DiagnosticType(r.GetType()),
+				DiagnosticType:     diag.Type(r.GetType()),
 				DiagnosticSeverity: diag.Severity(r.GetSeverity()),
 				Summary:            r.GetSummary(),
 				Details:            r.GetDetail(),

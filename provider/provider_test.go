@@ -265,8 +265,8 @@ func TestTableDuplicates(t *testing.T) {
 
 func TestProvider_ConfigureProvider(t *testing.T) {
 	tp := testProviderCreatorFunc()
-	tp.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, error) {
-		return nil, errors.New("test error")
+	tp.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, diag.Diagnostics) {
+		return nil, diag.FromError(errors.New("test error"), diag.INTERNAL)
 	}
 	resp, err := tp.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
 		CloudQueryVersion: "dev",
@@ -276,8 +276,8 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		Config:      nil,
 		ExtraFields: nil,
 	})
-	assert.Equal(t, "provider unitest logger not defined, make sure to run it with serve", resp.Error)
-	assert.NotNil(t, err)
+	assert.Equal(t, "provider unitest logger not defined, make sure to run it with serve", resp.Diagnostics.Error())
+	assert.NoError(t, err)
 	// set logger this time
 	tp.Logger = hclog.Default()
 	resp, err = tp.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
@@ -288,8 +288,9 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		Config:      nil,
 		ExtraFields: nil,
 	})
-	assert.Equal(t, "", resp.Error)
-	assert.Error(t, err)
+	assert.True(t, resp.Diagnostics.HasErrors())
+	assert.Equal(t, "test error", resp.Diagnostics.Error())
+	assert.NoError(t, err)
 }
 
 type FetchResourceTableTest struct {
@@ -297,7 +298,6 @@ type FetchResourceTableTest struct {
 	ExpectedFetchResponses []*cqproto.FetchResourcesResponse
 	ExpectedError          error
 	MockStorageFunc        func(ctrl *gomock.Controller) *mock.MockStorage
-	PartialFetch           bool
 	ResourcesToFetch       []string
 	Context                func() context.Context
 }
@@ -305,7 +305,7 @@ type FetchResourceTableTest struct {
 func TestProvider_FetchResources(t *testing.T) {
 	tp := testProviderCreatorFunc()
 	tp.Logger = hclog.Default()
-	tp.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, error) {
+	tp.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, diag.Diagnostics) {
 		return &testClient{}, nil
 	}
 	_, err := tp.ConfigureProvider(context.Background(), &cqproto.ConfigureProviderRequest{
@@ -333,10 +333,10 @@ func TestProvider_FetchResources(t *testing.T) {
 			MockStorageFunc: func(ctrl *gomock.Controller) *mock.MockStorage {
 				mockDB := mock.NewMockStorage(ctrl)
 				mockDB.EXPECT().Dialect().Return(schema.PostgresDialect{})
+				mockDB.EXPECT().RemoveStaleData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				mockDB.EXPECT().Close()
 				return mockDB
 			},
-			PartialFetch:     true,
 			ResourcesToFetch: []string{"bad_resource_ignore_error"},
 		},
 		{
@@ -357,7 +357,6 @@ func TestProvider_FetchResources(t *testing.T) {
 				mockDB.EXPECT().Close()
 				return mockDB
 			},
-			PartialFetch:     false,
 			ResourcesToFetch: []string{"bad_resource"},
 		},
 		{
@@ -432,7 +431,7 @@ func (f *testResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 }
 
 func TestProvider_FetchResourcesParallelLimit(t *testing.T) {
-	parallelCheckProvider.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, error) {
+	parallelCheckProvider.Configure = func(logger hclog.Logger, i interface{}) (schema.ClientMeta, diag.Diagnostics) {
 		return testClient{}, nil
 	}
 	parallelCheckProvider.Logger = hclog.Default()
@@ -444,8 +443,8 @@ func TestProvider_FetchResourcesParallelLimit(t *testing.T) {
 		Config:      nil,
 		ExtraFields: nil,
 	})
-	assert.Equal(t, "", resp.Error)
-	assert.Nil(t, err)
+	assert.False(t, resp.Diagnostics.HasDiags())
+	assert.NoError(t, err)
 
 	// it runs 5 resources at a time. each resource takes ~500ms
 	start := time.Now()

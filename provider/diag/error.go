@@ -43,15 +43,15 @@ type BaseError struct {
 	// Detail is an optional second message, typically used to communicate a potential fix to the user.
 	detail string
 
-	// DiagnosticType indicates the classification family of this diagnostic
-	diagnosticType DiagnosticType
+	// Type indicates the classification family of this diagnostic
+	diagnosticType Type
 
 	// if noOverwrite is true, further Options won't overwrite previously set values. Valid for the duration of one "invocation"
 	noOverwrite bool
 }
 
 // NewBaseError creates a BaseError from given error, except the given error is a BaseError itself
-func NewBaseError(err error, dt DiagnosticType, opts ...BaseErrorOption) *BaseError {
+func NewBaseError(err error, dt Type, opts ...BaseErrorOption) *BaseError {
 	be, ok := err.(*BaseError)
 	if !ok {
 		be = &BaseError{
@@ -90,7 +90,7 @@ func (e BaseError) Description() Description {
 	}
 }
 
-func (e BaseError) Type() DiagnosticType {
+func (e BaseError) Type() Type {
 	return e.diagnosticType
 }
 
@@ -112,6 +112,7 @@ func (e BaseError) Unwrap() error {
 type BaseErrorOption func(*BaseError)
 
 // WithNoOverwrite sets the noOverwrite flag of BaseError, active for the duration of the application of options
+// Deprecated: Prefer using WithOptionalSeverity on the opposite side instead
 func WithNoOverwrite() BaseErrorOption {
 	return func(e *BaseError) {
 		e.noOverwrite = true
@@ -127,7 +128,17 @@ func WithSeverity(s Severity) BaseErrorOption {
 	}
 }
 
-func WithType(dt DiagnosticType) BaseErrorOption {
+func WithOptionalSeverity(s Severity) BaseErrorOption {
+	return func(e *BaseError) {
+		if e.noOverwrite || e.severitySet {
+			return
+		}
+		// we keep as e.severitySet = false
+		e.severity = s
+	}
+}
+
+func WithType(dt Type) BaseErrorOption {
 	return func(e *BaseError) {
 		if !e.noOverwrite || dt > e.diagnosticType {
 			e.diagnosticType = dt
@@ -161,7 +172,7 @@ func WithResourceId(id []string) BaseErrorOption {
 
 func WithDetails(detail string, args ...interface{}) BaseErrorOption {
 	return func(e *BaseError) {
-		if !e.noOverwrite || e.detail != "" {
+		if !e.noOverwrite || e.detail == "" {
 			e.detail = fmt.Sprintf(detail, args...)
 		}
 	}
@@ -175,8 +186,8 @@ func WithError(err error) BaseErrorOption {
 	}
 }
 
-// Convert an error to Diagnostics, or return if it's already of type diagnostic(s). nil error returns nil value.
-func FromError(err error, dt DiagnosticType, opts ...BaseErrorOption) Diagnostics {
+// FromError converts an error to Diagnostics, or return if it's already of type diagnostic(s). nil error returns nil value.
+func FromError(err error, dt Type, opts ...BaseErrorOption) Diagnostics {
 	if err == nil {
 		return nil
 	}
