@@ -324,12 +324,11 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	if l := len(resources); l > 0 {
 		e.Logger.Debug("storing resources", "count", l)
 	}
-	//err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
-	//if err == nil {
-	//	return resources, nil
-	//}
-	//e.Logger.Warn("failed copy-from to db", "error", err)
-	var err error
+	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
+	if err == nil {
+		return resources, nil
+	}
+	e.Logger.Warn("failed copy-from to db", "error", err)
 
 	// fallback insert, copy from sometimes does problems, so we fall back with bulk insert
 	err = e.Db.Insert(ctx, e.Table, resources)
