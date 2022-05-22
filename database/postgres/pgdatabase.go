@@ -229,11 +229,7 @@ func quoteColumns(columns []string) []string {
 	return ret
 }
 
-type execer interface {
-	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
-}
-
-func deleteResourceByCQId(ctx context.Context, db execer, resources schema.Resources, cascadeDeleteFilters map[string]interface{}) error {
+func deleteResourceByCQId(ctx context.Context, tx pgx.Tx, resources schema.Resources, cascadeDeleteFilters map[string]interface{}) error {
 	q := goqu.Dialect("postgres").Delete(resources.TableName()).Where(goqu.Ex{"cq_id": resources.GetIds()})
 	for k, v := range cascadeDeleteFilters {
 		q = q.Where(goqu.Ex{k: goqu.Op{"eq": v}})
@@ -242,6 +238,6 @@ func deleteResourceByCQId(ctx context.Context, db execer, resources schema.Resou
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec(ctx, sql, args...)
+	_, err = tx.Exec(ctx, sql, args...)
 	return err
 }
