@@ -12,6 +12,13 @@ import (
 	"github.com/thoas/go-funk"
 )
 
+type Fallback struct {
+	Value interface{}
+}
+type Options struct {
+	Fallback *Fallback
+}
+
 // PathResolver resolves a field in the Resource.Item
 //
 // Examples:
@@ -106,6 +113,12 @@ func parseDate(dateStr string, rfcs ...string) (date *time.Time, err error) {
 	return
 }
 
+func WithFallbackValue(fallback *Fallback) func(*Options) {
+	return func(opts *Options) {
+		opts.Fallback = fallback
+	}
+}
+
 // IPAddressResolver resolves the ip string value and returns net.IP
 //
 // Examples:
@@ -127,7 +140,7 @@ func IPAddressResolver(path string) ColumnResolver {
 	}
 }
 
-// IPAddressesResolver resolves the ip string value and returns net.IP
+// IPAddressesResolver resolves the ip string value and returns []net.IP
 //
 // Examples:
 // IPAddressesResolver("IP")
@@ -170,11 +183,16 @@ func MACAddressResolver(path string) ColumnResolver {
 	}
 }
 
-// IPNetResolver resolves the network string value and returns net.IPNet
+// IPNetResolver resolves the network string value and returns *net.IPNet
 //
 // Examples:
 // IPNetResolver("Network")
-func IPNetResolver(path string) ColumnResolver {
+func IPNetResolver(path string, options ...func(*Options)) ColumnResolver {
+	opts := &Options{}
+	for _, o := range options {
+		o(opts)
+	}
+
 	return func(_ context.Context, meta ClientMeta, r *Resource, c Column) error {
 		ipStr, err := cast.ToStringE(funk.Get(r.Item, path, funk.WithAllowZero()))
 		if err != nil {
@@ -182,6 +200,9 @@ func IPNetResolver(path string) ColumnResolver {
 		}
 		_, inet, err := net.ParseCIDR(ipStr)
 		if err != nil {
+			if opts.Fallback != nil {
+				return r.Set(c.Name, opts.Fallback.Value)
+			}
 			return err
 		}
 		return r.Set(c.Name, inet)
