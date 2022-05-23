@@ -45,11 +45,10 @@ func NewPgDatabase(ctx context.Context, logger hclog.Logger, dsn string, sd sche
 var _ execution.Storage = (*PgDatabase)(nil)
 
 // Insert inserts all resources to given table, table and resources are assumed from same table.
-func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schema.Resources, shouldCascade bool, cascadeDeleteFilters map[string]interface{}) error {
+func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schema.Resources) error {
 	if len(resources) == 0 {
 		return nil
 	}
-
 	// It is safe to assume that all resources have the same columns
 	cols := quoteColumns(resources.ColumnNames())
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
@@ -77,25 +76,10 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 	if err != nil {
 		return diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name), diag.WithSummary("bad insert SQL statement created"), diag.WithDetails("SQL statement %q is invalid", s))
 	}
-
-	err = p.pool.BeginTxFunc(ctx, pgx.TxOptions{
-		IsoLevel:       pgx.ReadCommitted,
-		AccessMode:     pgx.ReadWrite,
-		DeferrableMode: pgx.Deferrable,
-	}, func(tx pgx.Tx) error {
-		if shouldCascade {
-			if err := deleteResourceByCQId(ctx, tx, resources, cascadeDeleteFilters); err != nil {
-				return err
-			}
-		}
-
-		_, err := tx.Exec(ctx, s, args...)
-		return err
-	})
+	_, err = p.pool.Exec(ctx, s, args...)
 	if err == nil {
 		return nil
 	}
-
 	if pgErr, ok := err.(*pgconn.PgError); ok {
 		// This should rarely occur, but if it occurs we want to print the SQL to debug it further
 		if pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
@@ -120,7 +104,16 @@ func (p PgDatabase) CopyFrom(ctx context.Context, resources schema.Resources, sh
 		DeferrableMode: pgx.Deferrable,
 	}, func(tx pgx.Tx) error {
 		if shouldCascade {
-			if err := deleteResourceByCQId(ctx, tx, resources, cascadeDeleteFilters); err != nil {
+			q := goqu.Dialect("postgres").Delete(resources.TableName()).Where(goqu.Ex{"cq_id": resources.GetIds()})
+			for k, v := range cascadeDeleteFilters {
+				q = q.Where(goqu.Ex{k: goqu.Op{"eq": v}})
+			}
+			sql, args, err := q.Prepared(true).ToSQL()
+			if err != nil {
+				return err
+			}
+			_, err = tx.Exec(ctx, sql, args...)
+			if err != nil {
 				return err
 			}
 		}
@@ -227,17 +220,4 @@ func quoteColumns(columns []string) []string {
 		ret[i] = strconv.Quote(v)
 	}
 	return ret
-}
-
-func deleteResourceByCQId(ctx context.Context, tx pgx.Tx, resources schema.Resources, cascadeDeleteFilters map[string]interface{}) error {
-	q := goqu.Dialect("postgres").Delete(resources.TableName()).Where(goqu.Ex{"cq_id": resources.GetIds()})
-	for k, v := range cascadeDeleteFilters {
-		q = q.Where(goqu.Ex{k: goqu.Op{"eq": v}})
-	}
-	sql, args, err := q.Prepared(true).ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, sql, args...)
-	return err
 }
