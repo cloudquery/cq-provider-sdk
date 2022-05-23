@@ -26,7 +26,7 @@ func (f noopStorage) Exec(ctx context.Context, query string, args ...interface{}
 	return nil
 }
 
-func (f noopStorage) Insert(ctx context.Context, t *schema.Table, instance schema.Resources) error {
+func (f noopStorage) Insert(ctx context.Context, t *schema.Table, instance schema.Resources, shouldCascade bool, cascadeDeleteFilters map[string]interface{}) error {
 	return nil
 }
 
@@ -38,7 +38,7 @@ func (f noopStorage) RemoveStaleData(ctx context.Context, t *schema.Table, execu
 	return nil
 }
 
-func (f noopStorage) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool, CascadeDeleteFilters map[string]interface{}) error {
+func (f noopStorage) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool, cascadeDeleteFilters map[string]interface{}) error {
 	return nil
 }
 
