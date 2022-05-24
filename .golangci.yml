@@ -5,6 +5,7 @@ run:
   skip-dirs:
     - bin
     - docs
+    - cqproto
 
 linters-settings:
   errcheck:

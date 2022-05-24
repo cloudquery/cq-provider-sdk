@@ -156,6 +156,37 @@ type ModuleFile struct {
 // ResourceFetchStatus defines execution status of the resource fetch execution
 type ResourceFetchStatus int
 
+const (
+	// ResourceFetchComplete execution was completed successfully without any errors/diagnostics
+	ResourceFetchComplete ResourceFetchStatus = iota
+	// ResourceFetchFailed execution failed and wasn't able to fetch any resource
+	ResourceFetchFailed
+	// ResourceFetchPartial execution was partial, one or more resources failed to resolve/fetch
+	ResourceFetchPartial
+	// ResourceFetchCanceled execution was canceled preemptively
+	ResourceFetchCanceled
+)
+
+func (s ResourceFetchStatus) String() string {
+	name, ok := internal.ResourceFetchSummary_Status_name[int32(s)]
+	if !ok {
+		return "UNKNOWN"
+	}
+	return name
+}
+
+// ResourceFetchSummary includes a summarized report of a fetched resource, such as total amount of resources collected,
+// status of the fetch and any diagnostics found while executing fetch on it.
+type ResourceFetchSummary struct {
+	// Execution status of resource
+	Status ResourceFetchStatus
+	// Total Amount of resources collected by this resource
+	ResourceCount uint64
+	// Diagnostics of failed resource fetch, the diagnostic provides insights such as severity, summary and
+	// details on how to solve this issue
+	Diagnostics diag.Diagnostics
+}
+
 type FailedResourceFetch struct {
 	// table name of the failed resource fetch
 	TableName string
@@ -181,39 +212,6 @@ type ProviderDiagnostic struct {
 	Details            string
 }
 
-// ResourceFetchSummary includes a summarized report of a fetched resource, such as total amount of resources collected,
-// status of the fetch and any diagnostics found while executing fetch on it.
-type ResourceFetchSummary struct {
-	// Execution status of resource
-	Status ResourceFetchStatus
-	// Total Amount of resources collected by this resource
-	ResourceCount uint64
-	// Diagnostics of failed resource fetch, the diagnostic provides insights such as severity, summary and
-	// details on how to solve this issue
-	Diagnostics diag.Diagnostics
-}
-
-const (
-	// ResourceFetchComplete execution was completed successfully without any errors/diagnostics
-	ResourceFetchComplete ResourceFetchStatus = iota
-	// ResourceFetchFailed execution failed and wasn't able to fetch any resource
-	ResourceFetchFailed
-	// ResourceFetchPartial execution was partial, one or more resources failed to resolve/fetch
-	ResourceFetchPartial
-	// ResourceFetchCanceled execution was canceled preemptively
-	ResourceFetchCanceled
-)
-
-var _ diag.Diagnostic = (*ProviderDiagnostic)(nil)
-
-func (s ResourceFetchStatus) String() string {
-	name, ok := internal.ResourceFetchSummary_Status_name[int32(s)]
-	if !ok {
-		return "UNKNOWN"
-	}
-	return name
-}
-
 func (p ProviderDiagnostic) Severity() diag.Severity {
 	return p.DiagnosticSeverity
 }
@@ -234,3 +232,5 @@ func (p ProviderDiagnostic) Description() diag.Description {
 func (p ProviderDiagnostic) Error() string {
 	return fmt.Sprintf("%s: %s", p.ResourceName, p.Summary)
 }
+
+var _ diag.Diagnostic = (*ProviderDiagnostic)(nil)
