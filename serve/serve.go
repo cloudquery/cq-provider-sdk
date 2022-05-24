@@ -118,7 +118,11 @@ func serve(opts *Options) {
 		VersionedPlugins: map[int]plugin.PluginSet{
 			cqproto.V4: {
 				"provider": &cqproto.CQPlugin{Impl: opts.Provider},
-			}},
+			},
+			cqproto.V5: {
+				"provider": &cqproto.CQPlugin{Impl: opts.Provider},
+			},
+		},
 		GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {
 			return grpc.NewServer(opts...)
 		},
