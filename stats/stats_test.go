@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_meta(t *testing.T) {
+func Test_getMeasurementDetails(t *testing.T) {
 	type args struct {
 		name string
 		tags []stats.Tag
