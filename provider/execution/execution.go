@@ -13,11 +13,10 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/stats"
-	segmentStats "github.com/segmentio/stats/v4"
-
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
 	"github.com/modern-go/reflect2"
+	segmentStats "github.com/segmentio/stats/v4"
 	"github.com/thoas/go-funk"
 	"golang.org/x/sync/semaphore"
 )

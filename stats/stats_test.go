@@ -67,5 +67,4 @@ func TestLogHandler(t *testing.T) {
 	assert.EqualValues(t, "withoutStop:table:table2", logHandler.trackedOperations.Keys()[0])
 
 	cancel()
-
 }

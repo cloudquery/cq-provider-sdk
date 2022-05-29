@@ -42,7 +42,7 @@ func NewClockWithObserve(name string, tags ...stats.Tag) *stats.Clock {
 // HandleMeasures can be called by `NewClockWithObserve` which indicates a "start" of an operation
 // Or by `clock.Stop` which indicates a "stop" of an operation
 // We pass the measurements to a channel and periodically aggregate the data and print a hearbeat log
-func (h *durationLogger) HandleMeasures(time time.Time, measures ...stats.Measure) {
+func (h *durationLogger) HandleMeasures(t time.Time, measures ...stats.Measure) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for _, m := range measures {
@@ -53,7 +53,7 @@ func (h *durationLogger) HandleMeasures(time time.Time, measures ...stats.Measur
 				h.trackedOperations.Set(id, stat{start: item.(stat).start, duration: m.Fields[0].Value.Duration(), stopped: true})
 			}
 		} else {
-			h.trackedOperations.Set(id, stat{start: time})
+			h.trackedOperations.Set(id, stat{start: t})
 		}
 	}
 }
