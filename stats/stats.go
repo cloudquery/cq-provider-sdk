@@ -93,6 +93,8 @@ func Start(ctx context.Context, logger hclog.Logger, options ...func(*Options)) 
 		o(opts)
 	}
 
+	logger.Debug("starting stats collector heartbeat", "tick", opts.tick)
+
 	stats.Register(opts.handler)
 
 	go func() {
