@@ -407,6 +407,14 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 		if c.Resolver != nil {
 			e.Logger.Trace("using custom column resolver", "column", c.Name)
 			err := c.Resolver(ctx, meta, resource, c)
+			// if default wasn't set as nil and our resource is either nil or we got an error we set the default value
+			if !reflect2.IsNil(c.Default) && (err != nil || resource.Get(c.Name) != nil) {
+				// Set default value if defined, otherwise it will be nil
+				if err := resource.Set(c.Name, c.Default); err != nil {
+					diags = diags.Add(fromError(err, diag.WithResourceName(e.ResourceName), diag.WithType(diag.INTERNAL),
+						diag.WithSummary("failed to set resource default value for %s@%s", e.Table.Name, c.Name)))
+				}
+			}
 			if err == nil {
 				continue
 			}
@@ -419,16 +427,6 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 				diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSeverity(diag.IGNORE), diag.WithSummary("column resolver %q failed for table %q", c.Name, e.Table.Name)))
 			} else {
 				diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSummary("column resolver %q failed for table %q", c.Name, e.Table.Name)))
-			}
-
-			// TODO: double check logic here
-			if reflect2.IsNil(c.Default) {
-				continue
-			}
-			// Set default value if defined, otherwise it will be nil
-			if err := resource.Set(c.Name, c.Default); err != nil {
-				diags = diags.Add(fromError(err, diag.WithResourceName(e.ResourceName), diag.WithType(diag.INTERNAL),
-					diag.WithSummary("failed to set resource default value for %s@%s", e.Table.Name, c.Name)))
 			}
 			continue
 		}
