@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/hashicorp/errwrap"
@@ -11,6 +12,8 @@ import (
 )
 
 type Diagnostics []Diagnostic
+
+var _ sort.Interface = (*Diagnostics)(nil)
 
 func (diags Diagnostics) Error() string {
 	switch {
@@ -137,7 +140,7 @@ func (diags Diagnostics) Errors() uint64 {
 
 // CountBySeverity returns number of diagnostics of the given severity. If includeSquashed is false, squashed diags are counted as a single diag.
 func (diags Diagnostics) CountBySeverity(sev Severity, includeSquashed bool) uint64 {
-	var count uint64 = 0
+	var count uint64
 
 	for _, d := range diags {
 		if d.Severity() != sev {
@@ -150,6 +153,24 @@ func (diags Diagnostics) CountBySeverity(sev Severity, includeSquashed bool) uin
 		}
 	}
 	return count
+}
+
+// BySeverity returns a subset of diagnostics matching the given severity.
+func (diags Diagnostics) BySeverity(sevs ...Severity) Diagnostics {
+	sevMap := make(map[Severity]struct{}, len(sevs))
+	for i := range sevs {
+		sevMap[sevs[i]] = struct{}{}
+	}
+
+	ret := make(Diagnostics, 0, len(diags))
+	for _, d := range diags {
+		if _, ok := sevMap[d.Severity()]; !ok {
+			continue
+		}
+		ret = append(ret, d)
+	}
+
+	return ret
 }
 
 func (diags Diagnostics) Redacted() Diagnostics {

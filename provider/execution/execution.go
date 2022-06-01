@@ -12,12 +12,13 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
-	"golang.org/x/sync/semaphore"
-
+	"github.com/cloudquery/cq-provider-sdk/stats"
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
 	"github.com/modern-go/reflect2"
+	segmentStats "github.com/segmentio/stats/v4"
 	"github.com/thoas/go-funk"
+	"golang.org/x/sync/semaphore"
 )
 
 // executionJitter adds a -1 minute to execution of fetch, so if a user fetches only 1 resources and it finishes
@@ -52,7 +53,6 @@ type TableExecutor struct {
 
 // NewTableExecutor creates a new TableExecutor for given schema.Table
 func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted, timeout time.Duration) TableExecutor {
-
 	var classifiers = []ErrorClassifier{defaultErrorClassifier}
 	if classifier != nil {
 		classifiers = append([]ErrorClassifier{classifier}, classifiers...)
@@ -77,50 +77,34 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 
 // Resolve is the root function of table executor which starts an execution of a Table resolving it, and it's relations.
 func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uint64, diag.Diagnostics) {
+	var clients []schema.ClientMeta
+
 	if e.Table.Multiplex != nil {
-		if clients := e.Table.Multiplex(meta); len(clients) > 0 {
-			return e.doMultiplexResolve(ctx, clients)
-		}
+		clients = e.Table.Multiplex(meta)
+	}
+	if len(clients) == 0 {
+		clients = append(clients, meta)
 	}
 
-	if e.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, e.timeout)
-		defer cancel()
-	}
-	return e.withLogger(append(meta.Logger().ImpliedArgs(), "multiplex", false)...).callTableResolve(ctx, meta, nil)
+	return e.doMultiplexResolve(ctx, clients)
 }
 
 // withTable allows to create a new TableExecutor for received *schema.Table
 func (e TableExecutor) withTable(t *schema.Table, kv ...interface{}) *TableExecutor {
 	var c [2]schema.ColumnList
 	c[0], c[1] = e.Db.Dialect().Columns(t).Sift()
-	return &TableExecutor{
-		ResourceName:   e.ResourceName,
-		Table:          t,
-		Db:             e.Db,
-		Logger:         e.Logger.With(kv...),
-		classifiers:    e.classifiers,
-		extraFields:    e.extraFields,
-		executionStart: e.executionStart,
-		columns:        c,
-		goroutinesSem:  e.goroutinesSem,
-	}
+	cpy := e
+	cpy.Table = t
+	cpy.Logger = cpy.Logger.With(kv...)
+	cpy.columns = c
+
+	return &cpy
 }
 
 func (e TableExecutor) withLogger(kv ...interface{}) *TableExecutor {
-	return &TableExecutor{
-		ResourceName:   e.ResourceName,
-		Table:          e.Table,
-		Db:             e.Db,
-		Logger:         e.Logger.With(kv...),
-		classifiers:    e.classifiers,
-		extraFields:    e.extraFields,
-		executionStart: e.executionStart,
-		columns:        e.columns,
-		goroutinesSem:  e.goroutinesSem,
-	}
-
+	cpy := e
+	cpy.Logger = cpy.Logger.With(kv...)
+	return &cpy
 }
 
 // doMultiplexResolve resolves table with multiplexed clients appending all diagnostics returned from each multiplex.
@@ -226,12 +210,14 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 
 // callTableResolve does the actual resolving of the table calling the root table's resolver and for each returned resource resolves its columns and relations.
 func (e TableExecutor) callTableResolve(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) (uint64, diag.Diagnostics) {
+	clock := stats.NewClockWithObserve("callTableResolve", segmentStats.Tag{Name: "client_id", Value: identifyClient(client)}, segmentStats.Tag{Name: "table", Value: e.Table.Name})
+	defer clock.Stop()
+
 	// set up all diagnostics to collect from resolving table
 	var diags diag.Diagnostics
 
 	if e.Table.Resolver == nil {
 		return 0, diags.Add(diag.NewBaseError(nil, diag.SCHEMA, diag.WithSeverity(diag.ERROR), diag.WithResourceName(e.ResourceName), diag.WithSummary("table %q missing resolver, make sure table implements the resolver", e.Table.Name)))
-
 	}
 	if err := e.truncateTable(ctx, client, parent); err != nil {
 		return 0, diags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
@@ -286,9 +272,11 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 	if parent == nil {
 		e.Logger.Info("fetched successfully", "count", nc)
 	}
+
 	if err := e.cleanupStaleData(ctx, client, parent); err != nil {
 		return nc, diags.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed to cleanup stale data on table %q", e.Table.Name)))
 	}
+
 	return nc, diags
 }
 
@@ -299,8 +287,8 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 		diags     diag.Diagnostics
 	)
 
-	for _, o := range objects {
-		resource := schema.NewResourceData(e.Db.Dialect(), e.Table, parent, o, e.metadata, e.executionStart)
+	for i := range objects {
+		resource := schema.NewResourceData(e.Db.Dialect(), e.Table, parent, objects[i], e.metadata, e.executionStart)
 		// Before inserting resolve all table column resolvers
 		resolveDiags := e.resolveResourceValues(ctx, meta, resource)
 		diags = diags.Add(resolveDiags)
@@ -345,7 +333,7 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	e.Logger.Warn("failed copy-from to db", "error", err)
 
 	// fallback insert, copy from sometimes does problems, so we fall back with bulk insert
-	err = e.Db.Insert(ctx, e.Table, resources)
+	err = e.Db.Insert(ctx, e.Table, resources, shouldCascade, e.extraFields)
 	if err == nil {
 		return resources, nil
 	}
@@ -355,7 +343,7 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
 	partialFetchResources := make(schema.Resources, 0)
 	for id := range resources {
-		if err := e.Db.Insert(ctx, e.Table, schema.Resources{resources[id]}); err != nil {
+		if err := e.Db.Insert(ctx, e.Table, schema.Resources{resources[id]}, shouldCascade, e.extraFields); err != nil {
 			e.Logger.Error("failed to insert resource into db", "error", err, "resource_keys", resources[id].PrimaryKeyValues())
 			diags = diags.Add(ClassifyError(err, diag.WithType(diag.DATABASE)))
 			continue
@@ -385,7 +373,11 @@ func (e TableExecutor) resolveResourceValues(ctx context.Context, meta schema.Cl
 	// call PostRowResolver if defined after columns have been resolved
 	if e.Table.PostResourceResolver != nil {
 		if err := e.Table.PostResourceResolver(ctx, meta, resource); err != nil {
-			return diags.Add(e.handleResolveError(meta, resource, err, diag.WithSummary("post resource resolver failed for %q", e.Table.Name)))
+			diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSummary("post resource resolver failed for %q", e.Table.Name)))
+
+			if diags.HasErrors() {
+				return diags
+			}
 		}
 	}
 	// Finally, resolve columns internal to the SDK

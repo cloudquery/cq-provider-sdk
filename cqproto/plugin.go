@@ -10,6 +10,7 @@ import (
 
 const (
 	V4 = 4
+	V5 = 5
 
 	Vunmanaged = -1
 )
@@ -28,6 +29,6 @@ func (p *CQPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
 	return nil
 }
 
-func (p *CQPlugin) GRPCClient(_ context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+func (*CQPlugin) GRPCClient(_ context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
 	return &GRPCClient{broker: broker, client: internal.NewProviderClient(c)}, nil
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/provider"
-
+	"github.com/cloudquery/cq-provider-sdk/stats"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
@@ -48,6 +48,7 @@ type Options struct {
 }
 
 func Serve(opts *Options) {
+	defer stats.Flush()
 
 	if opts.Name == "" {
 		panic("missing provider name")
@@ -97,6 +98,7 @@ func Serve(opts *Options) {
 		})
 	}
 
+	stats.Start(context.Background(), opts.Logger)
 	serve(opts)
 }
 
@@ -116,9 +118,10 @@ func serve(opts *Options) {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
 		VersionedPlugins: map[int]plugin.PluginSet{
-			cqproto.V4: {
+			cqproto.V5: {
 				"provider": &cqproto.CQPlugin{Impl: opts.Provider},
-			}},
+			},
+		},
 		GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {
 			return grpc.NewServer(opts...)
 		},

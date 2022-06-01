@@ -4,17 +4,18 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration"
 	"github.com/cloudquery/cq-provider-sdk/provider"
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
+	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/testlog"
 	"github.com/cloudquery/faker/v3"
@@ -41,6 +42,16 @@ type ResourceTestCase struct {
 // Verifier verifies tables specified by table schema (main table and its relations).
 type Verifier func(t *testing.T, table *schema.Table, conn pgxscan.Querier, shouldSkipIgnoreInTest bool)
 
+type testResourceSender struct {
+	Errors []string
+}
+
+var (
+	dbConnOnce sync.Once
+	pool       execution.QueryExecer
+	dbErr      error
+)
+
 func init() {
 	_ = faker.SetRandomMapAndSliceMinSize(1)
 	_ = faker.SetRandomMapAndSliceMaxSize(1)
@@ -63,10 +74,9 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 	l := testlog.New(t)
 	l.SetLevel(hclog.Info)
 	resource.Provider.Logger = l
-	tableCreator := migration.NewTableCreator(l, schema.PostgresDialect{})
 
 	for _, table := range resource.Provider.ResourceMap {
-		if err := dropAndCreateTable(context.Background(), tableCreator, conn, table, nil); err != nil {
+		if err := dropAndCreateTable(context.Background(), conn, table); err != nil {
 			assert.FailNow(t, fmt.Sprintf("failed to create tables %s", table.Name), err)
 		}
 	}
@@ -192,23 +202,14 @@ func verifyNoEmptyColumns(t *testing.T, table *schema.Table, conn pgxscan.Querie
 	})
 }
 
-func dropAndCreateTable(
-	ctx context.Context,
-	tableCreator *migration.TableCreator,
-	conn execution.QueryExecer,
-	table *schema.Table,
-	parent *schema.Table) error {
-
-	ups, downs, err := tableCreator.CreateTableDefinitions(ctx, table, parent)
-
+func dropAndCreateTable(ctx context.Context, conn execution.QueryExecer, table *schema.Table) error {
+	ups, err := migration.CreateTableDefinitions(ctx, schema.PostgresDialect{}, table, nil)
 	if err != nil {
 		return err
 	}
 
-	for _, sql := range downs {
-		if err := conn.Exec(ctx, sql); err != nil {
-			return err
-		}
+	if err := dropTables(ctx, conn, table); err != nil {
+		return err
 	}
 
 	for _, sql := range ups {
@@ -220,8 +221,16 @@ func dropAndCreateTable(
 	return nil
 }
 
-type testResourceSender struct {
-	Errors []string
+func dropTables(ctx context.Context, db execution.QueryExecer, table *schema.Table) error {
+	if err := db.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s CASCADE", strconv.Quote(table.Name))); err != nil {
+		return err
+	}
+	for _, rel := range table.Relations {
+		if err := dropTables(ctx, db, rel); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (f *testResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
@@ -229,17 +238,13 @@ func (f *testResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 		fmt.Printf(r.Error)
 		f.Errors = append(f.Errors, r.Error)
 	}
-	for _, diag := range r.Summary.Diagnostics {
-		f.Errors = append(f.Errors, fmt.Sprintf("resource: %s. summary: %s, details %s", diag.Description().Resource, diag.Description().Summary, diag.Description().Detail))
+	for _, d := range r.Summary.Diagnostics {
+		if d.Severity() != diag.IGNORE {
+			f.Errors = append(f.Errors, fmt.Sprintf("resource: %s. summary: %s, details %s", d.Description().Resource, d.Description().Summary, d.Description().Detail))
+		}
 	}
 	return nil
 }
-
-var (
-	dbConnOnce sync.Once
-	pool       execution.QueryExecer
-	dbErr      error
-)
 
 func setupDatabase() (execution.QueryExecer, error) {
 	dbConnOnce.Do(func() {
