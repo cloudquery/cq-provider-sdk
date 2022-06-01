@@ -49,7 +49,8 @@ type Column struct {
 	Type ValueType
 	// Description about column, this description is added as a comment in the database
 	Description string
-	// Default value if the resolver/default getting gets a nil value
+	// Default value if the resolver/default getting returns a nil value or an error. Default values are not allowed
+	// to be set for Columns that are defined as PKs which will result in a Panic
 	Default interface{}
 	// Column Resolver allows to set you own data based on resolving this can be an API call or setting multiple embedded values etc'
 	Resolver ColumnResolver

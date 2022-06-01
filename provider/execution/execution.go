@@ -15,7 +15,6 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/stats"
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
-	"github.com/modern-go/reflect2"
 	segmentStats "github.com/segmentio/stats/v4"
 	"github.com/thoas/go-funk"
 	"golang.org/x/sync/semaphore"
@@ -57,6 +56,14 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 	if classifier != nil {
 		classifiers = append([]ErrorClassifier{classifier}, classifiers...)
 	}
+
+	// validate no pk columns have a default value defined
+	for _, pk := range table.Options.PrimaryKeys {
+		if table.Column(pk).Default != nil {
+			panic(fmt.Sprintf("pk column %s has a default value defined", pk))
+		}
+	}
+
 	var c [2]schema.ColumnList
 	c[0], c[1] = db.Dialect().Columns(table).Sift()
 
@@ -408,7 +415,7 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 			e.Logger.Trace("using custom column resolver", "column", c.Name)
 			err := c.Resolver(ctx, meta, resource, c)
 			// if default wasn't set as nil and our resource is either nil or we got an error we set the default value
-			if !reflect2.IsNil(c.Default) && (err != nil || resource.Get(c.Name) != nil) {
+			if c.Default != nil && (err != nil || resource.Get(c.Name) == nil) {
 				// Set default value if defined, otherwise it will be nil
 				if err := resource.Set(c.Name, c.Default); err != nil {
 					diags = diags.Add(fromError(err, diag.WithResourceName(e.ResourceName), diag.WithType(diag.INTERNAL),
