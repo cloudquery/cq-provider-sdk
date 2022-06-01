@@ -613,6 +613,15 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			Name: "with-defaults",
+			Table: &schema.Table{
+				Name:     "simple",
+				Resolver: doNothingResolver,
+				Columns:  []schema.Column{{Name: "name", Type: schema.TypeString, Default: "someValue"}},
+			},
+		},
 	}
 
 	executionClient := executionClient{testlog.New(t)}
@@ -652,6 +661,15 @@ func TestTableExecutor_resolveResourceValues(t *testing.T) {
 			SetupStorage:   nil,
 			ExpectedValues: []interface{}{false, 0, true, 5, ptr.Int(0), ptr.Int(5), ""},
 			ExpectedDiags:  nil,
+		},
+		{
+			Name: "with-defaults",
+			Table: &schema.Table{
+				Name:     "simple",
+				Resolver: doNothingResolver,
+				Columns:  []schema.Column{{Name: "name", Type: schema.TypeString, Default: "someValue"}},
+			},
+			ExpectedValues: []interface{}{"someValue"},
 		},
 		{
 			Name:  "resolve_columns with dialect",
@@ -708,4 +726,15 @@ func TestTableExecutor_resolveResourceValues(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTableExecutor_panicPKWithDefault(t *testing.T) {
+	assert.Panics(t, func() {
+		NewTableExecutor("testPK", noopStorage{}, testlog.New(t), &schema.Table{
+			Name:     "simple",
+			Resolver: doNothingResolver,
+			Columns:  []schema.Column{{Name: "name", Type: schema.TypeString, Default: "someValue"}},
+			Options:  schema.TableCreationOptions{PrimaryKeys: []string{"someValue"}},
+		}, nil, nil, nil, nil, 10*time.Second)
+	})
 }
