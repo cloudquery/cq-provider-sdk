@@ -97,25 +97,6 @@ func (t Table) IsIgnoreError(e error) bool {
 	return false
 }
 
-// IsIgnoreErrorColumn returns true if the error is ignored via the column resolver, current table IgnoreError function or in any other parent table (in that ordered)
-// it stops checking the moment one of them exists and not until it returns true or fals
-func (t Table) IsIgnoreErrorColumn(c Column, e error) bool {
-	// first priority is to check the columns IgnoreError function
-	if c.IgnoreError != nil {
-		return c.IgnoreError(e)
-	}
-	// secondy priority is to check the tables IgnoreError function
-	if t.IgnoreError != nil {
-		return t.IgnoreError(e)
-	}
-	// third priority is to check the parent tables IgnoreError recursively
-	if t.Parent != nil {
-		return t.Parent.IsIgnoreError(e)
-	}
-
-	return false
-}
-
 // Signature returns a comparable string about the structure of the table (columns, options, relations)
 func (t Table) Signature(d Dialect) string {
 	const sdkSignatureSerial = "" // Change this to force a change across all providers

@@ -414,7 +414,7 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 				return diags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName), WithResource(resource), diag.WithSummary("failed to resolve column %s@%s", e.Table.Name, c.Name)))
 			}
 			// check if column resolver defined an IgnoreError function, if it does check if ignore should be ignored.
-			if e.Table.IsIgnoreErrorColumn(c, err) {
+			if e.Table.IsIgnoreError(err) {
 				diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSeverity(diag.IGNORE), diag.WithSummary("column resolver %q failed for table %q", c.Name, e.Table.Name)))
 			} else {
 				diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSummary("column resolver %q failed for table %q", c.Name, e.Table.Name)))
