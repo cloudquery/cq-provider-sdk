@@ -92,6 +92,7 @@ func (e TableExecutor) withTable(t *schema.Table, kv ...interface{}) *TableExecu
 	var c [2]schema.ColumnList
 	c[0], c[1] = e.Db.Dialect().Columns(t).Sift()
 	cpy := e
+	cpy.Table.Parent = t.Parent
 	cpy.Table = t
 	cpy.Logger = cpy.Logger.With(kv...)
 	cpy.columns = c
@@ -236,7 +237,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 			close(res)
 		}()
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
-			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
+			if e.Table.IsIgnoreError(err) {
 				e.Logger.Debug("ignored an error", "err", err)
 				err = diag.NewBaseError(err, diag.RESOLVING, diag.WithSeverity(diag.IGNORE), diag.WithSummary("table %q resolver ignored error", e.Table.Name))
 			}
@@ -413,7 +414,7 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 				return diags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName), WithResource(resource), diag.WithSummary("failed to resolve column %s@%s", e.Table.Name, c.Name)))
 			}
 			// check if column resolver defined an IgnoreError function, if it does check if ignore should be ignored.
-			if c.IgnoreError != nil && c.IgnoreError(err) {
+			if e.Table.IsIgnoreErrorColumn(c, err) {
 				diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSeverity(diag.IGNORE), diag.WithSummary("column resolver %q failed for table %q", c.Name, e.Table.Name)))
 			} else {
 				diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSummary("column resolver %q failed for table %q", c.Name, e.Table.Name)))
