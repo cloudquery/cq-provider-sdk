@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -153,55 +152,4 @@ func TestTableSignatures(t *testing.T) {
 		newSig4 := newT.Signature(PostgresDialect{})
 		assert.NotEqual(t, newSig, newSig4)
 	}
-}
-
-func TestTableIsIgnoreError(t *testing.T) {
-	table := &Table{
-		Name: "simple_table",
-		IgnoreError: func(err error) bool {
-			return true
-		},
-		Columns: []Column{
-			{
-				Name: "some_string",
-				Type: TypeString,
-			},
-		},
-		Relations: []*Table{
-			{
-				Name: "simple_table",
-				IgnoreError: func(err error) bool {
-					return true
-				},
-			},
-		},
-	}
-	table.Relations[0].Parent = table
-	err := fmt.Errorf("some error")
-
-	assert.True(t, table.IsIgnoreError(err))
-
-	table.IgnoreError = func(err error) bool {
-		return false
-	}
-	assert.False(t, table.IsIgnoreError(err))
-
-	table.IgnoreError = nil
-	assert.False(t, table.IsIgnoreError(err))
-
-	assert.True(t, table.Relations[0].IsIgnoreError(err))
-
-	table.Relations[0].IgnoreError = nil
-	table.IgnoreError = func(e error) bool {
-		return true
-	}
-	assert.True(t, table.Relations[0].IsIgnoreError(err))
-
-	table.IgnoreError = func(e error) bool {
-		return false
-	}
-	assert.False(t, table.Relations[0].IsIgnoreError(err))
-
-	table.IgnoreError = nil
-	assert.False(t, table.Relations[0].IsIgnoreError(err))
 }
