@@ -92,7 +92,7 @@ func (e TableExecutor) withTable(t *schema.Table, kv ...interface{}) *TableExecu
 	var c [2]schema.ColumnList
 	c[0], c[1] = e.Db.Dialect().Columns(t).Sift()
 	cpy := e
-	cpy.Table.Parent = t.Parent
+	cpy.Table.Parent = e.Table
 	cpy.Table = t
 	cpy.Logger = cpy.Logger.With(kv...)
 	cpy.columns = c
