@@ -17,6 +17,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/module"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/creasty/defaults"
+	"github.com/ghodss/yaml"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/hcl/v2/hclsimple"
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -29,6 +30,12 @@ import (
 type Config interface {
 	// Example returns a configuration example (with comments) so user clients can generate an example config
 	Example() string
+}
+
+// ConfigYAML Every provider implements a resources field we only want to extract that in fetch execution
+type ConfigYAML interface {
+	// Example returns a configuration example in YAML (with comments) so user clients can generate an example config
+	ExampleYAML() string
 }
 
 // Provider is the base structure required to pass and serve an sdk provider.Provider
@@ -72,18 +79,38 @@ func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSc
 }
 
 func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderConfigRequest) (*cqproto.GetProviderConfigResponse, error) {
-	providerConfig := p.Config()
-	if err := defaults.Set(providerConfig); err != nil {
-		return &cqproto.GetProviderConfigResponse{}, err
-	}
-	data := fmt.Sprintf(`
+	cfgYAML, ok := p.Config().(ConfigYAML)
+	if !ok {
+		// Use old HCL config
+		providerConfig := p.Config()
+		if err := defaults.Set(providerConfig); err != nil {
+			return &cqproto.GetProviderConfigResponse{}, err
+		}
+		data := fmt.Sprintf(`
 		provider "%s" {
 			%s
 			// list of resources to fetch
 			resources = %s
 		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
 
-	return &cqproto.GetProviderConfigResponse{Config: hclwrite.Format([]byte(data))}, nil
+		return &cqproto.GetProviderConfigResponse{Config: hclwrite.Format([]byte(data))}, nil
+	}
+
+	providerConfig := cfgYAML
+	if err := defaults.Set(providerConfig); err != nil {
+		return &cqproto.GetProviderConfigResponse{}, err
+	}
+
+	// TODO do it in YAML, whatever that might be
+	data := fmt.Sprintf(`
+		provider "%s" {
+			%s
+			// list of resources to fetch
+			resources = %s
+		}`, p.Name, cfgYAML.ExampleYAML(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
+
+	yb, _ := yaml.Marshal(data)
+	return &cqproto.GetProviderConfigResponse{ConfigYAML: yb}, nil
 }
 
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
@@ -113,31 +140,36 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 
 	p.extraFields = request.ExtraFields
 	p.dbURL = request.Connection.DSN
-	providerConfig := p.Config()
-	if err := defaults.Set(providerConfig); err != nil {
-		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diag.FromError(err, diag.INTERNAL),
-		}, nil
-	}
-	// if we received an empty config we notify in log and only use defaults.
-	if len(request.Config) == 0 {
-		p.Logger.Info("Received empty configuration, using only defaults")
-	} else if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
-		p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)
-		// this part will be deprecated.
-		if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
-			p.Logger.Error("Failed to load configuration.", "error", err)
+
+	cfgYAML, ok := p.Config().(ConfigYAML)
+	if !ok {
+		providerConfig := p.Config()
+		if err := defaults.Set(providerConfig); err != nil {
 			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diag.FromError(err, diag.USER),
+				Diagnostics: diag.FromError(err, diag.INTERNAL),
 			}, nil
 		}
-	}
 
-	client, diags := p.Configure(p.Logger, providerConfig)
-	if diags.HasErrors() {
-		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diags,
-		}, nil
+		// if we received an empty config we notify in log and only use defaults.
+		if len(request.Config) == 0 {
+			p.Logger.Info("Received empty configuration, using only defaults")
+		} else if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
+			p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)
+			// this part will be deprecated.
+			if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
+				p.Logger.Error("Failed to load configuration.", "error", err)
+				return &cqproto.ConfigureProviderResponse{
+					Diagnostics: diag.FromError(err, diag.USER),
+				}, nil
+			}
+		}
+
+		client, diags := p.Configure(p.Logger, providerConfig)
+		if diags.HasErrors() {
+			return &cqproto.ConfigureProviderResponse{
+				Diagnostics: diags,
+			}, nil
+		}
 	}
 
 	tables := make(map[string]string)

@@ -67,7 +67,8 @@ type GetProviderSchemaResponse struct {
 type GetProviderConfigRequest struct{}
 
 type GetProviderConfigResponse struct {
-	Config []byte
+	Config     []byte
+	ConfigYAML []byte
 }
 
 type ConfigureProviderRequest struct {

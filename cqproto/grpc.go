@@ -50,7 +50,8 @@ func (g GRPCClient) GetProviderConfig(ctx context.Context, _ *GetProviderConfigR
 		return nil, err
 	}
 	return &GetProviderConfigResponse{
-		Config: res.GetConfig(),
+		Config:     res.GetConfig(),
+		ConfigYAML: res.GetConfigYaml(),
 	}, nil
 }
 
@@ -149,7 +150,10 @@ func (g *GRPCServer) GetProviderConfig(ctx context.Context, _ *internal.GetProvi
 	if err != nil {
 		return nil, err
 	}
-	return &internal.GetProviderConfig_Response{Config: resp.Config}, nil
+	return &internal.GetProviderConfig_Response{
+		Config:     resp.Config,
+		ConfigYaml: resp.ConfigYAML,
+	}, nil
 }
 
 func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.ConfigureProvider_Request) (*internal.ConfigureProvider_Response, error) {

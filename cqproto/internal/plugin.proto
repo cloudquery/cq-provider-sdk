@@ -140,6 +140,7 @@ message GetProviderConfig {
     string name = 1;
     string version = 2;
     bytes config = 3;
+    bytes config_yaml = 4;
   }
 }
 
