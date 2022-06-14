@@ -35,7 +35,7 @@ func getMemory() uint64 {
 }
 
 func calculateGoRoutines(totalMemory uint64) uint64 {
-	var total uint64 = 0
+	var total uint64
 	if totalMemory == 0 {
 		// assume we have 2 GB RAM
 		total = uint64(math.Max(minimalGoRoutines, goroutinesPerGB*2*goroutineReducer))
