@@ -2,6 +2,11 @@
 
 package limit
 
+import (
+	"github.com/lorenzosaino/go-sysctl"
+	"github.com/spf13/cast"
+)
+
 func calculateFileLimit() (uint64, error) {
 	maxFileOpen, err := sysctl.Get("fs.file-max")
 	if err != nil {
