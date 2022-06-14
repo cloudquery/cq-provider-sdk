@@ -135,12 +135,17 @@ message GetProviderSchema {
 }
 
 message GetProviderConfig {
+  enum Format {
+    HCL = 0;
+    YAML = 1;
+  }
+
   message Request {}
   message Response {
     string name = 1;
     string version = 2;
     bytes config = 3;
-    bytes config_yaml = 4;
+    Format format = 4;
   }
 }
 

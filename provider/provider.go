@@ -30,12 +30,8 @@ import (
 type Config interface {
 	// Example returns a configuration example (with comments) so user clients can generate an example config
 	Example() string
-}
-
-// ConfigYAML Every provider implements a resources field we only want to extract that in fetch execution
-type ConfigYAML interface {
-	// Example returns a configuration example in YAML (with comments) so user clients can generate an example config
-	ExampleYAML() string
+	// ExampleFormat is the format of the config Example() returns
+	ExampleFormat() cqproto.ConfigFormat
 }
 
 // Provider is the base structure required to pass and serve an sdk provider.Provider
@@ -79,13 +75,12 @@ func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSc
 }
 
 func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderConfigRequest) (*cqproto.GetProviderConfigResponse, error) {
-	cfgYAML, ok := p.Config().(ConfigYAML)
-	if !ok {
-		// Use old HCL config
-		providerConfig := p.Config()
-		if err := defaults.Set(providerConfig); err != nil {
-			return &cqproto.GetProviderConfigResponse{}, err
-		}
+	providerConfig := p.Config()
+	if err := defaults.Set(providerConfig); err != nil {
+		return &cqproto.GetProviderConfigResponse{}, err
+	}
+	switch providerConfig.ExampleFormat() {
+	case cqproto.ConfigHCL:
 		data := fmt.Sprintf(`
 		provider "%s" {
 			%s
@@ -93,24 +88,29 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 			resources = %s
 		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
 
-		return &cqproto.GetProviderConfigResponse{Config: hclwrite.Format([]byte(data))}, nil
-	}
-
-	providerConfig := cfgYAML
-	if err := defaults.Set(providerConfig); err != nil {
-		return &cqproto.GetProviderConfigResponse{}, err
-	}
-
-	// TODO do it in YAML, whatever that might be
-	data := fmt.Sprintf(`
+		return &cqproto.GetProviderConfigResponse{
+			Config: hclwrite.Format([]byte(data)),
+			Format: 0,
+		}, nil
+	case cqproto.ConfigYAML:
+		// TODO do this in YAML
+		data := fmt.Sprintf(`
 		provider "%s" {
 			%s
 			// list of resources to fetch
 			resources = %s
-		}`, p.Name, cfgYAML.ExampleYAML(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
+		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
 
-	yb, _ := yaml.Marshal(data)
-	return &cqproto.GetProviderConfigResponse{ConfigYAML: yb}, nil
+		yb, _ := yaml.Marshal(data)
+
+		return &cqproto.GetProviderConfigResponse{
+			Config: yb,
+			Format: 1,
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("unknown config format %v", providerConfig.ExampleFormat())
+	}
 }
 
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
@@ -141,35 +141,39 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	p.extraFields = request.ExtraFields
 	p.dbURL = request.Connection.DSN
 
-	cfgYAML, ok := p.Config().(ConfigYAML)
-	if !ok {
-		providerConfig := p.Config()
-		if err := defaults.Set(providerConfig); err != nil {
-			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diag.FromError(err, diag.INTERNAL),
-			}, nil
-		}
+	providerConfig := p.Config()
+	if err := defaults.Set(providerConfig); err != nil {
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diag.FromError(err, diag.INTERNAL),
+		}, nil
+	}
 
-		// if we received an empty config we notify in log and only use defaults.
-		if len(request.Config) == 0 {
-			p.Logger.Info("Received empty configuration, using only defaults")
-		} else if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
-			p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)
-			// this part will be deprecated.
-			if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
-				p.Logger.Error("Failed to load configuration.", "error", err)
-				return &cqproto.ConfigureProviderResponse{
-					Diagnostics: diag.FromError(err, diag.USER),
-				}, nil
+	// if we received an empty config we notify in log and only use defaults.
+	if len(request.Config) == 0 {
+		p.Logger.Info("Received empty configuration, using only defaults")
+	} else {
+		switch providerConfig.ExampleFormat() {
+		case cqproto.ConfigHCL:
+			if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
+				p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)
+				// this part will be deprecated.
+				if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
+					p.Logger.Error("Failed to load configuration.", "error", err)
+					return &cqproto.ConfigureProviderResponse{
+						Diagnostics: diag.FromError(err, diag.USER),
+					}, nil
+				}
 			}
+		case cqproto.ConfigYAML:
+			// TODO
 		}
+	}
 
-		client, diags := p.Configure(p.Logger, providerConfig)
-		if diags.HasErrors() {
-			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diags,
-			}, nil
-		}
+	client, diags := p.Configure(p.Logger, providerConfig)
+	if diags.HasErrors() {
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diags,
+		}, nil
 	}
 
 	tables := make(map[string]string)

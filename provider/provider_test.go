@@ -236,6 +236,10 @@ func (testConfig) Example() string {
 	return ""
 }
 
+func (testConfig) ExampleFormat() cqproto.ConfigFormat {
+	return cqproto.ConfigHCL
+}
+
 func (testClient) Logger() hclog.Logger {
 	return hclog.Default()
 }

@@ -63,12 +63,19 @@ type GetProviderSchemaResponse struct {
 	ResourceTables map[string]*schema.Table
 }
 
+type ConfigFormat int
+
+const (
+	ConfigHCL  = ConfigFormat(0)
+	ConfigYAML = ConfigFormat(1)
+)
+
 // GetProviderConfigRequest represents a CloudQuery RPC request for provider's config
 type GetProviderConfigRequest struct{}
 
 type GetProviderConfigResponse struct {
-	Config     []byte
-	ConfigYAML []byte
+	Config []byte
+	Format ConfigFormat
 }
 
 type ConfigureProviderRequest struct {

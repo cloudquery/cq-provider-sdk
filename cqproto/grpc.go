@@ -49,9 +49,17 @@ func (g GRPCClient) GetProviderConfig(ctx context.Context, _ *GetProviderConfigR
 	if err != nil {
 		return nil, err
 	}
+
 	return &GetProviderConfigResponse{
-		Config:     res.GetConfig(),
-		ConfigYAML: res.GetConfigYaml(),
+		Config: res.GetConfig(),
+		Format: func(f internal.GetProviderConfig_Format) ConfigFormat {
+			switch f {
+			case internal.GetProviderConfig_YAML:
+				return ConfigYAML
+			default:
+				return ConfigHCL
+			}
+		}(res.GetFormat()),
 	}, nil
 }
 
@@ -150,9 +158,14 @@ func (g *GRPCServer) GetProviderConfig(ctx context.Context, _ *internal.GetProvi
 	if err != nil {
 		return nil, err
 	}
+	f := internal.GetProviderConfig_HCL
+	if resp.Format == 1 {
+		f = internal.GetProviderConfig_YAML
+	}
+
 	return &internal.GetProviderConfig_Response{
-		Config:     resp.Config,
-		ConfigYaml: resp.ConfigYAML,
+		Config: resp.Config,
+		Format: f,
 	}, nil
 }
 
