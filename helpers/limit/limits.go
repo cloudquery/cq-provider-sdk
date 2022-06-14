@@ -2,11 +2,15 @@ package limit
 
 import (
 	"github.com/pbnjay/memory"
+	"math"
 )
 
 const (
-	gbInBytes       int     = 1024 * 1024 * 1024
-	goroutinesPerGB float64 = 250000
+	gbInBytes         int     = 1024 * 1024 * 1024
+	goroutinesPerGB   float64 = 250000
+	minimalGoRoutines float64 = 100
+	//
+	goroutineReducer = 0.8
 )
 
 type Rlimit struct {
@@ -31,9 +35,20 @@ func getMemory() uint64 {
 }
 
 func calculateGoRoutines(totalMemory uint64) uint64 {
+	var total uint64 = 0
 	if totalMemory == 0 {
 		// assume we have 2 GB RAM
-		return uint64(goroutinesPerGB * 2)
+		total = uint64(math.Max(minimalGoRoutines, goroutinesPerGB*2*goroutineReducer))
+	} else {
+		total = uint64(math.Max(minimalGoRoutines, (goroutinesPerGB*float64(totalMemory)/float64(gbInBytes))*goroutineReducer))
 	}
-	return uint64(goroutinesPerGB * float64(totalMemory) / float64(gbInBytes))
+	mfo, err := calculateFileLimit()
+	if err != nil {
+		return total
+	}
+
+	if mfo < total {
+		return uint64(float64(mfo) * 0.3)
+	}
+	return total
 }
