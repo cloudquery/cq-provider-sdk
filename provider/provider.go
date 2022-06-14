@@ -17,13 +17,13 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/module"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/creasty/defaults"
-	"github.com/ghodss/yaml"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/hcl/v2/hclsimple"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/thoas/go-funk"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+	"gopkg.in/yaml.v3"
 )
 
 // Config Every provider implements a resources field we only want to extract that in fetch execution

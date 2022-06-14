@@ -66,8 +66,8 @@ type GetProviderSchemaResponse struct {
 type ConfigFormat int
 
 const (
-	ConfigHCL  = ConfigFormat(0)
-	ConfigYAML = ConfigFormat(1)
+	ConfigYAML = ConfigFormat(0)
+	ConfigHCL  = ConfigFormat(1) // Deprecated
 )
 
 // GetProviderConfigRequest represents a CloudQuery RPC request for provider's config

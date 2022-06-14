@@ -136,8 +136,8 @@ message GetProviderSchema {
 
 message GetProviderConfig {
   enum Format {
-    HCL = 0;
-    YAML = 1;
+    YAML = 0;
+    HCL = 1;
   }
 
   message Request {}
