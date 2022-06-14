@@ -1,16 +1,16 @@
 package limit
 
 import (
-	"github.com/pbnjay/memory"
 	"math"
+
+	"github.com/pbnjay/memory"
 )
 
 const (
 	gbInBytes         int     = 1024 * 1024 * 1024
 	goroutinesPerGB   float64 = 250000
 	minimalGoRoutines float64 = 100
-	//
-	goroutineReducer = 0.8
+	goroutineReducer          = 0.8
 )
 
 type Rlimit struct {
