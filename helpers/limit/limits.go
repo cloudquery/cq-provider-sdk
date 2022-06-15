@@ -37,7 +37,7 @@ func GetMaxGoRoutines() uint64 {
 func DiagnoseLimits() (diags diag.Diagnostics) {
 	// the amount of goroutines we want based on machine memory
 	want := calculateGoRoutines(getMemory())
-	// calculate file limit
+	// calculate file descriptor limit
 	fds, err := calculateFileLimit()
 	if err == nil && fds < want {
 		diags = diags.Add(diag.NewBaseError(errors.New("available file descriptors capacity lower than expected"),
@@ -49,7 +49,6 @@ func DiagnoseLimits() (diags diag.Diagnostics) {
 		diags = diags.Add(diag.NewBaseError(errors.New("ulimit available for CloudQuery process lower than expected"),
 			diag.USER,
 			diag.WithDetails("set ulimit capacity is %d want %d to run optimally, consider increasing ulimit on this machine.", ulimit.Max, want)))
-
 	}
 	return diags
 }
