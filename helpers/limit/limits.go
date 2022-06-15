@@ -42,12 +42,14 @@ func DiagnoseLimits() (diags diag.Diagnostics) {
 	if err == nil && fds < want {
 		diags = diags.Add(diag.NewBaseError(errors.New("available file descriptors capacity lower than expected"),
 			diag.USER,
+			diag.WithSeverity(diag.WARNING),
 			diag.WithDetails("available descriptor capacity is %d want %d to run optimally, consider increasing max file descriptors on machine.", fds, want)))
 	}
 	ulimit, err := GetUlimit()
 	if err == nil && ulimit.Max < want {
 		diags = diags.Add(diag.NewBaseError(errors.New("ulimit available for CloudQuery process lower than expected"),
 			diag.USER,
+			diag.WithSeverity(diag.WARNING),
 			diag.WithDetails("set ulimit capacity is %d want %d to run optimally, consider increasing ulimit on this machine.", ulimit.Max, want)))
 	}
 	return diags
