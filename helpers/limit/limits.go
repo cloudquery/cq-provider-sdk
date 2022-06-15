@@ -1,8 +1,10 @@
 package limit
 
 import (
+	"errors"
 	"math"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/pbnjay/memory"
 )
 
@@ -30,18 +32,42 @@ func GetMaxGoRoutines() uint64 {
 	return ulimit.Max
 }
 
+// DiagnoseLimits verifies if user should increase ulimit or max file descriptors to improve number of expected
+// goroutines in CQ to improve performance
+func DiagnoseLimits() (diags diag.Diagnostics) {
+	// the amount of goroutines we want based on machine memory
+	want := calculateGoRoutines(getMemory())
+	// calculate file limit
+	fds, err := calculateFileLimit()
+	if err == nil && fds < want {
+		diags = diags.Add(diag.NewBaseError(errors.New("available file descriptors capacity lower than expected"),
+			diag.USER,
+			diag.WithDetails("available descriptor capacity is %d want %d to run optimally, consider increasing max file descriptors on machine.", fds, want)))
+	}
+	ulimit, err := GetUlimit()
+	if err == nil && ulimit.Max < want {
+		diags = diags.Add(diag.NewBaseError(errors.New("ulimit available for CloudQuery process lower than expected"),
+			diag.USER,
+			diag.WithDetails("set ulimit capacity is %d want %d to run optimally, consider increasing ulimit on this machine.", ulimit.Max, want)))
+
+	}
+	return diags
+}
+
 func getMemory() uint64 {
 	return memory.TotalMemory()
 }
 
-func calculateGoRoutines(totalMemory uint64) uint64 {
-	var total uint64
+func calculateMemoryGoRoutines(totalMemory uint64) uint64 {
 	if totalMemory == 0 {
 		// assume we have 2 GB RAM
-		total = uint64(math.Max(minimalGoRoutines, goroutinesPerGB*2*goroutineReducer))
-	} else {
-		total = uint64(math.Max(minimalGoRoutines, (goroutinesPerGB*float64(totalMemory)/float64(gbInBytes))*goroutineReducer))
+		return uint64(math.Max(minimalGoRoutines, goroutinesPerGB*2*goroutineReducer))
 	}
+	return uint64(math.Max(minimalGoRoutines, (goroutinesPerGB*float64(totalMemory)/float64(gbInBytes))*goroutineReducer))
+}
+
+func calculateGoRoutines(totalMemory uint64) uint64 {
+	total := calculateMemoryGoRoutines(totalMemory)
 	mfo, err := calculateFileLimit()
 	if err != nil {
 		return total
