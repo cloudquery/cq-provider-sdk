@@ -30,8 +30,8 @@ import (
 type Config interface {
 	// Example returns a configuration example (with comments) so user clients can generate an example config
 	Example() string
-	// ExampleFormat is the format of the config Example() returns
-	ExampleFormat() cqproto.ConfigFormat
+	// Format is the format of the config the provider supports
+	Format() cqproto.ConfigFormat
 }
 
 // Provider is the base structure required to pass and serve an sdk provider.Provider
@@ -79,7 +79,7 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.GetProviderConfigResponse{}, err
 	}
-	switch providerConfig.ExampleFormat() {
+	switch providerConfig.Format() {
 	case cqproto.ConfigHCL:
 		data := fmt.Sprintf(`
 		provider "%s" {
@@ -109,7 +109,7 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 		}, nil
 
 	default:
-		return nil, fmt.Errorf("unknown config format %v", providerConfig.ExampleFormat())
+		return nil, fmt.Errorf("unknown config format %v", providerConfig.Format())
 	}
 }
 
@@ -152,7 +152,7 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	if len(request.Config) == 0 {
 		p.Logger.Info("Received empty configuration, using only defaults")
 	} else {
-		switch providerConfig.ExampleFormat() {
+		switch providerConfig.Format() {
 		case cqproto.ConfigHCL:
 			if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
 				p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)

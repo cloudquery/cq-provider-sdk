@@ -236,7 +236,7 @@ func (testConfig) Example() string {
 	return ""
 }
 
-func (testConfig) ExampleFormat() cqproto.ConfigFormat {
+func (testConfig) Format() cqproto.ConfigFormat {
 	return cqproto.ConfigHCL
 }
 
