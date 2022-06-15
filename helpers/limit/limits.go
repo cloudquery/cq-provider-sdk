@@ -13,6 +13,8 @@ const (
 	goroutinesPerGB   float64 = 250000
 	minimalGoRoutines float64 = 100
 	goroutineReducer          = 0.8
+	// only use 75% of the available file descriptors, so to leave for other processes file descriptors
+	mfoReducer = 0.75
 )
 
 type Rlimit struct {
@@ -75,7 +77,7 @@ func calculateGoRoutines(totalMemory uint64) uint64 {
 	}
 
 	if mfo < total {
-		return uint64(float64(mfo) * 0.3)
+		return uint64(float64(mfo) * mfoReducer)
 	}
 	return total
 }
