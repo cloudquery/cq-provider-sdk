@@ -65,12 +65,12 @@ type Provider struct {
 }
 
 type ProviderConfiguration struct {
-	Custom    yaml.Node `yaml:",inline"`
+	Inline    yaml.Node `yaml:",inline"`
 	Resources []string  `yaml:"resources,flow"`
 }
 
 type providerConfigurationRaw struct {
-	Custom    yaml.Node `yaml:",inline"`
+	Inline    yaml.Node `yaml:",inline"`
 	Resources yaml.Node `yaml:"resources,flow"`
 }
 
@@ -104,7 +104,7 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 		}, nil
 	case cqproto.ConfigYAML:
 		var data ProviderConfiguration
-		if err := yaml.Unmarshal([]byte(providerConfig.Example()), &data.Custom); err != nil {
+		if err := yaml.Unmarshal([]byte(providerConfig.Example()), &data.Inline); err != nil {
 			return &cqproto.GetProviderConfigResponse{}, err
 		}
 		data.Resources = funk.Keys(p.ResourceMap).([]string)
@@ -176,17 +176,18 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 		switch providerConfig.Format() {
 		case cqproto.ConfigHCL:
 			if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
-				p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)
-				// this part will be deprecated.
-				if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
-					p.Logger.Error("Failed to load configuration.", "error", err)
-					return &cqproto.ConfigureProviderResponse{
-						Diagnostics: diag.FromError(err, diag.USER),
-					}, nil
-				}
+				p.Logger.Error("Failed to load configuration.", "error", err)
+				return &cqproto.ConfigureProviderResponse{
+					Diagnostics: diag.FromError(err, diag.USER),
+				}, nil
 			}
 		case cqproto.ConfigYAML:
-			// TODO
+			if err := yaml.Unmarshal(request.Config, &providerConfig); err != nil {
+				p.Logger.Error("Failed to load configuration.", "error", err)
+				return &cqproto.ConfigureProviderResponse{
+					Diagnostics: diag.FromError(err, diag.USER),
+				}, nil
+			}
 		}
 	}
 
