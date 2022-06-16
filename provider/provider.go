@@ -113,18 +113,9 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 		}
 
 		data.Inline["resources"] = yaml.Node{
-			Kind:        yaml.MappingNode,
 			HeadComment: "list of resources to fetch",
-			Content: []*yaml.Node{
-				{
-					Kind:  yaml.ScalarNode,
-					Value: "resources",
-				},
-				{
-					Kind:    yaml.SequenceNode,
-					Content: nodes,
-				},
-			},
+			Kind:        yaml.SequenceNode,
+			Content:     nodes,
 		}
 
 		yb, err := yaml.Marshal(data)
