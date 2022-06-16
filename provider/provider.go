@@ -65,13 +65,7 @@ type Provider struct {
 }
 
 type ProviderConfiguration struct {
-	Inline    yaml.Node `yaml:",inline"`
-	Resources []string  `yaml:"resources,flow"`
-}
-
-type providerConfigurationRaw struct {
-	Inline    yaml.Node `yaml:",inline"`
-	Resources yaml.Node `yaml:"resources,flow"`
+	Inline *yaml.Node `yaml:",inline"`
 }
 
 var _ cqproto.CQProviderServer = (*Provider)(nil)
@@ -105,18 +99,40 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 	case cqproto.ConfigYAML:
 		var data ProviderConfiguration
 		if err := yaml.Unmarshal([]byte(providerConfig.Example()), &data.Inline); err != nil {
-			return &cqproto.GetProviderConfigResponse{}, err
+			return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
 		}
-		data.Resources = funk.Keys(p.ResourceMap).([]string)
 
-		yb, _ := yaml.Marshal(data)
-		var dRaw providerConfigurationRaw
-		if err := yaml.Unmarshal(yb, &dRaw); err != nil {
-			return &cqproto.GetProviderConfigResponse{}, err
+		resList := funk.Keys(p.ResourceMap).([]string)
+		nodes := make([]*yaml.Node, len(resList))
+		for i := range resList {
+			nodes[i] = &yaml.Node{
+				Kind: yaml.ScalarNode,
+				//Style: yaml.DoubleQuotedStyle,
+				Value: resList[i],
+			}
 		}
-		dRaw.Resources.LineComment = "list of resources to fetch"
 
-		yb, _ = yaml.Marshal(dRaw)
+		data.Inline.Content = append(data.Inline.Content,
+			&yaml.Node{
+				Kind:        yaml.MappingNode,
+				HeadComment: "list of resources to fetch",
+				Content: []*yaml.Node{
+					{
+						Kind:  yaml.ScalarNode,
+						Value: "resources",
+					},
+					{
+						Kind:    yaml.SequenceNode,
+						Content: nodes,
+					},
+				},
+			},
+		)
+
+		yb, err := yaml.Marshal(data.Inline.Content)
+		if err != nil {
+			return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
+		}
 
 		return &cqproto.GetProviderConfigResponse{
 			Config: yb,
