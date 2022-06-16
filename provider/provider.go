@@ -45,7 +45,7 @@ type Provider struct {
 	// ResourceMap is all resources supported by this plugin
 	ResourceMap map[string]*schema.Table
 	// Configuration decoded from configure request
-	Config func() Config
+	Config func(format cqproto.ConfigFormat) Config
 	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger hclog.Logger
 	// ErrorClassifier allows the provider to classify errors it produces during table execution, and return them as diagnostics to the user.
@@ -64,6 +64,16 @@ type Provider struct {
 	storageCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (execution.Storage, error)
 }
 
+type ProviderConfiguration struct {
+	Custom    yaml.Node `yaml:",inline"`
+	Resources []string  `yaml:"resources,flow"`
+}
+
+type providerConfigurationRaw struct {
+	Custom    yaml.Node `yaml:",inline"`
+	Resources yaml.Node `yaml:"resources,flow"`
+}
+
 var _ cqproto.CQProviderServer = (*Provider)(nil)
 
 func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
@@ -74,8 +84,8 @@ func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSc
 	}, nil
 }
 
-func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderConfigRequest) (*cqproto.GetProviderConfigResponse, error) {
-	providerConfig := p.Config()
+func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProviderConfigRequest) (*cqproto.GetProviderConfigResponse, error) {
+	providerConfig := p.Config(req.Format)
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.GetProviderConfigResponse{}, err
 	}
@@ -86,26 +96,31 @@ func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderCo
 			%s
 			// list of resources to fetch
 			resources = %s
-		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
+		}`, p.Name, providerConfig.Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
 
 		return &cqproto.GetProviderConfigResponse{
 			Config: hclwrite.Format([]byte(data)),
-			Format: 0,
+			Format: cqproto.ConfigHCL,
 		}, nil
 	case cqproto.ConfigYAML:
-		// TODO do this in YAML
-		data := fmt.Sprintf(`
-		provider "%s" {
-			%s
-			// list of resources to fetch
-			resources = %s
-		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
+		var data ProviderConfiguration
+		if err := yaml.Unmarshal([]byte(providerConfig.Example()), &data.Custom); err != nil {
+			return &cqproto.GetProviderConfigResponse{}, err
+		}
+		data.Resources = funk.Keys(p.ResourceMap).([]string)
 
 		yb, _ := yaml.Marshal(data)
+		var dRaw providerConfigurationRaw
+		if err := yaml.Unmarshal(yb, &dRaw); err != nil {
+			return &cqproto.GetProviderConfigResponse{}, err
+		}
+		dRaw.Resources.LineComment = "list of resources to fetch"
+
+		yb, _ = yaml.Marshal(dRaw)
 
 		return &cqproto.GetProviderConfigResponse{
 			Config: yb,
-			Format: 1,
+			Format: cqproto.ConfigYAML,
 		}, nil
 
 	default:
@@ -141,7 +156,13 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	p.extraFields = request.ExtraFields
 	p.dbURL = request.Connection.DSN
 
-	providerConfig := p.Config()
+	providerConfig := p.Config(request.Format)
+	if providerConfig.Format() != request.Format {
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diag.FromError(fmt.Errorf("provider %s returned wrong format config: please upgrade provider", p.Name), diag.INTERNAL),
+		}, nil
+	}
+
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.ConfigureProviderResponse{
 			Diagnostics: diag.FromError(err, diag.INTERNAL),
