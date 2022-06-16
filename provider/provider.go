@@ -65,7 +65,7 @@ type Provider struct {
 }
 
 type ProviderConfiguration struct {
-	Inline *yaml.Node `yaml:",inline"`
+	Inline map[string]yaml.Node `yaml:",inline"`
 }
 
 var _ cqproto.CQProviderServer = (*Provider)(nil)
@@ -98,7 +98,7 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 		}, nil
 	case cqproto.ConfigYAML:
 		var data ProviderConfiguration
-		if err := yaml.Unmarshal([]byte(providerConfig.Example()), &data.Inline); err != nil {
+		if err := yaml.Unmarshal([]byte(providerConfig.Example()), &data); err != nil {
 			return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
 		}
 
@@ -112,24 +112,22 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 			}
 		}
 
-		data.Inline.Content = append(data.Inline.Content,
-			&yaml.Node{
-				Kind:        yaml.MappingNode,
-				HeadComment: "list of resources to fetch",
-				Content: []*yaml.Node{
-					{
-						Kind:  yaml.ScalarNode,
-						Value: "resources",
-					},
-					{
-						Kind:    yaml.SequenceNode,
-						Content: nodes,
-					},
+		data.Inline["resources"] = yaml.Node{
+			Kind:        yaml.MappingNode,
+			HeadComment: "list of resources to fetch",
+			Content: []*yaml.Node{
+				{
+					Kind:  yaml.ScalarNode,
+					Value: "resources",
+				},
+				{
+					Kind:    yaml.SequenceNode,
+					Content: nodes,
 				},
 			},
-		)
+		}
 
-		yb, err := yaml.Marshal(data.Inline.Content)
+		yb, err := yaml.Marshal(data)
 		if err != nil {
 			return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
 		}
