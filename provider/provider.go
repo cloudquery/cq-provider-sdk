@@ -97,7 +97,9 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 			Format: cqproto.ConfigHCL,
 		}, nil
 	case cqproto.ConfigYAML:
-		var data ProviderConfiguration
+		data := ProviderConfiguration{
+			Inline: make(map[string]yaml.Node),
+		}
 		if err := yaml.Unmarshal([]byte(providerConfig.Example()), &data); err != nil {
 			return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
 		}
