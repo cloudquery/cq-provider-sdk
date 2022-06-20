@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -64,10 +65,6 @@ type Provider struct {
 	storageCreator func(ctx context.Context, logger hclog.Logger, dbURL string) (execution.Storage, error)
 }
 
-type ProviderConfiguration struct {
-	Inline map[string]yaml.Node `yaml:",inline"`
-}
-
 var _ cqproto.CQProviderServer = (*Provider)(nil)
 
 func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
@@ -97,27 +94,28 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 			Format: cqproto.ConfigHCL,
 		}, nil
 	case cqproto.ConfigYAML:
-		data := ProviderConfiguration{
-			Inline: make(map[string]yaml.Node),
-		}
-		if err := yaml.Unmarshal([]byte(providerConfig.Example()), &data); err != nil {
-			return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
-		}
-
 		resList := funk.Keys(p.ResourceMap).([]string)
+		sort.Strings(resList)
 		nodes := make([]*yaml.Node, len(resList))
 		for i := range resList {
 			nodes[i] = &yaml.Node{
-				Kind: yaml.ScalarNode,
-				//Style: yaml.DoubleQuotedStyle,
+				Kind:  yaml.ScalarNode,
 				Value: resList[i],
 			}
 		}
 
-		data.Inline["resources"] = yaml.Node{
-			HeadComment: "list of resources to fetch",
-			Kind:        yaml.SequenceNode,
-			Content:     nodes,
+		data := &yaml.Node{
+			Kind:        yaml.MappingNode,
+			HeadComment: providerConfig.Example(),
+			Content: append([]*yaml.Node{
+				{
+					Kind:        yaml.ScalarNode,
+					HeadComment: "list of resources to fetch",
+					Value:       "resources",
+				},
+			},
+				nodes...,
+			),
 		}
 
 		yb, err := yaml.Marshal(data)
