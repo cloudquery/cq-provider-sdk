@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -97,36 +99,22 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 			Format: cqproto.ConfigHCL,
 		}, nil
 	case cqproto.ConfigYAML:
-		data := ProviderConfiguration{
-			Inline: make(map[string]yaml.Node),
-		}
-		if err := yaml.Unmarshal([]byte(providerConfig.Example()), &data); err != nil {
-			return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
-		}
+		const indent = "        "
 
+		yamlLines := []string{
+			indent + "# list of resources to fetch",
+			indent + "resources:",
+		}
 		resList := funk.Keys(p.ResourceMap).([]string)
-		nodes := make([]*yaml.Node, len(resList))
+		sort.Strings(resList)
 		for i := range resList {
-			nodes[i] = &yaml.Node{
-				Kind: yaml.ScalarNode,
-				//Style: yaml.DoubleQuotedStyle,
-				Value: resList[i],
-			}
+			yamlLines = append(yamlLines, indent+"  - "+resList[i])
 		}
 
-		data.Inline["resources"] = yaml.Node{
-			HeadComment: "list of resources to fetch",
-			Kind:        yaml.SequenceNode,
-			Content:     nodes,
-		}
-
-		yb, err := yaml.Marshal(data)
-		if err != nil {
-			return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
-		}
+		data := providerConfig.Example() + "\n" + strings.Join(yamlLines, "\n")
 
 		return &cqproto.GetProviderConfigResponse{
-			Config: yb,
+			Config: []byte(data),
 			Format: cqproto.ConfigYAML,
 		}, nil
 
