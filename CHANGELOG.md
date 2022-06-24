@@ -11,6 +11,114 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### :spider: Fixed
 -->
 
+## [0.12.2](https://github.com/cloudquery/cq-provider-sdk/compare/v0.12.1...v0.12.2) (2022-06-24)
+
+
+### Bug Fixes
+
+* Issues when PG username is 'cloudquery' ([#371](https://github.com/cloudquery/cq-provider-sdk/issues/371)) ([3317cae](https://github.com/cloudquery/cq-provider-sdk/commit/3317caef99a5e15d65080222264e39da825676af))
+
+## [0.12.1](https://github.com/cloudquery/cq-provider-sdk/compare/v0.12.0...v0.12.1) (2022-06-21)
+
+
+### Bug Fixes
+
+* Use errgroup SetLimit ([#363](https://github.com/cloudquery/cq-provider-sdk/issues/363)) ([964a1bb](https://github.com/cloudquery/cq-provider-sdk/commit/964a1bbb53cf23537b3c918cef4b9d676b526a9d))
+* YAML decoding ([#366](https://github.com/cloudquery/cq-provider-sdk/issues/366)) ([964a1bb](https://github.com/cloudquery/cq-provider-sdk/commit/862590a2ddd6dbf44894cca49021ee3957a84f43))
+
+## [0.12.0](https://github.com/cloudquery/cq-provider-sdk/compare/v0.11.4...v0.12.0) (2022-06-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* Support both YAML and HCL config (#332)
+
+### Features
+
+* Support both YAML and HCL config ([#332](https://github.com/cloudquery/cq-provider-sdk/issues/332)) ([2818697](https://github.com/cloudquery/cq-provider-sdk/commit/281869738c00ec66c3cb53e3ac4c6afffd102625))
+
+## [0.11.4](https://github.com/cloudquery/cq-provider-sdk/compare/v0.11.3...v0.11.4) (2022-06-20)
+
+
+### Bug Fixes
+
+* Classify db execution errors ([#342](https://github.com/cloudquery/cq-provider-sdk/issues/342)) ([4b36b47](https://github.com/cloudquery/cq-provider-sdk/commit/4b36b4798151c7480c638758464de64d3efd2752))
+* **deps:** Update github.com/jackc/pgerrcode digest to 469b46a ([#344](https://github.com/cloudquery/cq-provider-sdk/issues/344)) ([7e68b1d](https://github.com/cloudquery/cq-provider-sdk/commit/7e68b1dd407c7f40fa195989c70712d8c3774528))
+* **deps:** Update golang.org/x/sync digest to 0de741c ([#345](https://github.com/cloudquery/cq-provider-sdk/issues/345)) ([a00d795](https://github.com/cloudquery/cq-provider-sdk/commit/a00d79537dded8fa91d0abf5bc868206e9fbbe14))
+* **deps:** Update module github.com/aws/smithy-go to v1.11.3 ([#353](https://github.com/cloudquery/cq-provider-sdk/issues/353)) ([626dffd](https://github.com/cloudquery/cq-provider-sdk/commit/626dffd370167efdf1f22b85b735a4b050917744))
+* **deps:** Update module github.com/creasty/defaults to v1.6.0 ([#355](https://github.com/cloudquery/cq-provider-sdk/issues/355)) ([f5be010](https://github.com/cloudquery/cq-provider-sdk/commit/f5be010c96d01f9fc39fa403537af23a8299074e))
+* **deps:** Update module github.com/doug-martin/goqu/v9 to v9.18.0 ([#356](https://github.com/cloudquery/cq-provider-sdk/issues/356)) ([a5b1b7e](https://github.com/cloudquery/cq-provider-sdk/commit/a5b1b7e52350f415346c108cc43cb98f3c4b1b88))
+* **deps:** Update module github.com/gofrs/uuid to v4.2.0 ([#358](https://github.com/cloudquery/cq-provider-sdk/issues/358)) ([fce8f4b](https://github.com/cloudquery/cq-provider-sdk/commit/fce8f4bb7c464867dd99b7cc798d05fba55df50d))
+* **deps:** Update module github.com/golang-migrate/migrate/v4 to v4.15.2 ([#348](https://github.com/cloudquery/cq-provider-sdk/issues/348)) ([ad98898](https://github.com/cloudquery/cq-provider-sdk/commit/ad98898f0b530123a82be3a0db11a51d9a9ba8cb))
+* **deps:** Update module github.com/hashicorp/go-hclog to v1.2.1 ([#359](https://github.com/cloudquery/cq-provider-sdk/issues/359)) ([94aab01](https://github.com/cloudquery/cq-provider-sdk/commit/94aab01ab4aaca7c89ba1201c20192b0a6e60e62))
+* **deps:** Update module github.com/hashicorp/go-plugin to v1.4.4 ([#349](https://github.com/cloudquery/cq-provider-sdk/issues/349)) ([e96bfe5](https://github.com/cloudquery/cq-provider-sdk/commit/e96bfe57d3ba2621fd58364097a21cc4f5b9c77c))
+* **deps:** Update module github.com/hashicorp/go-version to v1.5.0 ([#360](https://github.com/cloudquery/cq-provider-sdk/issues/360)) ([813caa8](https://github.com/cloudquery/cq-provider-sdk/commit/813caa865097258055f336c69c73be6cded6e8a2))
+* **deps:** Update module github.com/Masterminds/squirrel to v1.5.3 ([#347](https://github.com/cloudquery/cq-provider-sdk/issues/347)) ([9931774](https://github.com/cloudquery/cq-provider-sdk/commit/9931774627d59914a7f5b81dfcf814d2d0478661))
+* **deps:** Update module github.com/stretchr/testify to v1.7.2 ([#350](https://github.com/cloudquery/cq-provider-sdk/issues/350)) ([94a16a5](https://github.com/cloudquery/cq-provider-sdk/commit/94a16a5f485faee3a153043038b69ef43133fc1b))
+* **deps:** Update module github.com/thoas/go-funk to v0.9.2 ([#351](https://github.com/cloudquery/cq-provider-sdk/issues/351)) ([2aa16f7](https://github.com/cloudquery/cq-provider-sdk/commit/2aa16f7946e2234347583abbeaebe093bb406d96))
+* **deps:** Update module github.com/vmihailenco/msgpack/v5 to v5.3.5 ([#352](https://github.com/cloudquery/cq-provider-sdk/issues/352)) ([5ca3b39](https://github.com/cloudquery/cq-provider-sdk/commit/5ca3b39a80437be10ed16c94845e07eee6e19f96))
+
+## [0.11.3](https://github.com/cloudquery/cq-provider-sdk/compare/v0.11.2...v0.11.3) (2022-06-15)
+
+
+### Bug Fixes
+
+* Windows sysctl call ([#340](https://github.com/cloudquery/cq-provider-sdk/issues/340)) ([464529d](https://github.com/cloudquery/cq-provider-sdk/commit/464529dfd4ca6cd57dc492c757149a898bc72790))
+
+## [0.11.2](https://github.com/cloudquery/cq-provider-sdk/compare/v0.11.1...v0.11.2) (2022-06-15)
+
+
+### Features
+
+* Calculate max goroutines based on file limit ([#337](https://github.com/cloudquery/cq-provider-sdk/issues/337)) ([fb429b8](https://github.com/cloudquery/cq-provider-sdk/commit/fb429b882599ff88c1032e7509d6034a12af5147))
+
+## [0.11.1](https://github.com/cloudquery/cq-provider-sdk/compare/v0.11.0...v0.11.1) (2022-06-14)
+
+
+### Bug Fixes
+
+* **deps:** Update module github.com/cloudquery/faker/v3 to v3.7.5 ([#334](https://github.com/cloudquery/cq-provider-sdk/issues/334)) ([cd97a4f](https://github.com/cloudquery/cq-provider-sdk/commit/cd97a4fa28bddb274346f002db053b8595370d5d))
+
+## [0.11.0](https://github.com/cloudquery/cq-provider-sdk/compare/v0.10.11...v0.11.0) (2022-06-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* IgnoreError Recursively for tables and columns (#323)
+
+### Features
+
+* IgnoreError Recursively for tables and columns ([#323](https://github.com/cloudquery/cq-provider-sdk/issues/323)) ([7212d98](https://github.com/cloudquery/cq-provider-sdk/commit/7212d98ade656f8881415cb41930537238e7fe55))
+* Sleep helper ([#328](https://github.com/cloudquery/cq-provider-sdk/issues/328)) ([04459c5](https://github.com/cloudquery/cq-provider-sdk/commit/04459c5edacf9d4bcc2911f39155cb2daa83c3a1))
+
+## [0.10.11](https://github.com/cloudquery/cq-provider-sdk/compare/v0.10.10...v0.10.11) (2022-06-07)
+
+
+### Features
+
+* Remove default value option from column ([#324](https://github.com/cloudquery/cq-provider-sdk/issues/324)) ([33a4353](https://github.com/cloudquery/cq-provider-sdk/commit/33a4353f89912e5bb8644797efc5aa24cc34e149)), closes [#298](https://github.com/cloudquery/cq-provider-sdk/issues/298)
+
+## [0.10.10](https://github.com/cloudquery/cq-provider-sdk/compare/v0.10.9...v0.10.10) (2022-06-07)
+
+
+### Features
+
+* Always use BigInt ([#321](https://github.com/cloudquery/cq-provider-sdk/issues/321)) ([2033349](https://github.com/cloudquery/cq-provider-sdk/commit/2033349d3dfa07035ad3c37acba23e285a49c172))
+
+## [0.10.9](https://github.com/cloudquery/cq-provider-sdk/compare/v0.10.8...v0.10.9) (2022-06-07)
+
+
+### Bug Fixes
+
+* Add missing SkipIgnoreInTest ([#319](https://github.com/cloudquery/cq-provider-sdk/issues/319)) ([b088a33](https://github.com/cloudquery/cq-provider-sdk/commit/b088a33aa119fd428f74bb86c83527e2a5d9eb8c))
+
+## [0.10.8](https://github.com/cloudquery/cq-provider-sdk/compare/v0.10.7...v0.10.8) (2022-06-07)
+
+
+### Bug Fixes
+
+* Respect Multiplexer No Clients ([#313](https://github.com/cloudquery/cq-provider-sdk/issues/313)) ([c873426](https://github.com/cloudquery/cq-provider-sdk/commit/c8734261bb8c081e6f73415663f90a750e93100e))
+
 ### [0.10.7](https://github.com/cloudquery/cq-provider-sdk/compare/v0.10.6...v0.10.7) (2022-06-01)
 
 

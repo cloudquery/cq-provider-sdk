@@ -49,22 +49,16 @@ type Column struct {
 	Type ValueType
 	// Description about column, this description is added as a comment in the database
 	Description string
-	// Default value if the resolver/default getting gets a nil value
-	Default interface{}
 	// Column Resolver allows to set you own data based on resolving this can be an API call or setting multiple embedded values etc'
 	Resolver ColumnResolver
-	// Ignore errors checks if returned error from column resolver should be ignored.
-	IgnoreError IgnoreErrorFunc
 	// Creation options allow modifying how column is defined when table is created
 	CreationOptions ColumnCreationOptions
-
 	// IgnoreInTests is used to skip verifying the column is non-nil in integration tests.
 	// By default, integration tests perform a fetch for all resources in cloudquery's test account, and
 	// verify all columns are non-nil.
 	// If IgnoreInTests is true, verification is skipped for this column.
 	// Used when it is hard to create a reproducible environment with this column being non-nil (e.g. various error columns).
 	IgnoreInTests bool
-
 	// internal is true if this column is managed by the SDK
 	internal bool
 	// meta holds serializable information about the column's resolvers and functions
@@ -98,12 +92,8 @@ func (v ValueType) String() string {
 	switch v {
 	case TypeBool:
 		return "TypeBool"
-	case TypeBigInt:
+	case TypeInt, TypeBigInt, TypeSmallInt:
 		return "TypeBigInt"
-	case TypeSmallInt:
-		return "TypeSmallInt"
-	case TypeInt:
-		return "TypeInt"
 	case TypeFloat:
 		return "TypeFloat"
 	case TypeUUID:
@@ -141,16 +131,13 @@ func (v ValueType) String() string {
 	}
 }
 
+// ValueTypeFromString this function is mainly used by https://github.com/cloudquery/cq-gen
 func ValueTypeFromString(s string) ValueType {
 	switch strings.ToLower(s) {
 	case "bool", "TypeBool":
 		return TypeBool
-	case "int", "TypeInt":
-		return TypeInt
-	case "bigint", "TypeBigInt":
+	case "int", "TypeInt", "bigint", "TypeBigInt", "smallint", "TypeSmallInt":
 		return TypeBigInt
-	case "smallint", "TypeSmallInt":
-		return TypeSmallInt
 	case "float", "TypeFloat":
 		return TypeFloat
 	case "uuid", "TypeUUID":
@@ -214,12 +201,9 @@ func (c Column) checkType(v interface{}) bool {
 	}
 
 	switch val := v.(type) {
-	case int8, *int8, uint8, *uint8, int16, *int16:
-		return c.Type == TypeSmallInt
-	case uint16, int32, *int32:
-		return c.Type == TypeInt
-	case int, *int, uint32, *uint32, int64, *int64:
-		return c.Type == TypeBigInt || c.Type == TypeInt
+	case int8, *int8, uint8, *uint8, int16, *int16, uint16, *uint16, int32, *int32, int, *int, uint32, *uint32, int64, *int64:
+		// TODO: Deprecate all Int Types in favour of BigInt
+		return c.Type == TypeBigInt || c.Type == TypeSmallInt || c.Type == TypeInt
 	case []byte:
 		if c.Type == TypeUUID {
 			if _, err := uuid.FromBytes(val); err != nil {
@@ -317,7 +301,7 @@ func (c Column) Meta() *ColumnMeta {
 	if c.Resolver == nil {
 		return &ColumnMeta{
 			Resolver:     nil,
-			IgnoreExists: c.IgnoreError != nil,
+			IgnoreExists: false,
 		}
 	}
 	fnName := runtime.FuncForPC(reflect.ValueOf(c.Resolver).Pointer()).Name()
@@ -326,7 +310,7 @@ func (c Column) Meta() *ColumnMeta {
 			Name:    strings.TrimPrefix(fnName, "github.com/cloudquery/cq-provider-sdk/provider/"),
 			Builtin: strings.HasPrefix(fnName, "github.com/cloudquery/cq-provider-sdk/"),
 		},
-		IgnoreExists: c.IgnoreError != nil,
+		IgnoreExists: false,
 	}
 }
 

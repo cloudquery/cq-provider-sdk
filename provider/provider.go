@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -23,12 +25,15 @@ import (
 	"github.com/thoas/go-funk"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+	"gopkg.in/yaml.v3"
 )
 
 // Config Every provider implements a resources field we only want to extract that in fetch execution
 type Config interface {
 	// Example returns a configuration example (with comments) so user clients can generate an example config
 	Example() string
+	// Format is the format of the config the provider supports
+	Format() cqproto.ConfigFormat
 }
 
 // Provider is the base structure required to pass and serve an sdk provider.Provider
@@ -42,7 +47,7 @@ type Provider struct {
 	// ResourceMap is all resources supported by this plugin
 	ResourceMap map[string]*schema.Table
 	// Configuration decoded from configure request
-	Config func() Config
+	Config func(format cqproto.ConfigFormat) Config
 	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger hclog.Logger
 	// ErrorClassifier allows the provider to classify errors it produces during table execution, and return them as diagnostics to the user.
@@ -71,19 +76,65 @@ func (p *Provider) GetProviderSchema(_ context.Context, _ *cqproto.GetProviderSc
 	}, nil
 }
 
-func (p *Provider) GetProviderConfig(_ context.Context, _ *cqproto.GetProviderConfigRequest) (*cqproto.GetProviderConfigResponse, error) {
-	providerConfig := p.Config()
+func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProviderConfigRequest) (*cqproto.GetProviderConfigResponse, error) {
+	providerConfig := p.Config(req.Format)
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.GetProviderConfigResponse{}, err
 	}
-	data := fmt.Sprintf(`
+	switch providerConfig.Format() {
+	case cqproto.ConfigHCL:
+		data := fmt.Sprintf(`
 		provider "%s" {
 			%s
 			// list of resources to fetch
 			resources = %s
-		}`, p.Name, p.Config().Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
+		}`, p.Name, providerConfig.Example(), helpers.FormatSlice(funk.Keys(p.ResourceMap).([]string)))
 
-	return &cqproto.GetProviderConfigResponse{Config: hclwrite.Format([]byte(data))}, nil
+		return &cqproto.GetProviderConfigResponse{
+			Config: hclwrite.Format([]byte(data)),
+			Format: cqproto.ConfigHCL,
+		}, nil
+	case cqproto.ConfigYAML:
+		resList := funk.Keys(p.ResourceMap).([]string)
+		sort.Strings(resList)
+		nodes := make([]*yaml.Node, len(resList))
+		for i := range resList {
+			nodes[i] = &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Value: resList[i],
+			}
+		}
+
+		data := &yaml.Node{
+			Kind: yaml.MappingNode,
+			// HeadComment doesn't work here
+			Content: []*yaml.Node{
+				{
+					Kind: yaml.ScalarNode,
+					// double newline will leave only the last block of comments
+					HeadComment: strings.TrimRight(providerConfig.Example(), "\r\n") + "\n \nlist of resources to fetch",
+					Value:       "resources",
+				},
+				{
+					Kind:    yaml.SequenceNode,
+					Content: nodes,
+				},
+			},
+		}
+
+		yb, err := yaml.Marshal(data)
+		if err != nil {
+			return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
+		}
+
+		return &cqproto.GetProviderConfigResponse{
+			Config: yb,
+			Format: cqproto.ConfigYAML,
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("unknown config format %v", providerConfig.Format())
+	}
 }
 
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
@@ -113,23 +164,39 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 
 	p.extraFields = request.ExtraFields
 	p.dbURL = request.Connection.DSN
-	providerConfig := p.Config()
+
+	providerConfig := p.Config(request.Format)
+	if providerConfig.Format() != request.Format {
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diag.FromError(fmt.Errorf("provider %s returned wrong format config: please upgrade provider", p.Name), diag.INTERNAL),
+		}, nil
+	}
+
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.ConfigureProviderResponse{
 			Diagnostics: diag.FromError(err, diag.INTERNAL),
 		}, nil
 	}
+
 	// if we received an empty config we notify in log and only use defaults.
 	if len(request.Config) == 0 {
 		p.Logger.Info("Received empty configuration, using only defaults")
-	} else if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
-		p.Logger.Warn("Failed to read config as hcl, will try as json", "error", err)
-		// this part will be deprecated.
-		if err := hclsimple.Decode("config.json", request.Config, nil, providerConfig); err != nil {
-			p.Logger.Error("Failed to load configuration.", "error", err)
-			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diag.FromError(err, diag.USER),
-			}, nil
+	} else {
+		switch providerConfig.Format() {
+		case cqproto.ConfigHCL:
+			if err := hclsimple.Decode("config.hcl", request.Config, nil, providerConfig); err != nil {
+				p.Logger.Error("Failed to load configuration.", "error", err)
+				return &cqproto.ConfigureProviderResponse{
+					Diagnostics: diag.FromError(err, diag.USER),
+				}, nil
+			}
+		case cqproto.ConfigYAML:
+			if err := yaml.Unmarshal(request.Config, providerConfig); err != nil {
+				p.Logger.Error("Failed to load configuration.", "error", err)
+				return &cqproto.ConfigureProviderResponse{
+					Diagnostics: diag.FromError(err, diag.USER),
+				}, nil
+			}
 		}
 	}
 
@@ -183,16 +250,13 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 	if maxGoroutines == 0 {
 		maxGoroutines = limit.GetMaxGoRoutines()
 	}
+	p.Logger.Info("calculated max goroutines for fetch execution", "max_goroutines", maxGoroutines)
 	goroutinesSem = semaphore.NewWeighted(helpers.Uint64ToInt64(maxGoroutines))
 
-	// limiter used to limit the amount of resources fetched concurrently
-	var parallelResourceSem *semaphore.Weighted
-	maxParallelFetchingLimit := request.ParallelFetchingLimit
-	if maxParallelFetchingLimit > 0 {
-		parallelResourceSem = semaphore.NewWeighted(helpers.Uint64ToInt64(maxParallelFetchingLimit))
-	}
-
 	g, gctx := errgroup.WithContext(ctx)
+	if request.ParallelFetchingLimit > 0 {
+		g.SetLimit(helpers.Uint64ToInt(request.ParallelFetchingLimit))
+	}
 	finishedResources := make(map[string]bool, len(resources))
 	l := &sync.Mutex{}
 	var totalResourceCount uint64
@@ -208,15 +272,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		l.Lock()
 		finishedResources[r] = false
 		l.Unlock()
-		if parallelResourceSem != nil {
-			if err := parallelResourceSem.Acquire(ctx, 1); err != nil {
-				return err
-			}
-		}
 		g.Go(func() error {
-			if parallelResourceSem != nil {
-				defer parallelResourceSem.Release(1)
-			}
 			resourceCount, diags := tableExec.Resolve(gctx, p.meta)
 			l.Lock()
 			defer l.Unlock()

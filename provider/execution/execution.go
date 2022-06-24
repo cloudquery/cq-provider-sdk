@@ -15,7 +15,6 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/stats"
 	"github.com/hashicorp/go-hclog"
 	"github.com/iancoleman/strcase"
-	"github.com/modern-go/reflect2"
 	segmentStats "github.com/segmentio/stats/v4"
 	"github.com/thoas/go-funk"
 	"golang.org/x/sync/semaphore"
@@ -29,6 +28,8 @@ const executionJitter = -1 * time.Minute
 type TableExecutor struct {
 	// ResourceName name of top-level resource associated with table
 	ResourceName string
+	// ParentExecutor is the parent executor, useful for nested tables to propagate up and use IgnoreError and so forth.
+	ParentExecutor *TableExecutor
 	// Table this execution is associated with
 	Table *schema.Table
 	// Database connection to insert data into
@@ -79,11 +80,10 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 func (e TableExecutor) Resolve(ctx context.Context, meta schema.ClientMeta) (uint64, diag.Diagnostics) {
 	var clients []schema.ClientMeta
 
+	clients = append(clients, meta)
+
 	if e.Table.Multiplex != nil {
 		clients = e.Table.Multiplex(meta)
-	}
-	if len(clients) == 0 {
-		clients = append(clients, meta)
 	}
 
 	return e.doMultiplexResolve(ctx, clients)
@@ -94,6 +94,7 @@ func (e TableExecutor) withTable(t *schema.Table, kv ...interface{}) *TableExecu
 	var c [2]schema.ColumnList
 	c[0], c[1] = e.Db.Dialect().Columns(t).Sift()
 	cpy := e
+	cpy.ParentExecutor = &e
 	cpy.Table = t
 	cpy.Logger = cpy.Logger.With(kv...)
 	cpy.columns = c
@@ -238,7 +239,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 			close(res)
 		}()
 		if err := e.Table.Resolver(ctx, client, parent, res); err != nil {
-			if e.Table.IgnoreError != nil && e.Table.IgnoreError(err) {
+			if e.IgnoreError(err) {
 				e.Logger.Debug("ignored an error", "err", err)
 				err = diag.NewBaseError(err, diag.RESOLVING, diag.WithSeverity(diag.IGNORE), diag.WithSummary("table %q resolver ignored error", e.Table.Name))
 			}
@@ -274,7 +275,7 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 	}
 
 	if err := e.cleanupStaleData(ctx, client, parent); err != nil {
-		return nc, diags.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed to cleanup stale data on table %q", e.Table.Name)))
+		return nc, diags.Add(ClassifyError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed to cleanup stale data on table %q", e.Table.Name)))
 	}
 
 	return nc, diags
@@ -339,7 +340,7 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	}
 	e.Logger.Error("failed insert to db", "error", err)
 	// Setup diags, adding first diagnostic that bulk insert failed
-	diags := diag.Diagnostics{}.Add(fromError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed bulk insert on table %q", e.Table.Name)))
+	diags := diag.Diagnostics{}.Add(ClassifyError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed bulk insert on table %q", e.Table.Name)))
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
 	partialFetchResources := make(schema.Resources, 0)
 	for id := range resources {
@@ -414,31 +415,12 @@ func (e TableExecutor) resolveColumns(ctx context.Context, meta schema.ClientMet
 			if funk.ContainsString(e.Db.Dialect().PrimaryKeys(e.Table), c.Name) {
 				return diags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName), WithResource(resource), diag.WithSummary("failed to resolve column %s@%s", e.Table.Name, c.Name)))
 			}
-			// check if column resolver defined an IgnoreError function, if it does check if ignore should be ignored.
-			if c.IgnoreError != nil && c.IgnoreError(err) {
-				diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSeverity(diag.IGNORE), diag.WithSummary("column resolver %q failed for table %q", c.Name, e.Table.Name)))
-			} else {
-				diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSummary("column resolver %q failed for table %q", c.Name, e.Table.Name)))
-			}
-
-			// TODO: double check logic here
-			if reflect2.IsNil(c.Default) {
-				continue
-			}
-			// Set default value if defined, otherwise it will be nil
-			if err := resource.Set(c.Name, c.Default); err != nil {
-				diags = diags.Add(fromError(err, diag.WithResourceName(e.ResourceName), diag.WithType(diag.INTERNAL),
-					diag.WithSummary("failed to set resource default value for %s@%s", e.Table.Name, c.Name)))
-			}
+			diags = diags.Add(e.handleResolveError(meta, resource, err, diag.WithSummary("column resolver %q failed for table %q", c.Name, e.Table.Name)))
 			continue
 		}
 		e.Logger.Trace("resolving column value with path", "column", c.Name)
 		// base use case: try to get column with CamelCase name
 		v := funk.Get(resource.Item, strcase.ToCamel(c.Name), funk.WithAllowZero())
-		if v == nil {
-			e.Logger.Trace("using column default value", "column", c.Name, "default", c.Default)
-			v = c.Default
-		}
 		e.Logger.Trace("setting column value", "column", c.Name, "value", v)
 		if err := resource.Set(c.Name, v); err != nil {
 			diags = diags.Add(fromError(err, diag.WithResourceName(e.ResourceName), diag.WithType(diag.INTERNAL),
@@ -473,6 +455,21 @@ func (e TableExecutor) handleResolveError(meta schema.ClientMeta, r *schema.Reso
 	}
 
 	return errAsDiags
+}
+
+// IgnoreError returns true if the error is ignored via the current table IgnoreError function or in any other parent table (in that ordered)
+// it stops checking the moment one of them exists and not until it returns true or fals
+func (e TableExecutor) IgnoreError(err error) bool {
+	// first priority is to check the tables IgnoreError function
+	if e.Table.IgnoreError != nil {
+		return e.Table.IgnoreError(err)
+	}
+	// secondy priority is to check the parent tables IgnoreError recursively
+	if e.ParentExecutor != nil {
+		return e.ParentExecutor.IgnoreError(err)
+	}
+
+	return false
 }
 
 func identifyClient(meta schema.ClientMeta) string {
