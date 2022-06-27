@@ -110,9 +110,27 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 			// HeadComment doesn't work here
 			Content: []*yaml.Node{
 				{
-					Kind: yaml.ScalarNode,
-					// double newline will leave only the last block of comments
-					HeadComment: strings.TrimRight(providerConfig.Example(), "\r\n") + "\n \nlist of resources to fetch",
+					Kind:  yaml.ScalarNode,
+					Value: "configuration",
+				},
+				{
+					Kind:        yaml.MappingNode,
+					HeadComment: strings.TrimRight(providerConfig.Example(), "\r\n") + "\n",
+					Content: []*yaml.Node{
+						{
+							Kind:        yaml.ScalarNode,
+							Value:       "example-key",
+							LineComment: "This is an example, can be removed",
+						},
+						{
+							Kind:  yaml.ScalarNode,
+							Value: "example-value",
+						},
+					},
+				},
+				{
+					Kind:        yaml.ScalarNode,
+					HeadComment: "list of resources to fetch",
 					Value:       "resources",
 				},
 				{
