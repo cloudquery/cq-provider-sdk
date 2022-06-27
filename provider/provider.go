@@ -117,7 +117,8 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 					Tag:  "!!null",
 				},
 				{
-					Kind:        yaml.ScalarNode,
+					Kind: yaml.ScalarNode,
+					// double newline will leave only the last block of comments
 					HeadComment: strings.TrimRight(providerConfig.Example(), "\r\n") + "\n \nlist of resources to fetch",
 					Value:       "resources",
 				},
