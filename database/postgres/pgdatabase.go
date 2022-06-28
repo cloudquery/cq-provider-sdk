@@ -12,9 +12,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/doug-martin/goqu/v9"
-
-	// Init postgres
-	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
+	_ "github.com/doug-martin/goqu/v9/dialect/postgres" // Init postgres
 	"github.com/hashicorp/go-hclog"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"

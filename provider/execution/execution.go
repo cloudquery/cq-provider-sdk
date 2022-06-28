@@ -38,8 +38,6 @@ type TableExecutor struct {
 	Logger hclog.Logger
 	// classifiers
 	classifiers []ErrorClassifier
-	// extraFields to be passed to each created resource in the execution, used in tests.
-	extraFields map[string]interface{}
 	// metadata to be passed to each created resource in the execution, used by cq* resolvers.
 	metadata map[string]interface{}
 	// When the execution started
@@ -53,7 +51,7 @@ type TableExecutor struct {
 }
 
 // NewTableExecutor creates a new TableExecutor for given schema.Table
-func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted, timeout time.Duration) TableExecutor {
+func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted, timeout time.Duration) TableExecutor {
 	var classifiers = []ErrorClassifier{defaultErrorClassifier}
 	if classifier != nil {
 		classifiers = append([]ErrorClassifier{classifier}, classifiers...)
@@ -66,7 +64,6 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 		Table:          table,
 		Db:             db,
 		Logger:         logger,
-		extraFields:    extraFields,
 		metadata:       metadata,
 		classifiers:    classifiers,
 		executionStart: time.Now().Add(executionJitter),
@@ -194,10 +191,7 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 	}
 	e.Logger.Debug("cleaning table stale data", "last_update", e.executionStart)
 
-	filters := make([]interface{}, 0)
-	for k, v := range e.extraFields {
-		filters = append(filters, k, v)
-	}
+	var filters []interface{}
 	if e.Table.DeleteFilter != nil {
 		filters = append(filters, e.Table.DeleteFilter(client, parent)...)
 	}
