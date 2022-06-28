@@ -169,20 +169,6 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	return totalResources, allDiags
 }
 
-// truncateTable cleans up a table from all data based on it's DeleteFilter
-func (e TableExecutor) truncateTable(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
-	if e.Table.DeleteFilter == nil {
-		return nil
-	}
-	if e.Table.AlwaysDelete {
-		// Delete previous fetch
-		e.Logger.Debug("cleaning table previous fetch", "always_delete", e.Table.AlwaysDelete)
-		return e.Db.Delete(ctx, e.Table, e.Table.DeleteFilter(client, parent))
-	}
-	e.Logger.Debug("skipping table truncate")
-	return nil
-}
-
 // cleanupStaleData cleans resources in table that weren't update in the latest table resolve execution
 func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
 	// Only clean top level tables
@@ -213,9 +199,6 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 
 	if e.Table.Resolver == nil {
 		return 0, diags.Add(diag.NewBaseError(nil, diag.SCHEMA, diag.WithSeverity(diag.ERROR), diag.WithResourceName(e.ResourceName), diag.WithSummary("table %q missing resolver, make sure table implements the resolver", e.Table.Name)))
-	}
-	if err := e.truncateTable(ctx, client, parent); err != nil {
-		return 0, diags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
 	}
 
 	res := make(chan interface{})

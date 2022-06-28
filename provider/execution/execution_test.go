@@ -353,8 +353,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				return db
 			},
 			Table: &schema.Table{
-				Name:         "simple",
-				AlwaysDelete: true,
+				Name: "simple",
 				DeleteFilter: func(meta schema.ClientMeta, parent *schema.Resource) []interface{} {
 					return []interface{}{}
 				},
@@ -372,8 +371,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				return db
 			},
 			Table: &schema.Table{
-				Name:         "simple",
-				AlwaysDelete: true,
+				Name: "simple",
 				DeleteFilter: func(meta schema.ClientMeta, parent *schema.Resource) []interface{} {
 					return []interface{}{}
 				},

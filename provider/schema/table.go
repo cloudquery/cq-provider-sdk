@@ -43,9 +43,6 @@ type Table struct {
 	PostResourceResolver RowResolver
 	// Options allow modification of how the table is defined when created
 	Options TableCreationOptions
-	// AlwaysDelete will always delete table data on fetch regardless if delete is disabled on run,
-	// use this only in specific cases, if you are unsure contact the CloudQuery Team.
-	AlwaysDelete bool
 
 	// IgnoreInTests is used to exclude a table from integration tests.
 	// By default, integration tests fetch all resources from cloudquery's test account, and verifY all tables
