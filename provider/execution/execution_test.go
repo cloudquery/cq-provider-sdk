@@ -344,52 +344,6 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			},
 		},
 		{
-			Name: "always_delete",
-			SetupStorage: func(t *testing.T) Storage {
-				db := new(DatabaseMock)
-				db.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-				db.On("Dialect").Return(noopDialect{})
-				return db
-			},
-			Table: &schema.Table{
-				Name: "simple",
-				DeleteFilter: func(meta schema.ClientMeta, parent *schema.Resource) []interface{} {
-					return []interface{}{}
-				},
-				Resolver: doNothingResolver,
-				Columns:  commonColumns,
-			},
-		},
-		{
-			Name: "always_delete_fail",
-			SetupStorage: func(t *testing.T) Storage {
-				db := new(DatabaseMock)
-				db.On("Delete", mock.Anything, mock.Anything, mock.Anything).
-					Return(fromError(errors.New("failed delete"), diag.WithResourceName("always_delete_fail"), diag.WithType(diag.DATABASE)))
-				db.On("Dialect").Return(noopDialect{})
-				return db
-			},
-			Table: &schema.Table{
-				Name: "simple",
-				DeleteFilter: func(meta schema.ClientMeta, parent *schema.Resource) []interface{} {
-					return []interface{}{}
-				},
-				Resolver: doNothingResolver,
-				Columns:  commonColumns,
-			},
-			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
-				{
-					Err:      "failed delete",
-					Resource: "always_delete_fail",
-					Severity: diag.ERROR,
-					Type:     diag.DATABASE,
-					Summary:  "failed delete",
-				},
-			},
-		},
-		{
 			Name: "cleanup_stale_data_fail",
 			SetupStorage: func(t *testing.T) Storage {
 				db := new(DatabaseMock)
