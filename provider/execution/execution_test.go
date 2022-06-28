@@ -377,7 +377,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				db := new(DatabaseMock)
 				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				db.On("Dialect").Return(noopDialect{})
-				db.On("CopyFrom", mock.Anything, mock.Anything, true, map[string]interface{}(nil)).Return(nil)
+				db.On("CopyFrom", mock.Anything, mock.Anything, true).Return(nil)
 				return db
 			},
 			Table: &schema.Table{
@@ -394,7 +394,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				db := new(DatabaseMock)
 				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				db.On("Dialect").Return(noopDialect{})
-				db.On("CopyFrom", mock.Anything, mock.Anything, true, map[string]interface{}(nil)).Return(nil)
+				db.On("CopyFrom", mock.Anything, mock.Anything, true).Return(nil)
 				return db
 			},
 			Table: &schema.Table{
@@ -427,7 +427,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				db := new(DatabaseMock)
 				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				db.On("Dialect").Return(schema.PostgresDialect{})
-				db.On("CopyFrom", mock.Anything, mock.Anything, true, map[string]interface{}(nil)).Return(nil).Run(
+				db.On("CopyFrom", mock.Anything, mock.Anything, true).Return(nil).Run(
 					func(args mock.Arguments) {
 						resources := args.Get(1).(schema.Resources)
 						if !assert.Greater(t, len(resources), 0) {
@@ -462,7 +462,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				db := new(DatabaseMock)
 				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				db.On("Dialect").Return(noopDialect{})
-				db.On("CopyFrom", mock.Anything, mock.Anything, true, map[string]interface{}(nil)).Return(nil)
+				db.On("CopyFrom", mock.Anything, mock.Anything, true).Return(nil)
 				return db
 			},
 			Table: &schema.Table{
@@ -507,10 +507,10 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			ErrorExpected: true,
 			ExpectedDiags: []diag.FlatDiag{
 				{
-					Err:      `error at github.com/cloudquery/cq-provider-sdk/provider/execution.glob..func4[execution_test.go:75] some error`,
+					Err:      `error at github.com/cloudquery/cq-provider-sdk/provider/execution.glob..func4[execution_test.go:74] some error`,
 					Resource: "return_wrap_error",
 					Severity: diag.ERROR,
-					Summary:  `failed to resolve table "simple": error at github.com/cloudquery/cq-provider-sdk/provider/execution.glob..func4[execution_test.go:75] some error`,
+					Summary:  `failed to resolve table "simple": error at github.com/cloudquery/cq-provider-sdk/provider/execution.glob..func4[execution_test.go:74] some error`,
 					Type:     diag.RESOLVING,
 				},
 			},
