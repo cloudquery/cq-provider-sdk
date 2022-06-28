@@ -53,9 +53,6 @@ type Table struct {
 	// When IgnoreInTests is true, integration tests won't fetch from this table.
 	// Used when it is hard to create a reproducible environment with a row in this table.
 	IgnoreInTests bool
-	// Global tables are usually the same regardless of the provider fetch configuration. Global table data gets fetched
-	// and doesn't produce PK conflict errors instead data is replaced
-	Global bool
 
 	// Serial is used to force a signature change, which forces new table creation and cascading removal of old table and relations
 	Serial string
