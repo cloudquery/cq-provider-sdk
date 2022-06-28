@@ -23,7 +23,6 @@ func TestDiagnostics_Squash(t *testing.T) {
 			},
 			Want: FlatDiags{
 				{
-					Err:      "error test",
 					Resource: "a",
 					Type:     RESOLVING,
 					Severity: ERROR,
@@ -46,7 +45,6 @@ func TestDiagnostics_Squash(t *testing.T) {
 			},
 			Want: FlatDiags{
 				{
-					Err:      "error test",
 					Resource: "a",
 					Type:     RESOLVING,
 					Severity: ERROR,
@@ -58,7 +56,6 @@ func TestDiagnostics_Squash(t *testing.T) {
 					},
 				},
 				{
-					Err:      "error test2",
 					Resource: "a",
 					Type:     RESOLVING,
 					Severity: ERROR,
@@ -79,7 +76,6 @@ func TestDiagnostics_Squash(t *testing.T) {
 			},
 			Want: FlatDiags{
 				{
-					Err:      "error test",
 					Resource: "a",
 					Type:     RESOLVING,
 					Severity: ERROR,
@@ -91,7 +87,6 @@ func TestDiagnostics_Squash(t *testing.T) {
 					},
 				},
 				{
-					Err:      "error test",
 					Resource: "b",
 					Type:     RESOLVING,
 					Severity: ERROR,
@@ -112,7 +107,6 @@ func TestDiagnostics_Squash(t *testing.T) {
 			},
 			Want: FlatDiags{
 				{
-					Err:      "error test",
 					Resource: "a",
 					Type:     RESOLVING,
 					Severity: WARNING,
@@ -124,7 +118,6 @@ func TestDiagnostics_Squash(t *testing.T) {
 					},
 				},
 				{
-					Err:      "error test",
 					Resource: "a",
 					Type:     RESOLVING,
 					Severity: ERROR,
@@ -162,7 +155,6 @@ func TestDiagnostics_SquashRedactable(t *testing.T) {
 
 	assert.Equal(t, FlatDiags{
 		{
-			Err:      "error test: 123",
 			Resource: "a",
 			Type:     RESOLVING,
 			Severity: ERROR,
@@ -190,7 +182,6 @@ func TestDiagnostics_SquashRedactable(t *testing.T) {
 
 	assert.Equal(t, FlatDiags{
 		{
-			Err:      "error test: xxx",
 			Resource: "a",
 			Type:     RESOLVING,
 			Severity: ERROR,
@@ -277,7 +268,7 @@ func TestDiagnostics_BySeverity(t *testing.T) {
 			assert.Equal(t, len(tc.expectedErrs), len(res))
 			resErrs := make([]string, len(res))
 			for i := range res {
-				resErrs[i] = res[i].Error()
+				resErrs[i] = res[i].Description().Summary
 			}
 			assert.Equal(t, tc.expectedErrs, resErrs)
 		})

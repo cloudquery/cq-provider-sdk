@@ -10,6 +10,7 @@ import (
 	reflect "reflect"
 	time "time"
 
+	diag "github.com/cloudquery/cq-provider-sdk/provider/diag"
 	execution "github.com/cloudquery/cq-provider-sdk/provider/execution"
 	schema "github.com/cloudquery/cq-provider-sdk/provider/schema"
 	gomock "github.com/golang/mock/gomock"
@@ -128,10 +129,10 @@ func (mr *MockStorageMockRecorder) Exec(arg0, arg1 interface{}, arg2 ...interfac
 }
 
 // Insert mocks base method.
-func (m *MockStorage) Insert(arg0 context.Context, arg1 *schema.Table, arg2 schema.Resources, arg3 bool) error {
+func (m *MockStorage) Insert(arg0 context.Context, arg1 *schema.Table, arg2 schema.Resources, arg3 bool) diag.Diagnostics {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Insert", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
+	ret0, _ := ret[0].(diag.Diagnostics)
 	return ret0
 }
 

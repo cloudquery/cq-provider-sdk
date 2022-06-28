@@ -54,14 +54,13 @@ func WrapError(err error) error {
 
 // NewBaseError creates a BaseError from given error, except the given error is a BaseError itself
 func NewBaseError(err error, dt Type, opts ...BaseErrorOption) *BaseError {
-	be, ok := err.(*BaseError)
-	if !ok {
-		be = &BaseError{
-			err:            err,
-			diagnosticType: dt,
-			severity:       ERROR,
-		}
+
+	be := &BaseError{
+		err:            err,
+		diagnosticType: dt,
+		severity:       ERROR,
 	}
+
 	for _, o := range opts {
 		o(be)
 	}
@@ -75,12 +74,19 @@ func (e BaseError) Severity() Severity {
 }
 
 func (e BaseError) Description() Description {
-	summary := e.summary
+	summary := ""
+
 	if e.summary == "" {
-		summary = e.Error()
-	} else if e.err != nil {
-		if es := e.err.Error(); es != summary {
-			summary += ": " + es
+		if e.err == nil {
+			summary = "no summary"
+		} else {
+			summary = e.err.Error()
+		}
+	} else {
+		if e.err == nil {
+			summary = e.summary
+		} else {
+			summary = e.summary + ": " + e.err.Error()
 		}
 	}
 
@@ -94,17 +100,6 @@ func (e BaseError) Description() Description {
 
 func (e BaseError) Type() Type {
 	return e.diagnosticType
-}
-
-func (e BaseError) Error() string {
-	// return original error
-	if e.err != nil {
-		return e.err.Error()
-	}
-	if e.summary == "" {
-		return "No summary"
-	}
-	return e.summary
 }
 
 func (e BaseError) Unwrap() error {
@@ -192,12 +187,5 @@ func FromError(err error, dt Type, opts ...BaseErrorOption) Diagnostics {
 		return nil
 	}
 
-	switch d := err.(type) {
-	case Diagnostics:
-		return d
-	case Diagnostic:
-		return Diagnostics{d}
-	default:
-		return Diagnostics{NewBaseError(err, dt, opts...)}
-	}
+	return Diagnostics{NewBaseError(err, dt, opts...)}
 }

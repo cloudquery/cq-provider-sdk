@@ -46,7 +46,7 @@ func NewPgDatabase(ctx context.Context, logger hclog.Logger, dsn string, sd sche
 }
 
 // Insert inserts all resources to given table, table and resources are assumed from same table.
-func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schema.Resources, shouldCascade bool) error {
+func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schema.Resources, shouldCascade bool) diag.Diagnostics {
 	if len(resources) == 0 {
 		return nil
 	}
@@ -57,18 +57,18 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 	sqlStmt := psql.Insert(t.Name).Columns(cols...)
 	for _, res := range resources {
 		if res.TableName() != t.Name {
-			return fmt.Errorf("resource table expected %s got %s", t.Name, res.TableName())
+			return diag.FromError(fmt.Errorf("resource table expected %s got %s", t.Name, res.TableName()), diag.INTERNAL)
 		}
 		values, err := res.Values()
 		if err != nil {
-			return fmt.Errorf("table %s insert failed %w", t.Name, err)
+			return diag.FromError(fmt.Errorf("table %s insert failed %w", t.Name, err), diag.INTERNAL)
 		}
 		sqlStmt = sqlStmt.Values(values...)
 	}
 
 	s, args, err := sqlStmt.ToSql()
 	if err != nil {
-		return diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name), diag.WithSummary("bad insert SQL statement created"), diag.WithDetails("SQL statement %q is invalid", s))
+		return diag.Diagnostics{diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name), diag.WithSummary("bad insert SQL statement created"), diag.WithDetails("SQL statement %q is invalid", s))}
 	}
 
 	err = p.pool.BeginTxFunc(ctx, pgx.TxOptions{
@@ -97,9 +97,9 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 		if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
 			p.log.Debug("insert integrity violation error", "constraint", pgErr.ConstraintName, "errMsg", pgErr.Message)
 		}
-		return diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name), diag.WithSummary("failed to insert to table %q", t.Name), diag.WithDetails("%s", pgErr.Message))
+		return diag.Diagnostics{diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name), diag.WithSummary("failed to insert to table %q", t.Name), diag.WithDetails("%s", pgErr.Message))}
 	}
-	return diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name))
+	return diag.Diagnostics{diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name))}
 }
 
 // CopyFrom copies all resources from []*Resource

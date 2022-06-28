@@ -172,7 +172,7 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 		return nil, err
 	}
 	return &internal.ConfigureProvider_Response{
-		Error:       resp.Diagnostics.Error(), // For backwards compatibility
+		Error:       resp.Diagnostics.DeprecatedToError(), // For backwards compatibility
 		Diagnostics: diagnosticsToProto(resp.Diagnostics),
 	}, nil
 }

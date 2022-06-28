@@ -17,9 +17,6 @@ import (
 //
 type TableResolver func(ctx context.Context, meta ClientMeta, parent *Resource, res chan<- interface{}) error
 
-// IgnoreErrorFunc checks if returned error from table resolver should be ignored.
-type IgnoreErrorFunc func(err error) bool
-
 type RowResolver func(ctx context.Context, meta ClientMeta, resource *Resource) error
 
 type Table struct {
@@ -33,8 +30,6 @@ type Table struct {
 	Relations []*Table
 	// Resolver is the main entry point to fetching table data and
 	Resolver TableResolver
-	// Ignore errors checks if returned error from table resolver should be ignored.
-	IgnoreError IgnoreErrorFunc
 	// Multiplex returns re-purposed meta clients. The sdk will execute the table with each of them
 	Multiplex func(meta ClientMeta) []ClientMeta
 	// DeleteFilter returns a list of key/value pairs to add when truncating this table's data from the database.

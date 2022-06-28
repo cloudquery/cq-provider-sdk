@@ -15,7 +15,10 @@ type Diagnostics []Diagnostic
 
 var _ sort.Interface = (*Diagnostics)(nil)
 
-func (diags Diagnostics) Error() string {
+// Deprecated! Only here for backward compatibility (specifically in the gRPC protocol). Do not use unless
+//  you are 100% sure you need this.
+// Converts a list of diagnostics into an error.
+func (diags Diagnostics) DeprecatedToError() string {
 	switch {
 	case len(diags) == 0:
 		// should never happen, since we don't create this wrapper if
@@ -114,7 +117,7 @@ func (diags Diagnostics) Squash() Diagnostics {
 			}
 		}
 
-		key := fmt.Sprintf("%s_%s_%s_%d_%d", reflect.ValueOf(keygen).Type().String(), keygen.Error(), keygen.Description().Resource, keygen.Severity(), keygen.Type())
+		key := fmt.Sprintf("%s_%s_%s_%d_%d", reflect.ValueOf(keygen).Type().String(), keygen.Description().Summary, keygen.Description().Resource, keygen.Severity(), keygen.Type())
 		if sd, ok := dd[key]; ok {
 			sd.count += CountDiag(d)
 			continue

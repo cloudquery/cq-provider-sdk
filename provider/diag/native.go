@@ -21,7 +21,3 @@ func (n nativeError) Description() Description {
 func (n nativeError) Err() error {
 	return n.err
 }
-
-func (n nativeError) Error() string {
-	return n.err.Error()
-}

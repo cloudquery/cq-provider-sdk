@@ -2,9 +2,8 @@ package diag
 
 import "sort"
 
-// FlatDiag is a structured diagnostic, usually can be used to create a json of diagnostics or testing.
+// FlatDiag is a structured diagnostic, used only for tests.
 type FlatDiag struct {
-	Err         string
 	Resource    string
 	ResourceID  []string
 	Type        Type
@@ -17,13 +16,13 @@ type FlatDiags []FlatDiag
 
 var _ sort.Interface = (*FlatDiags)(nil)
 
-// FlattenDiags converts Diagnostics to an array of FlatDiag
+// FlattenDiags converts Diagnostics to an array of FlatDiag.
+// Used only in tests.
 func FlattenDiags(dd Diagnostics, skipDescription bool) FlatDiags {
 	df := make(FlatDiags, len(dd))
 	for i, d := range dd {
 		description := d.Description()
 		df[i] = FlatDiag{
-			Err:      d.Error(),
 			Resource: description.Resource,
 			Type:     d.Type(),
 			Severity: d.Severity(),

@@ -6,7 +6,6 @@ type Severity int
 // nolint:revive
 type Type int
 type Diagnostic interface {
-	error
 	Severity() Severity
 	Type() Type
 	Description() Description

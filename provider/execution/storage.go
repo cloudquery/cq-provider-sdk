@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/georgysavva/scany/pgxscan"
 )
@@ -14,7 +15,7 @@ type Storage interface {
 	QueryExecer
 	Copier
 	TXer
-	Insert(ctx context.Context, t *schema.Table, instance schema.Resources, shouldCascade bool) error
+	Insert(ctx context.Context, t *schema.Table, instance schema.Resources, shouldCascade bool) diag.Diagnostics
 	Delete(ctx context.Context, t *schema.Table, kvFilters []interface{}) error
 	RemoveStaleData(ctx context.Context, t *schema.Table, executionStart time.Time, kvFilters []interface{}) error
 	CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool) error

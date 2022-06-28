@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/jackc/pgx/v4"
 )
@@ -31,7 +32,7 @@ func (noopStorage) Exec(ctx context.Context, query string, args ...interface{}) 
 	return nil
 }
 
-func (noopStorage) Insert(ctx context.Context, t *schema.Table, instance schema.Resources, shouldCascade bool) error {
+func (noopStorage) Insert(ctx context.Context, t *schema.Table, instance schema.Resources, shouldCascade bool) diag.Diagnostics {
 	return nil
 }
 

@@ -53,6 +53,8 @@ type Provider struct {
 	// ErrorClassifier allows the provider to classify errors it produces during table execution, and return them as diagnostics to the user.
 	// Classifier function may return empty slice if it cannot meaningfully convert the error into diagnostics. In this case
 	// the error will be converted by the SDK into diagnostic at ERROR level and RESOLVING type.
+	// The diagnostics returned should have as much context as possible, so, the classifier also recieves 'resourceName', 'summary', and 'primaryKeys',
+	// which it should populate the diagnostics it creates with.
 	ErrorClassifier execution.ErrorClassifier
 	// ModuleInfoReader is called when the user executes a module, to get provider supported metadata about the given module
 	ModuleInfoReader module.InfoReader

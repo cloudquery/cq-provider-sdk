@@ -2,8 +2,8 @@ package execution
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,9 +25,10 @@ type ExecutionTestCase struct {
 	Table *schema.Table
 
 	SetupStorage          func(t *testing.T) Storage
+	ErrorClassifier       ErrorClassifier
 	ExpectedResourceCount uint64
 	ErrorExpected         bool
-	ExpectedDiags         []diag.FlatDiag
+	ExpectedDiags         diag.FlatDiags
 }
 
 type executionClient struct {
@@ -90,15 +91,10 @@ var (
 		return resource.Set("name", "data")
 	}
 	postResourceResolverError = func(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) error {
-		return diag.Diagnostics{
-			diag.NewBaseError(nil, diag.RESOLVING, diag.WithResourceName(resource.TableName()), diag.WithSummary("some error")),
-			diag.NewBaseError(nil, diag.RESOLVING, diag.WithResourceName(resource.TableName()), diag.WithSummary("some error 2")),
-		}
+		return fmt.Errorf(exampleErrorStr)
 	}
 	postResourceResolverWarning = func(ctx context.Context, meta schema.ClientMeta, resource *schema.Resource) error {
-		return diag.Diagnostics{
-			diag.NewBaseError(nil, diag.RESOLVING, diag.WithResourceName(resource.TableName()), diag.WithSummary("some warning"), diag.WithSeverity(diag.WARNING)),
-		}
+		return fmt.Errorf(exampleWarningStr)
 	}
 
 	timeoutResolver = func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
@@ -109,6 +105,25 @@ var (
 			panic("timeoutResolver timed out unexpectedly")
 		}
 	}
+
+	exampleWarningStr = "exampleWarning"
+	exampleErrorStr   = "exampleError"
+
+	// Classifies 'errors containint EXAMPLEWARNING' as a warning. Otherwise, returns nil
+	testClassifier = func(meta schema.ClientMeta, resourceName string, err error, summary string, resourcePrimaryKeys []string) diag.Diagnostics {
+		if strings.Contains(err.Error(), exampleWarningStr) {
+			return diag.FromError(
+				err,
+				diag.RESOLVING,
+				diag.WithSeverity(diag.WARNING),
+				diag.WithSummary(summary),
+				diag.WithResourceName(resourceName),
+				diag.WithResourceId(resourcePrimaryKeys))
+		}
+
+		return diag.FromError(err, diag.RESOLVING, diag.WithSummary(summary), diag.WithResourceName(resourceName), diag.WithResourceId(resourcePrimaryKeys))
+	}
+
 	testZeroTable = &schema.Table{
 		Name: "test_zero_table",
 		Columns: []schema.Column{
@@ -203,9 +218,8 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns: commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      `table "no-resolver" missing resolver, make sure table implements the resolver`,
 					Resource: "missing_table_resolver",
 					Severity: diag.ERROR,
 					Summary:  `table "no-resolver" missing resolver, make sure table implements the resolver`,
@@ -229,9 +243,8 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			},
 			ExpectedResourceCount: 1,
 			ErrorExpected:         true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      `table "relation-no-resolver" missing resolver, make sure table implements the resolver`,
 					Resource: "missing_table_relation_resolver",
 					Severity: diag.ERROR,
 					Summary:  `table "relation-no-resolver" missing resolver, make sure table implements the resolver`,
@@ -247,9 +260,8 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      "table resolver panic: resolver panic",
 					Resource: "panic_resolver",
 					Severity: diag.PANIC,
 					Summary:  `panic on resource table "panic_resolver" fetch: table resolver panic: resolver panic`,
@@ -273,9 +285,8 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			},
 			ExpectedResourceCount: 1,
 			ErrorExpected:         true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      "table resolver panic: resolver panic",
 					Resource: "panic_relation_resolver",
 					Severity: diag.PANIC,
 					Summary:  `panic on resource table "relation_panic_resolver" fetch: table resolver panic: resolver panic`,
@@ -291,54 +302,11 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      "some error",
 					Resource: "error_returning",
 					Severity: diag.ERROR,
 					Summary:  `failed to resolve table "simple": some error`,
-					Type:     diag.RESOLVING,
-				},
-			},
-		},
-		{
-			Name: "error_returning_ignore_fail",
-			Table: &schema.Table{
-				IgnoreError: func(err error) bool {
-					return false
-				},
-				Name:     "simple",
-				Resolver: returnErrorResolver,
-				Columns:  commonColumns,
-			},
-			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
-				{
-					Err:      "some error",
-					Resource: "error_returning_ignore_fail",
-					Severity: diag.ERROR,
-					Summary:  `failed to resolve table "simple": some error`,
-					Type:     diag.RESOLVING,
-				},
-			},
-		},
-		{
-			Name: "error_returning_ignore",
-			Table: &schema.Table{
-				IgnoreError: func(err error) bool {
-					return true
-				},
-				Name:     "simple",
-				Resolver: returnErrorResolver,
-				Columns:  commonColumns,
-			},
-			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
-				{
-					Err:      "some error",
-					Resource: "error_returning_ignore",
-					Severity: diag.IGNORE,
-					Summary:  `table "simple" resolver ignored error: some error`,
 					Type:     diag.RESOLVING,
 				},
 			},
@@ -348,7 +316,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 			SetupStorage: func(t *testing.T) Storage {
 				db := new(DatabaseMock)
 				db.On("RemoveStaleData", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(fromError(errors.New("failed delete"), diag.WithResourceName("cleanup_stale_data_fail"), diag.WithType(diag.DATABASE)))
+					Return(fmt.Errorf("cleanup stale data failed"))
 				db.On("Dialect").Return(noopDialect{})
 				return db
 			},
@@ -361,13 +329,11 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      "failed delete",
-					Resource: "cleanup_stale_data_fail",
 					Severity: diag.ERROR,
 					Type:     diag.DATABASE,
-					Summary:  `failed to cleanup stale data on table "cleanup_delete": failed delete`,
+					Summary:  `failed to cleanup stale data on table "cleanup_delete": cleanup stale data failed`,
 				},
 			},
 		},
@@ -404,20 +370,12 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				PostResourceResolver: postResourceResolverError,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      "some error",
-					Resource: "simple",
+					Resource: "post_resource_resolver_fail",
 					Severity: diag.ERROR,
 					Type:     diag.RESOLVING,
-					Summary:  "some error",
-				},
-				{
-					Err:      "some error 2",
-					Resource: "simple",
-					Severity: diag.ERROR,
-					Type:     diag.RESOLVING,
-					Summary:  "some error 2",
+					Summary:  "post resource resolver failed for \"simple\": " + exampleErrorStr,
 				},
 			},
 		},
@@ -444,15 +402,15 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:              commonColumns,
 				PostResourceResolver: postResourceResolverWarning,
 			},
+			ErrorClassifier:       testClassifier,
 			ExpectedResourceCount: 1,
 			ErrorExpected:         true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      "some warning",
-					Resource: "post_resource_resolver_warning_table",
+					Resource: "post_resource_resolver_warning",
 					Severity: diag.WARNING,
 					Type:     diag.RESOLVING,
-					Summary:  "some warning",
+					Summary:  "post resource resolver failed for \"post_resource_resolver_warning_table\": " + exampleWarningStr,
 				},
 			},
 		},
@@ -478,9 +436,8 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				},
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      "failed column",
 					Resource: "failing_column",
 					Severity: diag.ERROR,
 					Type:     diag.RESOLVING,
@@ -505,12 +462,11 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      `error at github.com/cloudquery/cq-provider-sdk/provider/execution.glob..func4[execution_test.go:74] some error`,
 					Resource: "return_wrap_error",
 					Severity: diag.ERROR,
-					Summary:  `failed to resolve table "simple": error at github.com/cloudquery/cq-provider-sdk/provider/execution.glob..func4[execution_test.go:74] some error`,
+					Summary:  `failed to resolve table "simple": error at github.com/cloudquery/cq-provider-sdk/provider/execution.glob..func4[execution_test.go:75] some error`,
 					Type:     diag.RESOLVING,
 				},
 			},
@@ -523,9 +479,8 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				Columns:  commonColumns,
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      "context deadline exceeded",
 					Resource: "timeout_resolver",
 					Severity: diag.ERROR,
 					Summary:  `failed to resolve table "timeout_resolver": context deadline exceeded`,
@@ -554,40 +509,12 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				},
 			},
 			ErrorExpected: true,
-			ExpectedDiags: []diag.FlatDiag{
+			ExpectedDiags: diag.FlatDiags{
 				{
-					Err:      "column resolve panic: oops",
 					Resource: "panic_column",
 					Severity: diag.PANIC,
 					Type:     diag.RESOLVING,
 					Summary:  `resolve column "tags" in table "panic_column_table" recovered from panic: column resolve panic: oops`,
-				},
-			},
-		},
-		{
-			Name: "ignore_error_recursive",
-			Table: &schema.Table{
-				Name:        "simple",
-				Resolver:    returnValueResolver,
-				IgnoreError: func(err error) bool { return true },
-				Columns:     commonColumns,
-				Relations: []*schema.Table{
-					{
-						Name:     "simple",
-						Resolver: returnErrorResolver,
-						Columns:  commonColumns,
-					},
-				},
-			},
-			ErrorExpected:         true,
-			ExpectedResourceCount: 1,
-			ExpectedDiags: []diag.FlatDiag{
-				{
-					Err:      "some error",
-					Resource: "ignore_error_recursive",
-					Severity: diag.IGNORE,
-					Summary:  `table "simple" resolver ignored error: some error`,
-					Type:     diag.RESOLVING,
 				},
 			},
 		},
@@ -601,7 +528,7 @@ func TestTableExecutor_Resolve(t *testing.T) {
 				storage = tc.SetupStorage(t)
 			}
 			limiter := semaphore.NewWeighted(int64(limit.GetMaxGoRoutines()))
-			exec := NewTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, nil, nil, limiter, 10*time.Second)
+			exec := NewTableExecutor(tc.Name, storage, testlog.New(t), tc.Table, nil, tc.ErrorClassifier, limiter, 10*time.Second)
 			count, diags := exec.Resolve(context.Background(), executionClient)
 			assert.Equal(t, tc.ExpectedResourceCount, count)
 			if tc.ErrorExpected {
