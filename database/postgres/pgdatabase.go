@@ -48,7 +48,7 @@ func NewPgDatabase(ctx context.Context, logger hclog.Logger, dsn string, sd sche
 }
 
 // Insert inserts all resources to given table, table and resources are assumed from same table.
-func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schema.Resources, shouldCascade bool, cascadeDeleteFilters map[string]interface{}) error {
+func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schema.Resources, shouldCascade bool) error {
 	if len(resources) == 0 {
 		return nil
 	}
@@ -79,7 +79,7 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 		DeferrableMode: pgx.Deferrable,
 	}, func(tx pgx.Tx) error {
 		if shouldCascade {
-			if err := deleteResourceByCQId(ctx, tx, resources, cascadeDeleteFilters); err != nil {
+			if err := deleteResourceByCQId(ctx, tx, resources); err != nil {
 				return err
 			}
 		}
@@ -105,7 +105,7 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 }
 
 // CopyFrom copies all resources from []*Resource
-func (p PgDatabase) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool, cascadeDeleteFilters map[string]interface{}) error {
+func (p PgDatabase) CopyFrom(ctx context.Context, resources schema.Resources, shouldCascade bool) error {
 	if len(resources) == 0 {
 		return nil
 	}
@@ -115,7 +115,7 @@ func (p PgDatabase) CopyFrom(ctx context.Context, resources schema.Resources, sh
 		DeferrableMode: pgx.Deferrable,
 	}, func(tx pgx.Tx) error {
 		if shouldCascade {
-			if err := deleteResourceByCQId(ctx, tx, resources, cascadeDeleteFilters); err != nil {
+			if err := deleteResourceByCQId(ctx, tx, resources); err != nil {
 				return err
 			}
 		}
@@ -245,11 +245,8 @@ func quoteColumns(columns []string) []string {
 	return ret
 }
 
-func deleteResourceByCQId(ctx context.Context, tx pgx.Tx, resources schema.Resources, cascadeDeleteFilters map[string]interface{}) error {
+func deleteResourceByCQId(ctx context.Context, tx pgx.Tx, resources schema.Resources) error {
 	q := goqu.Dialect("postgres").Delete(resources.TableName()).Where(goqu.Ex{"cq_id": resources.GetIds()})
-	for k, v := range cascadeDeleteFilters {
-		q = q.Where(goqu.Ex{k: goqu.Op{"eq": v}})
-	}
 	sql, args, err := q.Prepared(true).ToSQL()
 	if err != nil {
 		return err

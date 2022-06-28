@@ -327,14 +327,14 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	if l := len(resources); l > 0 {
 		e.Logger.Debug("storing resources", "count", l)
 	}
-	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
+	err := e.Db.CopyFrom(ctx, resources, shouldCascade)
 	if err == nil {
 		return resources, nil
 	}
 	e.Logger.Warn("failed copy-from to db", "error", err)
 
 	// fallback insert, copy from sometimes does problems, so we fall back with bulk insert
-	err = e.Db.Insert(ctx, e.Table, resources, shouldCascade, e.extraFields)
+	err = e.Db.Insert(ctx, e.Table, resources, shouldCascade)
 	if err == nil {
 		return resources, nil
 	}
@@ -344,7 +344,7 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
 	partialFetchResources := make(schema.Resources, 0)
 	for id := range resources {
-		if err := e.Db.Insert(ctx, e.Table, schema.Resources{resources[id]}, shouldCascade, e.extraFields); err != nil {
+		if err := e.Db.Insert(ctx, e.Table, schema.Resources{resources[id]}, shouldCascade); err != nil {
 			e.Logger.Error("failed to insert resource into db", "error", err, "resource_keys", resources[id].PrimaryKeyValues())
 			diags = diags.Add(ClassifyError(err, diag.WithType(diag.DATABASE)))
 			continue
