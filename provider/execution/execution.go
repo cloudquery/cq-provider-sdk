@@ -337,10 +337,14 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 		partialFetchResources = append(partialFetchResources, resources[id])
 	}
 	if failed != nil {
+		msg := "all resources"
+		if failedCount < len(resources) {
+			msg = "some resources"
+		}
 		diags = diags.Add(diag.TelemetryFromError(
 			failed,
 			diag.InsertFailed,
-			diag.WithSummary("failed to insert %d resources out of %d into table %q", failedCount, len(resources), e.Table.Name),
+			diag.WithSummary("%s failed to insert into table %q", msg, e.Table.Name),
 		))
 	}
 	return partialFetchResources, diags
