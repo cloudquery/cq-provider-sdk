@@ -1,10 +1,6 @@
 package diag
 
-func TelemetryFromError(err error, eventType string) Diagnostic {
-	return NewBaseError(
-		err,
-		TELEMETRY,
-		WithSeverity(IGNORE),
-		WithDetails(eventType),
-	)
+func TelemetryFromError(err error, eventType string, opts ...BaseErrorOption) Diagnostic {
+	opts = append([]BaseErrorOption{WithSeverity(IGNORE), WithDetails(eventType)}, opts...)
+	return NewBaseError(err, TELEMETRY, opts...)
 }

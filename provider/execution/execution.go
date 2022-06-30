@@ -324,9 +324,11 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
 	partialFetchResources := make(schema.Resources, 0)
 	var failed error
+	failedCount := 0
 	for id := range resources {
 		if err := e.Db.Insert(ctx, e.Table, schema.Resources{resources[id]}, shouldCascade); err != nil {
 			failed = err
+			failedCount++
 			e.Logger.Error("failed to insert resource into db", "error", err, "resource_keys", resources[id].PrimaryKeyValues())
 			diags = diags.Add(ClassifyError(err, diag.WithType(diag.DATABASE)))
 			continue
@@ -335,7 +337,11 @@ func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resou
 		partialFetchResources = append(partialFetchResources, resources[id])
 	}
 	if failed != nil {
-		diags = diags.Add(diag.TelemetryFromError(failed, diag.InsertFailed))
+		diags = diags.Add(diag.TelemetryFromError(
+			failed,
+			diag.InsertFailed,
+			diag.WithSummary("failed to insert %d resources out of %d into table %q", failedCount, len(resources), e.Table.Name),
+		))
 	}
 	return partialFetchResources, diags
 }
