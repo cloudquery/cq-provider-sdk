@@ -88,7 +88,7 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 	}
 
 	for resourceName, table := range resource.Provider.ResourceMap {
-		t.Run(table.Name, func(t *testing.T) {
+		t.Run(resourceName, func(t *testing.T) {
 			testErr := testResource(t, resource, resourceName, table, conn)
 			if testErr != nil {
 				t.Errorf("Error testing %v: %v", table.Name, testErr)
