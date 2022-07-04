@@ -10,11 +10,6 @@ import (
 	"testing"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/cloudquery/faker/v3"
-	"github.com/georgysavva/scany/pgxscan"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration"
@@ -23,6 +18,10 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/testlog"
+	"github.com/cloudquery/faker/v3"
+	"github.com/georgysavva/scany/pgxscan"
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
 )
 
 type ResourceTestCase struct {
@@ -121,7 +120,7 @@ func testResource(t *testing.T, resource ResourceTestCase, name string, table *s
 		// fallback to default verification
 		verifyNoEmptyColumns(t, table, conn, resource.SkipIgnoreInTest)
 	}
-	
+
 	return nil
 }
 
