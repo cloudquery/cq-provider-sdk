@@ -1,7 +1,9 @@
 package provider
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -21,6 +23,7 @@ import (
 	"github.com/creasty/defaults"
 	"github.com/hashicorp/go-hclog"
 	"github.com/thoas/go-funk"
+	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"gopkg.in/yaml.v3"
@@ -44,6 +47,8 @@ type Provider struct {
 	ResourceMap map[string]*schema.Table
 	// Configuration decoded from configure request
 	Config func() Config
+	// ConfigSchema returns the JSON schema for the config
+	ConfigSchema string
 	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger hclog.Logger
 	// ErrorClassifier allows the provider to classify errors it produces during table execution, and return them as diagnostics to the user.
@@ -120,7 +125,64 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 	}, nil
 }
 
-func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
+func (p *Provider) ValidateProviderConfig(_ context.Context, request *cqproto.ValidateProviderConfigRequest) (*cqproto.ValidateProviderConfigResponse, error) {
+	if len(request.Config) == 0 {
+		return &cqproto.ValidateProviderConfigResponse{}, nil
+	}
+
+	providerConfig := p.Config()
+	if err := defaults.Set(providerConfig); err != nil {
+		return &cqproto.ValidateProviderConfigResponse{
+			Diagnostics: diag.FromError(err, diag.INTERNAL),
+		}, nil
+	}
+
+	d := yaml.NewDecoder(bytes.NewReader(request.Config))
+	d.KnownFields(true)
+	if err := d.Decode(providerConfig); err != nil {
+		p.Logger.Error("Failed to load configuration.", "error", err)
+		return &cqproto.ValidateProviderConfigResponse{
+			Diagnostics: diag.FromError(err, diag.USER),
+		}, nil
+	}
+
+	if p.ConfigSchema == "" {
+		// no schema: Everything is valid. Parse config succeeded, assume success
+		return &cqproto.ValidateProviderConfigResponse{}, nil
+	}
+
+	// Validate using given schema
+	schemaLoader := gojsonschema.NewStringLoader(p.ConfigSchema)
+	documentLoader := gojsonschema.NewGoLoader(providerConfig)
+	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	if err != nil {
+		return &cqproto.ValidateProviderConfigResponse{
+			Diagnostics: diag.FromError(err, diag.USER, diag.WithSummary("Failed to validate config")),
+		}, nil
+	}
+	if !result.Valid() {
+		errs := result.Errors()
+		if len(errs) == 0 {
+			return &cqproto.ValidateProviderConfigResponse{
+				Diagnostics: diag.FromError(errors.New("Failed to validate config with schema"), diag.USER, diag.WithSummary("Invalid configuration")),
+			}, nil
+		}
+		var diags diag.Diagnostics
+		for _, e := range errs {
+			diags = diags.Add(
+				diag.FromError(errors.New(e.String()), diag.USER, diag.WithDetails("%s", e.Description()), diag.WithSummary("Config field %q has error of type %s", e.Field(), e.Type())),
+			)
+		}
+		return &cqproto.ValidateProviderConfigResponse{
+			Diagnostics: diags,
+		}, nil
+	}
+
+	// success
+	return &cqproto.ValidateProviderConfigResponse{}, nil
+}
+
+func (p *Provider) ConfigureProvider(ctx context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
 	if p.Logger == nil {
 		return &cqproto.ConfigureProviderResponse{
 			Diagnostics: diag.FromError(fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name), diag.INTERNAL),
@@ -145,12 +207,29 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 		}
 	}
 
+	var diags diag.Diagnostics
+
+	// validate provider configuration before proceeding
+	validateResponse, err := p.ValidateProviderConfig(ctx, &cqproto.ValidateProviderConfigRequest{Config: request.Config})
+	if err != nil {
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diag.FromError(err, diag.INTERNAL, diag.WithSummary("ValidateProviderConfig failed")),
+		}, nil
+	} else if validateResponse != nil {
+		diags = diags.Add(validateResponse.Diagnostics)
+	}
+	if diags.HasErrors() {
+		return &cqproto.ConfigureProviderResponse{
+			Diagnostics: diags,
+		}, nil
+	}
+
 	p.dbURL = request.Connection.DSN
 
 	providerConfig := p.Config()
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diag.FromError(err, diag.INTERNAL),
+			Diagnostics: diags.Add(diag.FromError(err, diag.INTERNAL)),
 		}, nil
 	}
 
@@ -158,15 +237,18 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	if len(request.Config) == 0 {
 		p.Logger.Info("Received empty configuration, using only defaults")
 	} else {
-		if err := yaml.Unmarshal(request.Config, providerConfig); err != nil {
+		d := yaml.NewDecoder(bytes.NewReader(request.Config))
+		d.KnownFields(true)
+		if err := d.Decode(providerConfig); err != nil {
 			p.Logger.Error("Failed to load configuration.", "error", err)
 			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diag.FromError(err, diag.USER),
+				Diagnostics: diags.Add(diag.FromError(err, diag.USER)),
 			}, nil
 		}
 	}
 
-	client, diags := p.Configure(p.Logger, providerConfig)
+	client, moreDiags := p.Configure(p.Logger, providerConfig)
+	diags = diags.Add(moreDiags)
 	if diags.HasErrors() {
 		return &cqproto.ConfigureProviderResponse{
 			Diagnostics: diags,

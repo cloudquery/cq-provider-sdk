@@ -7,6 +7,8 @@ service Provider {
   rpc GetProviderSchema(GetProviderSchema.Request) returns (GetProviderSchema.Response);
   // Gets a provider's configuration example
   rpc GetProviderConfig(GetProviderConfig.Request) returns (GetProviderConfig.Response);
+  // Validates a config for the provider
+  rpc ValidateProviderConfig(ValidateProviderConfig.Request) returns (ValidateProviderConfig.Response);
   // One-time initialization, called before other functions below
   rpc ConfigureProvider(ConfigureProvider.Request) returns (ConfigureProvider.Response);
   // Fetch Provider Resources
@@ -33,7 +35,6 @@ message ConfigureProvider {
     repeated Diagnostic diagnostics = 2;
   }
 }
-
 
 message FetchResources {
   message Request {
@@ -152,6 +153,15 @@ message GetProviderConfig {
     bytes config = 3;
     // Deprecated. Format of the config, always ConfigYAML
     ConfigFormat format = 4 [deprecated = true];
+  }
+}
+
+message ValidateProviderConfig {
+  message Request {
+    bytes config = 1;
+  }
+  message Response {
+    repeated Diagnostic diagnostics = 1;
   }
 }
 
