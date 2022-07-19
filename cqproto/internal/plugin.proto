@@ -133,6 +133,12 @@ message GetProviderSchema {
   }
 }
 
+// ConfigFormat is deprecated
+enum ConfigFormat {
+  HCL = 0;
+  YAML = 1;
+}
+
 message GetProviderConfig {
   message Request {
     // next available index: 2
@@ -141,7 +147,7 @@ message GetProviderConfig {
     string name = 1;
     string version = 2;
     bytes config = 3;
-    // next available index: 5
+    ConfigFormat format = 4; // deprecated
   }
 }
 

@@ -69,6 +69,7 @@ type GetProviderConfigRequest struct {
 
 type GetProviderConfigResponse struct {
 	Config []byte
+	Format int // Deprecated
 }
 
 type ConfigureProviderRequest struct {

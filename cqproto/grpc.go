@@ -52,6 +52,7 @@ func (g GRPCClient) GetProviderConfig(ctx context.Context, request *GetProviderC
 
 	return &GetProviderConfigResponse{
 		Config: res.GetConfig(),
+		Format: 1, // YAML - Deprecated
 	}, nil
 }
 
