@@ -73,6 +73,15 @@ type GetProviderConfigResponse struct {
 	Format internal.ConfigFormat // Deprecated
 }
 
+type ValidateProviderConfigRequest struct {
+	// Config is the configuration the user supplied for the provider
+	Config []byte
+}
+
+type ValidateProviderConfigResponse struct {
+	Diagnostics diag.Diagnostics
+}
+
 type ConfigureProviderRequest struct {
 	// CloudQueryVersion is the version of CloudQuery executing the request.
 	CloudQueryVersion string
