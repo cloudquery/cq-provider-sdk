@@ -8,7 +8,6 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/doug-martin/goqu/v9"
@@ -68,7 +67,7 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 
 	s, args, err := sqlStmt.ToSql()
 	if err != nil {
-		return diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name), diag.WithSummary("bad insert SQL statement created"), diag.WithDetails("SQL statement %q is invalid", s))
+		return fmt.Errorf("bad insert SQL statement created %w", err)
 	}
 
 	err = p.pool.BeginTxFunc(ctx, pgx.TxOptions{
@@ -85,21 +84,22 @@ func (p PgDatabase) Insert(ctx context.Context, t *schema.Table, resources schem
 		_, err := tx.Exec(ctx, s, args...)
 		return err
 	})
-	if err == nil {
-		return nil
+	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			// This should rarely occur, but if it occurs we want to print the SQL to debug it further
+			if pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
+				p.log.Debug("insert syntax error", "sql", s)
+			}
+			if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+				p.log.Debug("insert integrity violation error", "constraint", pgErr.ConstraintName, "errMsg", pgErr.Message)
+			}
+			return fmt.Errorf("insert failed to table %q %w", t.Name, err)
+		}
+		return fmt.Errorf("begin transaction failed to table %q %w", t.Name, err)
 	}
 
-	if pgErr, ok := err.(*pgconn.PgError); ok {
-		// This should rarely occur, but if it occurs we want to print the SQL to debug it further
-		if pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
-			p.log.Debug("insert syntax error", "sql", s)
-		}
-		if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
-			p.log.Debug("insert integrity violation error", "constraint", pgErr.ConstraintName, "errMsg", pgErr.Message)
-		}
-		return diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name), diag.WithSummary("failed to insert to table %q", t.Name), diag.WithDetails("%s", pgErr.Message))
-	}
-	return diag.NewBaseError(err, diag.DATABASE, diag.WithResourceName(t.Name))
+	return nil
+
 }
 
 // CopyFrom copies all resources from []*Resource

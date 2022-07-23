@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto/internal"
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/hashicorp/go-plugin"
 	"github.com/vmihailenco/msgpack/v5"
@@ -45,16 +44,13 @@ func (g GRPCClient) GetProviderSchema(ctx context.Context, _ *GetProviderSchemaR
 }
 
 func (g GRPCClient) GetProviderConfig(ctx context.Context, request *GetProviderConfigRequest) (*GetProviderConfigResponse, error) {
-	res, err := g.client.GetProviderConfig(ctx, &internal.GetProviderConfig_Request{
-		Format: internal.ConfigFormat_YAML,
-	})
+	res, err := g.client.GetProviderConfig(ctx, &internal.GetProviderConfig_Request{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &GetProviderConfigResponse{
 		Config: res.GetConfig(),
-		Format: internal.ConfigFormat_YAML,
 	}, nil
 }
 
@@ -66,13 +62,12 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 			Dsn:  request.Connection.DSN,
 		},
 		Config: request.Config,
-		Format: internal.ConfigFormat_YAML,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &ConfigureProviderResponse{
-		Diagnostics: diagnosticsFromProto("", res.Diagnostics),
+		Error: res.Error,
 	}, nil
 }
 
@@ -101,35 +96,18 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 		return nil, err
 	}
 	fr := &FetchResourcesResponse{
-		ResourceName:                resp.GetResource(),
-		FinishedResources:           resp.GetFinishedResources(),
-		ResourceCount:               resp.GetResourceCount(),
-		Error:                       resp.GetError(),
-		PartialFetchFailedResources: partialFetchFailedResourcesFromProto(resp.GetPartialFetchFailedResources()),
+		ResourceName:      resp.GetResource(),
+		FinishedResources: resp.GetFinishedResources(),
+		ResourceCount:     resp.GetResourceCount(),
+		Error:             resp.GetError(),
 	}
 	if resp.GetSummary() != nil {
 		fr.Summary = ResourceFetchSummary{
 			Status:        ResourceFetchStatus(resp.Summary.Status),
 			ResourceCount: resp.GetSummary().GetResourceCount(),
-			Diagnostics:   diagnosticsFromProto(resp.GetResource(), resp.GetSummary().Diagnostics),
 		}
 	}
 	return fr, nil
-}
-
-func (g GRPCClient) GetModuleInfo(ctx context.Context, request *GetModuleRequest) (*GetModuleResponse, error) {
-	res, err := g.client.GetModuleInfo(ctx, &internal.GetModuleInfo_Request{
-		Module:            request.Module,
-		PreferredVersions: request.PreferredVersions,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &GetModuleResponse{
-		Data:              moduleInfoFromProto(res.Data),
-		AvailableVersions: res.AvailableVersions,
-		Diagnostics:       diagnosticsFromProto("", res.Diagnostics),
-	}, nil
 }
 
 func (g *GRPCServer) GetProviderSchema(ctx context.Context, _ *internal.GetProviderSchema_Request) (*internal.GetProviderSchema_Response, error) {
@@ -168,8 +146,7 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 		return nil, err
 	}
 	return &internal.ConfigureProvider_Response{
-		Error:       resp.Diagnostics.Error(), // For backwards compatibility
-		Diagnostics: diagnosticsToProto(resp.Diagnostics),
+		Error: resp.Error, // For backwards compatibility
 	}, nil
 }
 
@@ -197,36 +174,15 @@ func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, se
 
 func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 	return g.server.Send(&internal.FetchResources_Response{
-		Resource:                    response.ResourceName,
-		FinishedResources:           response.FinishedResources,
-		ResourceCount:               response.ResourceCount,
-		Error:                       response.Error,
-		PartialFetchFailedResources: partialFetchFailedResourcesToProto(response.PartialFetchFailedResources),
+		Resource:          response.ResourceName,
+		FinishedResources: response.FinishedResources,
+		ResourceCount:     response.ResourceCount,
+		Error:             response.Error,
 		Summary: &internal.ResourceFetchSummary{
 			Status:        internal.ResourceFetchSummary_Status(response.Summary.Status),
 			ResourceCount: response.Summary.ResourceCount,
-			Diagnostics:   diagnosticsToProto(response.Summary.Diagnostics),
 		},
 	})
-}
-
-func (g *GRPCServer) GetModuleInfo(ctx context.Context, request *internal.GetModuleInfo_Request) (*internal.GetModuleInfo_Response, error) {
-	resp, err := g.Impl.GetModuleInfo(ctx, &GetModuleRequest{
-		Module:            request.Module,
-		PreferredVersions: request.PreferredVersions,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if resp == nil {
-		return &internal.GetModuleInfo_Response{}, nil
-	}
-
-	return &internal.GetModuleInfo_Response{
-		Data:              moduleInfoToProto(resp.Data),
-		AvailableVersions: resp.AvailableVersions,
-		Diagnostics:       diagnosticsToProto(resp.Diagnostics),
-	}, nil
 }
 
 func tablesFromProto(in map[string]*internal.Table) map[string]*schema.Table {
@@ -335,131 +291,4 @@ func columnMetaToProto(m *schema.ColumnMeta) *internal.ColumnMeta {
 		Resolver:     r,
 		IgnoreExists: m.IgnoreExists,
 	}
-}
-
-func partialFetchFailedResourcesFromProto(in []*internal.PartialFetchFailedResource) []*FailedResourceFetch {
-	if len(in) == 0 {
-		return nil
-	}
-	failedResources := make([]*FailedResourceFetch, len(in))
-	for i, p := range in {
-		failedResources[i] = &FailedResourceFetch{
-			TableName:            p.TableName,
-			RootTableName:        p.RootTableName,
-			RootPrimaryKeyValues: p.RootPrimaryKeyValues,
-			Error:                p.Error,
-		}
-	}
-	return failedResources
-}
-
-func partialFetchFailedResourcesToProto(in []*FailedResourceFetch) []*internal.PartialFetchFailedResource {
-	if len(in) == 0 {
-		return nil
-	}
-	failedResources := make([]*internal.PartialFetchFailedResource, len(in))
-	for i, p := range in {
-		failedResources[i] = &internal.PartialFetchFailedResource{
-			TableName:            p.TableName,
-			RootTableName:        p.RootTableName,
-			RootPrimaryKeyValues: p.RootPrimaryKeyValues,
-			Error:                p.Error,
-		}
-	}
-	return failedResources
-}
-
-func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
-	if len(in) == 0 {
-		return nil
-	}
-	diagnostics := make([]*internal.Diagnostic, len(in))
-	for i, p := range in {
-		diagnostics[i] = &internal.Diagnostic{
-			Type:       internal.Diagnostic_Type(p.Type()),
-			Severity:   internal.Diagnostic_Severity(p.Severity()),
-			Summary:    p.Description().Summary,
-			Detail:     p.Description().Detail,
-			Resource:   p.Description().Resource,
-			ResourceId: p.Description().ResourceID,
-		}
-		if rd, ok := p.(diag.Redactable); ok {
-			if r := rd.Redacted(); r != nil {
-				diagnostics[i].Redacted = &internal.Diagnostic{
-					Type:       internal.Diagnostic_Type(r.Type()),
-					Severity:   internal.Diagnostic_Severity(r.Severity()),
-					Summary:    r.Description().Summary,
-					Detail:     r.Description().Detail,
-					Resource:   r.Description().Resource,
-					ResourceId: r.Description().ResourceID,
-				}
-			}
-		}
-	}
-	return diagnostics
-}
-
-func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.Diagnostics {
-	if len(in) == 0 {
-		return nil
-	}
-	diagnostics := make(diag.Diagnostics, len(in))
-	for i, p := range in {
-		pdiag := &ProviderDiagnostic{
-			ResourceName:       resourceName,
-			ResourceId:         p.GetResourceId(),
-			DiagnosticType:     diag.Type(p.GetType()),
-			DiagnosticSeverity: diag.Severity(p.GetSeverity()),
-			Summary:            p.GetSummary(),
-			Details:            p.GetDetail(),
-		}
-		if r := p.GetRedacted(); r != nil {
-			diagnostics[i] = diag.NewRedactedDiagnostic(pdiag, &ProviderDiagnostic{
-				ResourceName:       resourceName,
-				ResourceId:         r.GetResourceId(),
-				DiagnosticType:     diag.Type(r.GetType()),
-				DiagnosticSeverity: diag.Severity(r.GetSeverity()),
-				Summary:            r.GetSummary(),
-				Details:            r.GetDetail(),
-			})
-			continue
-		}
-
-		diagnostics[i] = pdiag
-	}
-	return diagnostics
-}
-
-func moduleInfoFromProto(in map[uint32]*internal.GetModuleInfo_Response_ModuleInfo) map[uint32]ModuleInfo {
-	ret := make(map[uint32]ModuleInfo, len(in))
-	for ver := range in {
-		v := ModuleInfo{
-			Extras: in[ver].Extras,
-		}
-		for _, f := range in[ver].Files {
-			v.Files = append(v.Files, &ModuleFile{
-				Name:     f.GetName(),
-				Contents: f.GetContents(),
-			})
-		}
-		ret[ver] = v
-	}
-	return ret
-}
-
-func moduleInfoToProto(in map[uint32]ModuleInfo) map[uint32]*internal.GetModuleInfo_Response_ModuleInfo {
-	ret := make(map[uint32]*internal.GetModuleInfo_Response_ModuleInfo, len(in))
-	for ver, info := range in {
-		v := &internal.GetModuleInfo_Response_ModuleInfo{
-			Extras: in[ver].Extras,
-		}
-		for j := range info.Files {
-			v.Files = append(v.Files, &internal.GetModuleInfo_Response_ModuleInfo_ModuleFile{
-				Name:     in[ver].Files[j].Name,
-				Contents: in[ver].Files[j].Contents,
-			})
-		}
-		ret[ver] = v
-	}
-	return ret
 }
