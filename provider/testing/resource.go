@@ -84,7 +84,7 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 	}); configErr != nil {
 		t.Fatal("failed to configure provider", configErr)
 	} else if resp != nil && resp.Diagnostics.HasErrors() {
-		t.Fatal("errors while configuring provider", configErr)
+		t.Fatal("errors while configuring provider", resp.Diagnostics.Error())
 	}
 
 	for resourceName, table := range resource.Provider.ResourceMap {
