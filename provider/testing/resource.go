@@ -14,7 +14,6 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/migration"
 	"github.com/cloudquery/cq-provider-sdk/provider"
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/cloudquery/cq-provider-sdk/testlog"
@@ -246,11 +245,7 @@ func (f *testResourceSender) Send(r *cqproto.FetchResourcesResponse) error {
 		fmt.Printf(r.Error)
 		f.Errors = append(f.Errors, r.Error)
 	}
-	for _, d := range r.Summary.Diagnostics {
-		if d.Severity() != diag.IGNORE {
-			f.Errors = append(f.Errors, fmt.Sprintf("resource: %s. summary: %s, details %s", d.Description().Resource, d.Description().Summary, d.Description().Detail))
-		}
-	}
+
 	return nil
 }
 

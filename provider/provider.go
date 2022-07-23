@@ -14,7 +14,6 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/helpers/limit"
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/creasty/defaults"
@@ -48,7 +47,7 @@ type Provider struct {
 	// ErrorClassifier allows the provider to classify errors it produces during table execution, and return them as diagnostics to the user.
 	// Classifier function may return empty slice if it cannot meaningfully convert the error into diagnostics. In this case
 	// the error will be converted by the SDK into diagnostic at ERROR level and RESOLVING type.
-	ErrorClassifier execution.ErrorClassifier
+	// ErrorClassifier execution.ErrorClassifier
 	// Database connection string
 	dbURL string
 	// meta is the provider's client created when configure is called
@@ -109,7 +108,7 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 
 	yb, err := yaml.Marshal(data)
 	if err != nil {
-		return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
+		return &cqproto.GetProviderConfigResponse{}, fmt.Errorf("failed to marshal provider config: %w", err)
 	}
 
 	return &cqproto.GetProviderConfigResponse{
@@ -226,7 +225,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		tableExec := execution.NewTableExecutor(resource, conn, p.Logger.With("table", table.Name), table, request.Metadata, p.ErrorClassifier, goroutinesSem, request.Timeout)
+		tableExec := execution.NewTableExecutor(resource, conn, p.Logger.With("table", table.Name), table, request.Metadata, goroutinesSem, request.Timeout)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource
@@ -234,7 +233,10 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		finishedResources[r] = false
 		l.Unlock()
 		g.Go(func() error {
-			resourceCount, diags := tableExec.Resolve(gctx, p.meta)
+			resourceCount, err := tableExec.Resolve(gctx, p.meta)
+			if err != nil {
+				return err
+			}
 			l.Lock()
 			defer l.Unlock()
 			finishedResources[r] = true
@@ -242,8 +244,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 			status := cqproto.ResourceFetchComplete
 			if isCancelled(ctx) {
 				status = cqproto.ResourceFetchCanceled
-			} else if diags.HasErrors() {
-				status = cqproto.ResourceFetchPartial
 			}
 			if err := sender.Send(&cqproto.FetchResourcesResponse{
 				ResourceName:      r,
@@ -252,7 +252,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 				Summary: cqproto.ResourceFetchSummary{
 					Status:        status,
 					ResourceCount: resourceCount,
-					Diagnostics:   diags,
 				},
 			}); err != nil {
 				return err

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/cloudquery/cq-provider-sdk/cqproto/internal"
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/hashicorp/go-plugin"
 	"github.com/vmihailenco/msgpack/v5"
@@ -106,7 +105,6 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 		fr.Summary = ResourceFetchSummary{
 			Status:        ResourceFetchStatus(resp.Summary.Status),
 			ResourceCount: resp.GetSummary().GetResourceCount(),
-			Diagnostics:   diagnosticsFromProto(resp.GetResource(), resp.GetSummary().Diagnostics),
 		}
 	}
 	return fr, nil
@@ -183,7 +181,6 @@ func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 		Summary: &internal.ResourceFetchSummary{
 			Status:        internal.ResourceFetchSummary_Status(response.Summary.Status),
 			ResourceCount: response.Summary.ResourceCount,
-			Diagnostics:   diagnosticsToProto(response.Summary.Diagnostics),
 		},
 	})
 }
@@ -294,65 +291,4 @@ func columnMetaToProto(m *schema.ColumnMeta) *internal.ColumnMeta {
 		Resolver:     r,
 		IgnoreExists: m.IgnoreExists,
 	}
-}
-
-func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
-	if len(in) == 0 {
-		return nil
-	}
-	diagnostics := make([]*internal.Diagnostic, len(in))
-	for i, p := range in {
-		diagnostics[i] = &internal.Diagnostic{
-			Type:       internal.Diagnostic_Type(p.Type()),
-			Severity:   internal.Diagnostic_Severity(p.Severity()),
-			Summary:    p.Description().Summary,
-			Detail:     p.Description().Detail,
-			Resource:   p.Description().Resource,
-			ResourceId: p.Description().ResourceID,
-		}
-		if rd, ok := p.(diag.Redactable); ok {
-			if r := rd.Redacted(); r != nil {
-				diagnostics[i].Redacted = &internal.Diagnostic{
-					Type:       internal.Diagnostic_Type(r.Type()),
-					Severity:   internal.Diagnostic_Severity(r.Severity()),
-					Summary:    r.Description().Summary,
-					Detail:     r.Description().Detail,
-					Resource:   r.Description().Resource,
-					ResourceId: r.Description().ResourceID,
-				}
-			}
-		}
-	}
-	return diagnostics
-}
-
-func diagnosticsFromProto(resourceName string, in []*internal.Diagnostic) diag.Diagnostics {
-	if len(in) == 0 {
-		return nil
-	}
-	diagnostics := make(diag.Diagnostics, len(in))
-	for i, p := range in {
-		pdiag := &ProviderDiagnostic{
-			ResourceName:       resourceName,
-			ResourceId:         p.GetResourceId(),
-			DiagnosticType:     diag.Type(p.GetType()),
-			DiagnosticSeverity: diag.Severity(p.GetSeverity()),
-			Summary:            p.GetSummary(),
-			Details:            p.GetDetail(),
-		}
-		if r := p.GetRedacted(); r != nil {
-			diagnostics[i] = diag.NewRedactedDiagnostic(pdiag, &ProviderDiagnostic{
-				ResourceName:       resourceName,
-				ResourceId:         r.GetResourceId(),
-				DiagnosticType:     diag.Type(r.GetType()),
-				DiagnosticSeverity: diag.Severity(r.GetSeverity()),
-				Summary:            r.GetSummary(),
-				Details:            r.GetDetail(),
-			})
-			continue
-		}
-
-		diagnostics[i] = pdiag
-	}
-	return diagnostics
 }

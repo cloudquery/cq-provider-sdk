@@ -3,11 +3,8 @@ package cqproto
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/cloudquery/cq-provider-sdk/cqproto/internal"
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 )
 
@@ -111,8 +108,6 @@ type FetchResourcesResponse struct {
 	ResourceCount uint64
 	// Error value if any, if returned the stream will be canceled
 	Error string
-	// list of resources where the fetching failed
-	PartialFetchFailedResources []*FailedResourceFetch
 	// fetch summary of resource that finished execution
 	Summary ResourceFetchSummary
 }
@@ -127,20 +122,6 @@ type ResourceFetchSummary struct {
 	Status ResourceFetchStatus
 	// Total Amount of resources collected by this resource
 	ResourceCount uint64
-	// Diagnostics of failed resource fetch, the diagnostic provides insights such as severity, summary and
-	// details on how to solve this issue
-	Diagnostics diag.Diagnostics
-}
-
-type FailedResourceFetch struct {
-	// table name of the failed resource fetch
-	TableName string
-	// root/parent table name
-	RootTableName string
-	// root/parent primary key values
-	RootPrimaryKeyValues []string
-	// error message for this resource fetch failure
-	Error string
 }
 
 type ConnectionDetails struct {
@@ -148,53 +129,11 @@ type ConnectionDetails struct {
 	DSN  string
 }
 
-type ProviderDiagnostic struct {
-	ResourceName       string
-	ResourceId         []string
-	DiagnosticType     diag.Type
-	DiagnosticSeverity diag.Severity
-	Summary            string
-	Details            string
-}
-
 const (
 	// ResourceFetchComplete execution was completed successfully without any errors/diagnostics
 	ResourceFetchComplete ResourceFetchStatus = iota
 	// ResourceFetchFailed execution failed and wasn't able to fetch any resource
 	ResourceFetchFailed
-	// ResourceFetchPartial execution was partial, one or more resources failed to resolve/fetch
-	ResourceFetchPartial
 	// ResourceFetchCanceled execution was canceled preemptively
 	ResourceFetchCanceled
 )
-
-var _ diag.Diagnostic = (*ProviderDiagnostic)(nil)
-
-func (s ResourceFetchStatus) String() string {
-	name, ok := internal.ResourceFetchSummary_Status_name[int32(s)]
-	if !ok {
-		return "UNKNOWN"
-	}
-	return name
-}
-
-func (p ProviderDiagnostic) Severity() diag.Severity {
-	return p.DiagnosticSeverity
-}
-
-func (p ProviderDiagnostic) Type() diag.Type {
-	return p.DiagnosticType
-}
-
-func (p ProviderDiagnostic) Description() diag.Description {
-	return diag.Description{
-		Resource:   p.ResourceName,
-		ResourceID: p.ResourceId,
-		Summary:    p.Summary,
-		Detail:     p.Details,
-	}
-}
-
-func (p ProviderDiagnostic) Error() string {
-	return fmt.Sprintf("%s: %s", p.ResourceName, p.Summary)
-}
