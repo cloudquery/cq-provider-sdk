@@ -75,17 +75,13 @@ type ConfigureProviderRequest struct {
 }
 
 type ConfigureProviderResponse struct {
-	// Diagnostics about the configure action. If includes ERROR severity, operation is aborted.
-	// The error can be either from malformed configuration or failure to setup
-	Diagnostics diag.Diagnostics
+	Error string
 }
 
 // FetchResourcesRequest represents a CloudQuery RPC request of one or more resources
 type FetchResourcesRequest struct {
 	// List of resources to fetch
 	Resources []string
-	// PartialFetchingEnabled if true enables partial fetching
-	PartialFetchingEnabled bool
 	// ParallelFetchingLimit limits parallel resources fetch at a time is more than 0
 	ParallelFetchingLimit uint64
 	// MaxGoroutines specified an approximate maximum number of goroutines that will be spanwd during fetch

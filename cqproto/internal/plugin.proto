@@ -28,7 +28,9 @@ message ConfigureProvider {
   }
   message Response {
     string error = 1;
-    repeated Diagnostic diagnostics = 2;
+    // DEPRECATED. DONT REUSE FIELD NUMBER.
+    //repeated Diagnostic diagnostics = 2 [deprecated = true];
+    reserved 2;
   }
 }
 

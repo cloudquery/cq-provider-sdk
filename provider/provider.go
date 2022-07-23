@@ -38,7 +38,7 @@ type Provider struct {
 	// Version of the provider
 	Version string
 	// Configure the provider and return context
-	Configure func(hclog.Logger, interface{}) (schema.ClientMeta, diag.Diagnostics)
+	Configure func(hclog.Logger, interface{}) (schema.ClientMeta, error)
 	// ResourceMap is all resources supported by this plugin
 	ResourceMap map[string]*schema.Table
 	// Configuration decoded from configure request
@@ -120,14 +120,14 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
 	if p.Logger == nil {
 		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diag.FromError(fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name), diag.INTERNAL),
+			Error: fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name).Error(),
 		}, nil
 	}
 
 	if p.meta != nil {
 		if !IsDebug() {
 			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diag.FromError(fmt.Errorf("provider %s was already configured", p.Name), diag.INTERNAL),
+				Error: fmt.Errorf("provider %s already configured", p.Name).Error(),
 			}, nil
 		}
 
@@ -147,7 +147,7 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	providerConfig := p.Config()
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diag.FromError(err, diag.INTERNAL),
+			Error: err.Error(),
 		}, nil
 	}
 
@@ -158,15 +158,15 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 		if err := yaml.Unmarshal(request.Config, providerConfig); err != nil {
 			p.Logger.Error("Failed to load configuration.", "error", err)
 			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diag.FromError(err, diag.USER),
+				Error: err.Error(),
 			}, nil
 		}
 	}
 
-	client, diags := p.Configure(p.Logger, providerConfig)
-	if diags.HasErrors() {
+	client, err := p.Configure(p.Logger, providerConfig)
+	if err != nil {
 		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diags,
+			Error: err.Error(),
 		}, nil
 	}
 
@@ -174,15 +174,13 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	for r, t := range p.ResourceMap {
 		if err := getTableDuplicates(r, t, tables); err != nil {
 			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diags.Add(diag.FromError(err, diag.INTERNAL)),
+				Error: err.Error(),
 			}, nil
 		}
 	}
 
 	p.meta = client
-	return &cqproto.ConfigureProviderResponse{
-		Diagnostics: diags,
-	}, nil
+	return &cqproto.ConfigureProviderResponse{}, nil
 }
 
 func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchResourcesRequest, sender cqproto.FetchResourcesSender) error {

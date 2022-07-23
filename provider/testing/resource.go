@@ -83,7 +83,7 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 		Config: []byte(resource.Config),
 	}); configErr != nil {
 		t.Fatal("failed to configure provider", configErr)
-	} else if resp != nil && resp.Diagnostics.HasErrors() {
+	} else if resp != nil && resp.Error != "" {
 		t.Fatal("errors while configuring provider", configErr)
 	}
 

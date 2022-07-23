@@ -68,7 +68,7 @@ func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigurePro
 		return nil, err
 	}
 	return &ConfigureProviderResponse{
-		Diagnostics: diagnosticsFromProto("", res.Diagnostics),
+		Error: res.Error,
 	}, nil
 }
 
@@ -148,8 +148,7 @@ func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.Co
 		return nil, err
 	}
 	return &internal.ConfigureProvider_Response{
-		Error:       resp.Diagnostics.Error(), // For backwards compatibility
-		Diagnostics: diagnosticsToProto(resp.Diagnostics),
+		Error: resp.Error, // For backwards compatibility
 	}, nil
 }
 
