@@ -97,11 +97,10 @@ func (g GRPCFetchResponseStream) Recv() (*FetchResourcesResponse, error) {
 		return nil, err
 	}
 	fr := &FetchResourcesResponse{
-		ResourceName:                resp.GetResource(),
-		FinishedResources:           resp.GetFinishedResources(),
-		ResourceCount:               resp.GetResourceCount(),
-		Error:                       resp.GetError(),
-		PartialFetchFailedResources: partialFetchFailedResourcesFromProto(resp.GetPartialFetchFailedResources()),
+		ResourceName:      resp.GetResource(),
+		FinishedResources: resp.GetFinishedResources(),
+		ResourceCount:     resp.GetResourceCount(),
+		Error:             resp.GetError(),
 	}
 	if resp.GetSummary() != nil {
 		fr.Summary = ResourceFetchSummary{
@@ -178,11 +177,10 @@ func (g *GRPCServer) FetchResources(request *internal.FetchResources_Request, se
 
 func (g GRPCFetchResourcesServer) Send(response *FetchResourcesResponse) error {
 	return g.server.Send(&internal.FetchResources_Response{
-		Resource:                    response.ResourceName,
-		FinishedResources:           response.FinishedResources,
-		ResourceCount:               response.ResourceCount,
-		Error:                       response.Error,
-		PartialFetchFailedResources: partialFetchFailedResourcesToProto(response.PartialFetchFailedResources),
+		Resource:          response.ResourceName,
+		FinishedResources: response.FinishedResources,
+		ResourceCount:     response.ResourceCount,
+		Error:             response.Error,
 		Summary: &internal.ResourceFetchSummary{
 			Status:        internal.ResourceFetchSummary_Status(response.Summary.Status),
 			ResourceCount: response.Summary.ResourceCount,
@@ -297,38 +295,6 @@ func columnMetaToProto(m *schema.ColumnMeta) *internal.ColumnMeta {
 		Resolver:     r,
 		IgnoreExists: m.IgnoreExists,
 	}
-}
-
-func partialFetchFailedResourcesFromProto(in []*internal.PartialFetchFailedResource) []*FailedResourceFetch {
-	if len(in) == 0 {
-		return nil
-	}
-	failedResources := make([]*FailedResourceFetch, len(in))
-	for i, p := range in {
-		failedResources[i] = &FailedResourceFetch{
-			TableName:            p.TableName,
-			RootTableName:        p.RootTableName,
-			RootPrimaryKeyValues: p.RootPrimaryKeyValues,
-			Error:                p.Error,
-		}
-	}
-	return failedResources
-}
-
-func partialFetchFailedResourcesToProto(in []*FailedResourceFetch) []*internal.PartialFetchFailedResource {
-	if len(in) == 0 {
-		return nil
-	}
-	failedResources := make([]*internal.PartialFetchFailedResource, len(in))
-	for i, p := range in {
-		failedResources[i] = &internal.PartialFetchFailedResource{
-			TableName:            p.TableName,
-			RootTableName:        p.RootTableName,
-			RootPrimaryKeyValues: p.RootPrimaryKeyValues,
-			Error:                p.Error,
-		}
-	}
-	return failedResources
 }
 
 func diagnosticsToProto(in diag.Diagnostics) []*internal.Diagnostic {
