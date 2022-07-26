@@ -12,6 +12,19 @@ import (
 	"github.com/thoas/go-funk"
 )
 
+// PathTableResolver resolves a table in the parent.Item
+//
+// Examples:
+// PathTableResolver("Field")
+// PathTableResolver("InnerStruct.Field")
+// PathTableResolver("InnerStruct.InnerInnerStruct.Field")
+func PathTableResolver(path string) TableResolver {
+	return func(ctx context.Context, meta ClientMeta, parent *Resource, res chan<- interface{}) error {
+		res <- funk.Get(parent.Item, path, funk.WithAllowZero())
+		return nil
+	}
+}
+
 // PathResolver resolves a field in the Resource.Item
 //
 // Examples:
