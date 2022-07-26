@@ -15,6 +15,7 @@ type innerStruct struct {
 }
 
 type testStruct struct {
+	NilInner   *innerStruct
 	Inner      innerStruct
 	Value      int
 	unexported bool
@@ -130,24 +131,75 @@ var UUIDTestTable = &Table{
 	},
 }
 
-func TestPathResolver(t *testing.T) {
-	r1 := PathResolver("Inner.Value")
-	r2 := PathResolver("Value")
-	r3 := PathResolver("unexported")
+func TestPathTableResolver(t *testing.T) {
+	results := make(chan interface{})
+	pathTableTests := []struct {
+		path          string
+		expectedValue interface{}
+	}{
+		{
+			path:          "Inner",
+			expectedValue: innerStruct{Value: "bla"},
+		},
+		{
+			path:          "Inner.Value",
+			expectedValue: "bla",
+		},
+		{
+			path:          "NilInner.Value",
+			expectedValue: "",
+		},
+	}
+
 	resource := NewResourceData(PostgresDialect{}, pathTestTable, nil, testStruct{Inner: innerStruct{Value: "bla"}, Value: 5, unexported: false}, nil, time.Now())
-	err := r1(context.TODO(), nil, resource, Column{Name: "test"})
+	for _, test := range pathTableTests {
+		r1 := PathTableResolver(test.path)
+		go func() {
+			err := r1(context.TODO(), nil, resource, results)
+			assert.Nil(t, err)
+		}()
+		result := <-results
+		assert.Equal(t, result, test.expectedValue)
+	}
+}
 
-	assert.Nil(t, err)
-	assert.Equal(t, resource.Get("test"), "bla")
+func TestPathResolver(t *testing.T) {
+	pathTableTests := []struct {
+		path       string
+		getterPath string
+		isNil      bool
+		value      interface{}
+	}{
+		{
+			path:       "Inner.Value",
+			getterPath: "test",
+			value:      "bla",
+		},
+		{
+			path:       "Value",
+			getterPath: "int_value",
+			value:      5,
+		},
+		{
+			path:       "unexported",
+			getterPath: "unexported",
+			isNil:      true,
+			value:      nil,
+		},
+	}
 
-	err = r2(context.TODO(), nil, resource, Column{Name: "int_value"})
-
-	assert.Nil(t, err)
-	assert.Equal(t, resource.Get("int_value"), 5)
-
-	err = r3(context.TODO(), nil, resource, Column{Name: "unexported"})
-	assert.Nil(t, err)
-	assert.Nil(t, resource.Get("unexported"))
+	resource := NewResourceData(PostgresDialect{}, pathTestTable, nil, testStruct{Inner: innerStruct{Value: "bla"}, Value: 5, unexported: false}, nil, time.Now())
+	for _, test := range pathTableTests {
+		r1 := PathResolver(test.path)
+		err := r1(context.TODO(), nil, resource, Column{Name: test.getterPath})
+		assert.Nil(t, err)
+		assert.Equal(t, resource.Get(test.getterPath), test.value)
+		if test.isNil {
+			assert.Nil(t, resource.Get(test.getterPath))
+		} else {
+			assert.Equal(t, resource.Get(test.getterPath), test.value)
+		}
+	}
 }
 
 func TestInterfaceSlice(t *testing.T) {
