@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### :spider: Fixed
 -->
 
+## [0.14.5](https://github.com/cloudquery/cq-provider-sdk/compare/v0.14.4...v0.14.5) (2022-07-27)
+
+
+### Bug Fixes
+
+* **deps:** Update golang.org/x/sync digest to 886fb93 ([#438](https://github.com/cloudquery/cq-provider-sdk/issues/438)) ([451ce51](https://github.com/cloudquery/cq-provider-sdk/commit/451ce515eaafdfab579f77c5ece6de0fb673d216))
+
 ## [0.14.4](https://github.com/cloudquery/cq-provider-sdk/compare/v0.14.3...v0.14.4) (2022-07-22)
 
 
