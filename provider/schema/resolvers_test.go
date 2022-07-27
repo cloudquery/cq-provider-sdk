@@ -193,7 +193,6 @@ func TestPathResolver(t *testing.T) {
 		r1 := PathResolver(test.path)
 		err := r1(context.TODO(), nil, resource, Column{Name: test.getterPath})
 		assert.Nil(t, err)
-		assert.Equal(t, resource.Get(test.getterPath), test.value)
 		if test.isNil {
 			assert.Nil(t, resource.Get(test.getterPath))
 		} else {
