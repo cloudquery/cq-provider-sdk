@@ -135,6 +135,7 @@ func TestPathTableResolver(t *testing.T) {
 	results := make(chan interface{})
 	pathTableTests := []struct {
 		path          string
+		isNil         bool
 		expectedValue interface{}
 	}{
 		{
@@ -148,6 +149,9 @@ func TestPathTableResolver(t *testing.T) {
 		{
 			path:          "NilInner.Value",
 			expectedValue: "",
+		}, {
+			path:          "unexported",
+			expectedValue: nil,
 		},
 	}
 
@@ -159,7 +163,7 @@ func TestPathTableResolver(t *testing.T) {
 			assert.Nil(t, err)
 		}()
 		result := <-results
-		assert.Equal(t, result, test.expectedValue)
+		assert.Equal(t, test.expectedValue, result, "path: %s", test.path)
 	}
 }
 
@@ -196,7 +200,7 @@ func TestPathResolver(t *testing.T) {
 		if test.isNil {
 			assert.Nil(t, resource.Get(test.getterPath))
 		} else {
-			assert.Equal(t, resource.Get(test.getterPath), test.value)
+			assert.Equal(t, test.value, resource.Get(test.getterPath))
 		}
 	}
 }
