@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### :spider: Fixed
 -->
 
+## [0.14.6](https://github.com/cloudquery/cq-provider-sdk/compare/v0.14.5...v0.14.6) (2022-07-28)
+
+
+### Features
+
+* Add new Resolver PathTableResolver ([#440](https://github.com/cloudquery/cq-provider-sdk/issues/440)) ([90e9c01](https://github.com/cloudquery/cq-provider-sdk/commit/90e9c01c6518082b7bb4f61263c716fab86297cf))
+
 ## [0.14.5](https://github.com/cloudquery/cq-provider-sdk/compare/v0.14.4...v0.14.5) (2022-07-27)
 
 
