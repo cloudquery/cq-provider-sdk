@@ -14,9 +14,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/database"
 	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/helpers/limit"
-	"github.com/cloudquery/cq-provider-sdk/provider/diag"
 	"github.com/cloudquery/cq-provider-sdk/provider/execution"
-	"github.com/cloudquery/cq-provider-sdk/provider/module"
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 	"github.com/creasty/defaults"
 	"github.com/hashicorp/go-hclog"
@@ -39,7 +37,7 @@ type Provider struct {
 	// Version of the provider
 	Version string
 	// Configure the provider and return context
-	Configure func(hclog.Logger, interface{}) (schema.ClientMeta, diag.Diagnostics)
+	Configure func(hclog.Logger, interface{}) (schema.ClientMeta, error)
 	// ResourceMap is all resources supported by this plugin
 	ResourceMap map[string]*schema.Table
 	// Configuration decoded from configure request
@@ -49,9 +47,7 @@ type Provider struct {
 	// ErrorClassifier allows the provider to classify errors it produces during table execution, and return them as diagnostics to the user.
 	// Classifier function may return empty slice if it cannot meaningfully convert the error into diagnostics. In this case
 	// the error will be converted by the SDK into diagnostic at ERROR level and RESOLVING type.
-	ErrorClassifier execution.ErrorClassifier
-	// ModuleInfoReader is called when the user executes a module, to get provider supported metadata about the given module
-	ModuleInfoReader module.InfoReader
+	// ErrorClassifier execution.ErrorClassifier
 	// Database connection string
 	dbURL string
 	// meta is the provider's client created when configure is called
@@ -112,7 +108,7 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 
 	yb, err := yaml.Marshal(data)
 	if err != nil {
-		return &cqproto.GetProviderConfigResponse{}, diag.WrapError(err)
+		return &cqproto.GetProviderConfigResponse{}, fmt.Errorf("failed to marshal provider config: %w", err)
 	}
 
 	return &cqproto.GetProviderConfigResponse{
@@ -123,14 +119,14 @@ func (p *Provider) GetProviderConfig(_ context.Context, req *cqproto.GetProvider
 func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.ConfigureProviderRequest) (*cqproto.ConfigureProviderResponse, error) {
 	if p.Logger == nil {
 		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diag.FromError(fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name), diag.INTERNAL),
+			Error: fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name).Error(),
 		}, nil
 	}
 
 	if p.meta != nil {
 		if !IsDebug() {
 			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diag.FromError(fmt.Errorf("provider %s was already configured", p.Name), diag.INTERNAL),
+				Error: fmt.Errorf("provider %s already configured", p.Name).Error(),
 			}, nil
 		}
 
@@ -150,7 +146,7 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	providerConfig := p.Config()
 	if err := defaults.Set(providerConfig); err != nil {
 		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diag.FromError(err, diag.INTERNAL),
+			Error: err.Error(),
 		}, nil
 	}
 
@@ -161,15 +157,15 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 		if err := yaml.Unmarshal(request.Config, providerConfig); err != nil {
 			p.Logger.Error("Failed to load configuration.", "error", err)
 			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diag.FromError(err, diag.USER),
+				Error: err.Error(),
 			}, nil
 		}
 	}
 
-	client, diags := p.Configure(p.Logger, providerConfig)
-	if diags.HasErrors() {
+	client, err := p.Configure(p.Logger, providerConfig)
+	if err != nil {
 		return &cqproto.ConfigureProviderResponse{
-			Diagnostics: diags,
+			Error: err.Error(),
 		}, nil
 	}
 
@@ -177,15 +173,13 @@ func (p *Provider) ConfigureProvider(_ context.Context, request *cqproto.Configu
 	for r, t := range p.ResourceMap {
 		if err := getTableDuplicates(r, t, tables); err != nil {
 			return &cqproto.ConfigureProviderResponse{
-				Diagnostics: diags.Add(diag.FromError(err, diag.INTERNAL)),
+				Error: err.Error(),
 			}, nil
 		}
 	}
 
 	p.meta = client
-	return &cqproto.ConfigureProviderResponse{
-		Diagnostics: diags,
-	}, nil
+	return &cqproto.ConfigureProviderResponse{}, nil
 }
 
 func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchResourcesRequest, sender cqproto.FetchResourcesSender) error {
@@ -231,7 +225,7 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		if !ok {
 			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
 		}
-		tableExec := execution.NewTableExecutor(resource, conn, p.Logger.With("table", table.Name), table, request.Metadata, p.ErrorClassifier, goroutinesSem, request.Timeout)
+		tableExec := execution.NewTableExecutor(resource, conn, p.Logger.With("table", table.Name), table, request.Metadata, goroutinesSem, request.Timeout)
 		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
 		// Save resource aside
 		r := resource
@@ -239,7 +233,10 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		finishedResources[r] = false
 		l.Unlock()
 		g.Go(func() error {
-			resourceCount, diags := tableExec.Resolve(gctx, p.meta)
+			resourceCount, err := tableExec.Resolve(gctx, p.meta)
+			if err != nil {
+				return err
+			}
 			l.Lock()
 			defer l.Unlock()
 			finishedResources[r] = true
@@ -247,8 +244,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 			status := cqproto.ResourceFetchComplete
 			if isCancelled(ctx) {
 				status = cqproto.ResourceFetchCanceled
-			} else if diags.HasErrors() {
-				status = cqproto.ResourceFetchPartial
 			}
 			if err := sender.Send(&cqproto.FetchResourcesResponse{
 				ResourceName:      r,
@@ -257,7 +252,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 				Summary: cqproto.ResourceFetchSummary{
 					Status:        status,
 					ResourceCount: resourceCount,
-					Diagnostics:   diags,
 				},
 			}); err != nil {
 				return err
@@ -267,23 +261,6 @@ func (p *Provider) FetchResources(ctx context.Context, request *cqproto.FetchRes
 		})
 	}
 	return g.Wait()
-}
-
-func (p *Provider) GetModuleInfo(_ context.Context, request *cqproto.GetModuleRequest) (*cqproto.GetModuleResponse, error) {
-	if p.ModuleInfoReader == nil {
-		return nil, nil
-	}
-
-	if p.Logger == nil {
-		return nil, fmt.Errorf("provider %s logger not defined, make sure to run it with serve", p.Name)
-	}
-
-	resp, err := p.ModuleInfoReader(p.Logger, request.Module, request.PreferredVersions)
-	return &cqproto.GetModuleResponse{
-		Data:              resp.Data,
-		AvailableVersions: resp.AvailableVersions,
-		Diagnostics:       diag.FromError(err, diag.INTERNAL),
-	}, nil
 }
 
 func (p *Provider) interpolateAllResources(requestedResources []string) ([]string, error) {
