@@ -36,10 +36,8 @@ type TableExecutor struct {
 	Db Storage
 	// Logger associated with this execution
 	Logger hclog.Logger
-	// classifiers
-	classifiers []ErrorClassifier
-	// extraFields to be passed to each created resource in the execution, used in tests.
-	extraFields map[string]interface{}
+	// classifier
+	classifier ErrorClassifier
 	// metadata to be passed to each created resource in the execution, used by cq* resolvers.
 	metadata map[string]interface{}
 	// When the execution started
@@ -53,11 +51,7 @@ type TableExecutor struct {
 }
 
 // NewTableExecutor creates a new TableExecutor for given schema.Table
-func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, extraFields, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted, timeout time.Duration) TableExecutor {
-	var classifiers = []ErrorClassifier{defaultErrorClassifier}
-	if classifier != nil {
-		classifiers = append([]ErrorClassifier{classifier}, classifiers...)
-	}
+func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted, timeout time.Duration) TableExecutor {
 	var c [2]schema.ColumnList
 	c[0], c[1] = db.Dialect().Columns(table).Sift()
 
@@ -66,9 +60,8 @@ func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, tabl
 		Table:          table,
 		Db:             db,
 		Logger:         logger,
-		extraFields:    extraFields,
 		metadata:       metadata,
-		classifiers:    classifiers,
+		classifier:     classifier,
 		executionStart: time.Now().Add(executionJitter),
 		columns:        c,
 		goroutinesSem:  goroutinesSem,
@@ -172,20 +165,6 @@ func (e TableExecutor) doMultiplexResolve(ctx context.Context, clients []schema.
 	return totalResources, allDiags
 }
 
-// truncateTable cleans up a table from all data based on it's DeleteFilter
-func (e TableExecutor) truncateTable(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
-	if e.Table.DeleteFilter == nil {
-		return nil
-	}
-	if e.Table.AlwaysDelete {
-		// Delete previous fetch
-		e.Logger.Debug("cleaning table previous fetch", "always_delete", e.Table.AlwaysDelete)
-		return e.Db.Delete(ctx, e.Table, e.Table.DeleteFilter(client, parent))
-	}
-	e.Logger.Debug("skipping table truncate")
-	return nil
-}
-
 // cleanupStaleData cleans resources in table that weren't update in the latest table resolve execution
 func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.ClientMeta, parent *schema.Resource) error {
 	// Only clean top level tables
@@ -194,10 +173,7 @@ func (e TableExecutor) cleanupStaleData(ctx context.Context, client schema.Clien
 	}
 	e.Logger.Debug("cleaning table stale data", "last_update", e.executionStart)
 
-	filters := make([]interface{}, 0)
-	for k, v := range e.extraFields {
-		filters = append(filters, k, v)
-	}
+	var filters []interface{}
 	if e.Table.DeleteFilter != nil {
 		filters = append(filters, e.Table.DeleteFilter(client, parent)...)
 	}
@@ -219,9 +195,6 @@ func (e TableExecutor) callTableResolve(ctx context.Context, client schema.Clien
 
 	if e.Table.Resolver == nil {
 		return 0, diags.Add(diag.NewBaseError(nil, diag.SCHEMA, diag.WithSeverity(diag.ERROR), diag.WithResourceName(e.ResourceName), diag.WithSummary("table %q missing resolver, make sure table implements the resolver", e.Table.Name)))
-	}
-	if err := e.truncateTable(ctx, client, parent); err != nil {
-		return 0, diags.Add(ClassifyError(err, diag.WithResourceName(e.ResourceName)))
 	}
 
 	res := make(chan interface{})
@@ -324,33 +297,51 @@ func (e TableExecutor) resolveResources(ctx context.Context, meta schema.ClientM
 // saveToStorage copies resource data to source, it has ways of inserting, first it tries the most performant CopyFrom if that does work it bulk inserts,
 // finally it inserts each resource separately, appending errors for each failed resource, only successfully inserted resources are returned
 func (e TableExecutor) saveToStorage(ctx context.Context, resources schema.Resources, shouldCascade bool) (schema.Resources, diag.Diagnostics) {
+	var diags diag.Diagnostics
 	if l := len(resources); l > 0 {
 		e.Logger.Debug("storing resources", "count", l)
 	}
-	err := e.Db.CopyFrom(ctx, resources, shouldCascade, e.extraFields)
+	err := e.Db.CopyFrom(ctx, resources, shouldCascade)
 	if err == nil {
-		return resources, nil
+		return resources, diags
 	}
 	e.Logger.Warn("failed copy-from to db", "error", err)
+	diags = diags.Add(diag.TelemetryFromError(err, diag.CopyFromFailed))
 
 	// fallback insert, copy from sometimes does problems, so we fall back with bulk insert
-	err = e.Db.Insert(ctx, e.Table, resources, shouldCascade, e.extraFields)
+	err = e.Db.Insert(ctx, e.Table, resources, shouldCascade)
 	if err == nil {
-		return resources, nil
+		return resources, diags
 	}
 	e.Logger.Error("failed insert to db", "error", err)
+	diags = diags.Add(diag.TelemetryFromError(err, diag.BulkInsertFailed))
 	// Setup diags, adding first diagnostic that bulk insert failed
-	diags := diag.Diagnostics{}.Add(ClassifyError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed bulk insert on table %q", e.Table.Name)))
+	diags = diags.Add(ClassifyError(err, diag.WithType(diag.DATABASE), diag.WithSummary("failed bulk insert on table %q", e.Table.Name)))
 	// Try to insert resource by resource if partial fetch is enabled and an error occurred
 	partialFetchResources := make(schema.Resources, 0)
+	var failed error
+	failedCount := 0
 	for id := range resources {
-		if err := e.Db.Insert(ctx, e.Table, schema.Resources{resources[id]}, shouldCascade, e.extraFields); err != nil {
+		if err := e.Db.Insert(ctx, e.Table, schema.Resources{resources[id]}, shouldCascade); err != nil {
+			failed = err
+			failedCount++
 			e.Logger.Error("failed to insert resource into db", "error", err, "resource_keys", resources[id].PrimaryKeyValues())
 			diags = diags.Add(ClassifyError(err, diag.WithType(diag.DATABASE)))
 			continue
 		}
 		// If there is no error we add the resource to the final result
 		partialFetchResources = append(partialFetchResources, resources[id])
+	}
+	if failed != nil {
+		msg := "all resources"
+		if failedCount < len(resources) {
+			msg = "some resources"
+		}
+		diags = diags.Add(diag.TelemetryFromError(
+			failed,
+			diag.InsertFailed,
+			diag.WithSummary("%s failed to insert into table %q", msg, e.Table.Name),
+		))
 	}
 	return partialFetchResources, diags
 }
@@ -440,16 +431,20 @@ func (e TableExecutor) handleResolveError(meta schema.ClientMeta, r *schema.Reso
 		diag.WithSummary("failed to resolve table %q", e.Table.Name),
 	)...)
 
+	if e.classifier == nil {
+		return errAsDiags
+	}
+
 	classifiedDiags := make(diag.Diagnostics, 0, len(errAsDiags))
-	for _, c := range e.classifiers {
-		// fromError gives us diag.Diagnostics, but we need to make sure to pass one diag at a time to the classifiers and collect results,
-		// mostly because Unwrap()/errors.As() can't work on multiple diags
-		for _, d := range errAsDiags {
-			if diags := c(meta, e.ResourceName, d); diags != nil {
-				classifiedDiags = classifiedDiags.Add(diags)
-			}
+
+	// fromError gives us diag.Diagnostics, but we need to make sure to pass one diag at a time to the classifier and collect results,
+	// mostly because Unwrap()/errors.As() can't work on multiple diags
+	for _, d := range errAsDiags {
+		if diags := e.classifier(meta, e.ResourceName, d); diags != nil {
+			classifiedDiags = classifiedDiags.Add(diags)
 		}
 	}
+
 	if classifiedDiags.HasDiags() {
 		return classifiedDiags
 	}

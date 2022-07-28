@@ -72,7 +72,7 @@ var (
 	testProviderCreatorFunc = func() Provider {
 		return Provider{
 			Name: "unitest",
-			Config: func(_ cqproto.ConfigFormat) Config {
+			Config: func() Config {
 				return &testConfig{}
 			},
 			ResourceMap: map[string]*schema.Table{
@@ -154,7 +154,7 @@ var (
 
 	parallelCheckProvider = Provider{
 		Name: "parallel",
-		Config: func(_ cqproto.ConfigFormat) Config {
+		Config: func() Config {
 			return &testConfig{}
 		},
 		ResourceMap: map[string]*schema.Table{
@@ -236,10 +236,6 @@ func (testConfig) Example() string {
 	return ""
 }
 
-func (testConfig) Format() cqproto.ConfigFormat {
-	return cqproto.ConfigHCL
-}
-
 func (testClient) Logger() hclog.Logger {
 	return hclog.Default()
 }
@@ -285,8 +281,7 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:      nil,
-		ExtraFields: nil,
+		Config: nil,
 	})
 	assert.Equal(t, "provider unitest logger not defined, make sure to run it with serve", resp.Diagnostics.Error())
 	assert.NoError(t, err)
@@ -297,8 +292,7 @@ func TestProvider_ConfigureProvider(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:      nil,
-		ExtraFields: nil,
+		Config: nil,
 	})
 	assert.True(t, resp.Diagnostics.HasErrors())
 	assert.Equal(t, "test error", resp.Diagnostics.Error())
@@ -316,8 +310,7 @@ func TestProvider_FetchResources(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:      nil,
-		ExtraFields: nil,
+		Config: nil,
 	})
 	ctrl := gomock.NewController(t)
 	var fetchCases = []FetchResourceTableTest{
@@ -382,8 +375,8 @@ func TestProvider_FetchResources(t *testing.T) {
 				return mockDB
 			},
 			Context: func() context.Context {
-				//nolint:govet
-				ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+				t.Cleanup(cancel)
 				return ctx
 			},
 
@@ -438,8 +431,7 @@ func TestProvider_FetchResourcesParallelLimit(t *testing.T) {
 		Connection: cqproto.ConnectionDetails{
 			DSN: "postgres://postgres:pass@localhost:5432/postgres?sslmode=disable",
 		},
-		Config:      nil,
-		ExtraFields: nil,
+		Config: nil,
 	})
 	assert.False(t, resp.Diagnostics.HasDiags())
 	assert.NoError(t, err)

@@ -25,12 +25,12 @@ The following is a set of guidelines for contributing to this repository.
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by the [CloudQuery Code of Conduct](https://github.com/cloudquery/cloudquery/blob/main/CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [INSERT EMAIL HERE](mailto:INSERT EMAIL HERE).
+This project and everyone participating in it is governed by the [CloudQuery Code of Conduct](https://github.com/cloudquery/cloudquery/blob/main/CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. To report inappropriate behavior in violation of the code, please start by reaching out to us on our [Discord channel](https://cloudquery.io/discord).
 
 
 ## I don't want to read this whole thing I just have a question!!!
 
-> **Note:** Please don't file an issue to ask a question. You'll get faster results by reaching out to the community on our [discord channel](https://cloudquery.io/discord)
+> **Note:** Please don't file an issue to ask a question. You'll get faster results by reaching out to the community on our [Discord channel](https://cloudquery.io/discord)
 
 
 ## What To Know Before Getting Started
@@ -89,7 +89,7 @@ Explain the problem and include additional details to help maintainers reproduce
 * **Describe the Bug** in as many details as possible. For example, start by explaining how and where you are running CloudQuery (local machine, cloud service, docker, k8s, CI Pipeline, etc)
 * **Provide specific examples to demonstrate the steps**. Include links to gists and or files, or copy/pasteable snippets to help give context to the issue. If you're providing snippets in the issue, use [Markdown code blocks](https://help.github.com/articles/markdown-basics/#multiple-lines)
 * **Explain which behavior you expected to see instead and why.**
-* **Inlcude (sanitized) log output** execute CloudQuery with the `--enable-console-log` and `-v` flags to get all of the debug information
+* **Include (sanitized) log output** execute CloudQuery with the `--enable-console-log` and `-v` flags to get all of the debug information
 
 Provide more context by answering these questions:
 
@@ -128,8 +128,6 @@ Unsure where to begin contributing to CloudQuery? You can start by looking throu
 
 If you don't see any issues that you think you can help with reach out to the community on Discord and we would be happy to work with you!
 
-
-
 #### Local Development
 
 CloudQuery has the ability to be run locally with a corresponding local postgres database. To get it up and running follow the following instructions:
@@ -137,3 +135,17 @@ CloudQuery has the ability to be run locally with a corresponding local postgres
 * [Connecting to a database](https://docs.cloudquery.io/docs/getting-started#spawn-or-connect-to-a-database)
 * [Debugging a Provider](https://docs.cloudquery.io/docs/developers/debugging)
 * [Developing a New Provider](https://docs.cloudquery.io/docs/developers/developing-new-provider)
+
+#### Commit Messages
+
+We make use of the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/) for pull request titles. This allows us to categorize contributions and automate versioning for releases. Pull request titles should start with one of the prefixes specified in the table below:
+
+| Title      | Message | Action |
+| ----------- | ----------- |----------- |
+| `chore: <Message>`      |  `<String>`       | patch release|
+| `fix: <Message>`      |  `<String>`      | patch release|
+| `feat: <Message>`      |  `<String>`       | patch release|
+| `refactor: <Message>`      |  `<String>`       | patch release|
+| `test: <Message>`      |  `<String>`       | patch release|
+
+Additional context can be provided in parentheses, e.g. `fix(docs): Fix typo`. Breaking changes should be suffixed with `!`, e.g. `feat!: Drop support for X`. This will always result in a minor release.

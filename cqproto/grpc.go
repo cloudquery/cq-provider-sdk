@@ -46,7 +46,7 @@ func (g GRPCClient) GetProviderSchema(ctx context.Context, _ *GetProviderSchemaR
 
 func (g GRPCClient) GetProviderConfig(ctx context.Context, request *GetProviderConfigRequest) (*GetProviderConfigResponse, error) {
 	res, err := g.client.GetProviderConfig(ctx, &internal.GetProviderConfig_Request{
-		Format: configFormatFromProto(request.Format),
+		Format: internal.ConfigFormat_YAML,
 	})
 	if err != nil {
 		return nil, err
@@ -54,24 +54,19 @@ func (g GRPCClient) GetProviderConfig(ctx context.Context, request *GetProviderC
 
 	return &GetProviderConfigResponse{
 		Config: res.GetConfig(),
-		Format: configFormatToProto(res.GetFormat()),
+		Format: internal.ConfigFormat_YAML,
 	}, nil
 }
 
 func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigureProviderRequest) (*ConfigureProviderResponse, error) {
-	fieldsData, err := msgpack.Marshal(request.ExtraFields)
-	if err != nil {
-		return nil, err
-	}
 	res, err := g.client.ConfigureProvider(ctx, &internal.ConfigureProvider_Request{
 		CloudqueryVersion: request.CloudQueryVersion,
 		Connection: &internal.ConnectionDetails{
 			Type: internal.ConnectionType_POSTGRES,
 			Dsn:  request.Connection.DSN,
 		},
-		Config:      request.Config,
-		ExtraFields: fieldsData,
-		Format:      configFormatFromProto(request.Format),
+		Config: request.Config,
+		Format: internal.ConfigFormat_YAML,
 	})
 	if err != nil {
 		return nil, err
@@ -150,35 +145,24 @@ func (g *GRPCServer) GetProviderSchema(ctx context.Context, _ *internal.GetProvi
 }
 
 func (g *GRPCServer) GetProviderConfig(ctx context.Context, request *internal.GetProviderConfig_Request) (*internal.GetProviderConfig_Response, error) {
-	resp, err := g.Impl.GetProviderConfig(ctx, &GetProviderConfigRequest{
-		Format: configFormatToProto(request.Format),
-	})
+	resp, err := g.Impl.GetProviderConfig(ctx, &GetProviderConfigRequest{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &internal.GetProviderConfig_Response{
 		Config: resp.Config,
-		Format: configFormatFromProto(resp.Format),
 	}, nil
 }
 
 func (g *GRPCServer) ConfigureProvider(ctx context.Context, request *internal.ConfigureProvider_Request) (*internal.ConfigureProvider_Response, error) {
-	var eFields = make(map[string]interface{})
-	if request.GetExtraFields() != nil {
-		if err := msgpack.Unmarshal(request.GetExtraFields(), &eFields); err != nil {
-			return nil, err
-		}
-	}
 	resp, err := g.Impl.ConfigureProvider(ctx, &ConfigureProviderRequest{
 		CloudQueryVersion: request.GetCloudqueryVersion(),
 		Connection: ConnectionDetails{
 			Type: string(request.Connection.GetType()),
 			DSN:  request.Connection.GetDsn(),
 		},
-		Config:      request.Config,
-		ExtraFields: eFields,
-		Format:      configFormatToProto(request.Format),
+		Config: request.Config,
 	})
 	if err != nil {
 		return nil, err
@@ -478,22 +462,4 @@ func moduleInfoToProto(in map[uint32]ModuleInfo) map[uint32]*internal.GetModuleI
 		ret[ver] = v
 	}
 	return ret
-}
-
-func configFormatFromProto(in ConfigFormat) internal.ConfigFormat {
-	switch in {
-	case ConfigYAML:
-		return internal.ConfigFormat_YAML
-	default:
-		return internal.ConfigFormat_HCL
-	}
-}
-
-func configFormatToProto(in internal.ConfigFormat) ConfigFormat {
-	switch in {
-	case internal.ConfigFormat_YAML:
-		return ConfigYAML
-	default:
-		return ConfigHCL
-	}
 }
