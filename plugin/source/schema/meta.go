@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
+	"github.com/rs/zerolog"
 )
 
 type ClientMeta interface {
-	Logger() hclog.Logger
+	Logger() zerolog.Logger
 }
 
 type ClientIdentifier interface {

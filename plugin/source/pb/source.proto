@@ -1,0 +1,51 @@
+syntax = "proto3";
+package proto;
+option go_package = "/internal";
+
+service Source {
+  // Information about what a provider supports/expects
+  rpc GetProviderSchema(GetProviderSchema.Request) returns (GetProviderSchema.Response);
+  // Gets a provider's configuration example
+  rpc GetProviderConfig(GetProviderConfig.Request) returns (GetProviderConfig.Response);
+  // Fetch Provider Resources
+  rpc FetchResources(FetchResources.Request) returns (stream FetchResources.Response);
+}
+
+message FetchResources {
+  message Request {
+    // Holds information such as credentials, regions, accounts, etc'
+    bytes config = 1;
+    // list of resources provider is requested to fetch
+    repeated string resources = 2;
+    // if value is more than 0 it enables throttling for concurrent fetch
+    uint64 parallel_fetching_limit = 3;
+    // approximate maximum goroutines spawned during fetch
+    uint64 max_goroutines = 4;
+    // timeout for each parent resource resolve call
+    int64 timeout = 5;
+  }
+  message Response {
+    // marshalled []*schema.Resources
+    bytes resources = 1;
+  }
+}
+
+message GetProviderSchema {
+  message Request {}
+  message Response {
+    string name = 1;
+    string version = 2;
+    // Marshalled []*schema.Table
+    bytes tables = 3;
+  }
+}
+
+message GetProviderConfig {
+  message Request {}
+  message Response {
+    string name = 1;
+    string version = 2;
+    bytes config = 3;
+  }
+}
+
