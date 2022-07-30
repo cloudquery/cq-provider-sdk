@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.19.4
-// source: internal/source/source.proto
+// source: plugin/source/pb/source.proto
 
-package source
+package pb
 
 import (
 	context "context"
@@ -22,12 +22,12 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SourceClient interface {
-	// Information about what a provider supports/expects
-	GetProviderSchema(ctx context.Context, in *GetProviderSchema_Request, opts ...grpc.CallOption) (*GetProviderSchema_Response, error)
-	// Gets a provider's configuration example
-	GetProviderConfig(ctx context.Context, in *GetProviderConfig_Request, opts ...grpc.CallOption) (*GetProviderConfig_Response, error)
-	// Fetch Provider Resources
-	FetchResources(ctx context.Context, in *FetchResources_Request, opts ...grpc.CallOption) (Source_FetchResourcesClient, error)
+	// Get all tables the source plugin supports
+	GetTables(ctx context.Context, in *GetTables_Request, opts ...grpc.CallOption) (*GetTables_Response, error)
+	// Get an example configuration for the source plugin
+	GetExampleConfig(ctx context.Context, in *GetExampleConfig_Request, opts ...grpc.CallOption) (*GetExampleConfig_Response, error)
+	// Fetch resources
+	Fetch(ctx context.Context, in *Fetch_Request, opts ...grpc.CallOption) (Source_FetchClient, error)
 }
 
 type sourceClient struct {
@@ -38,30 +38,30 @@ func NewSourceClient(cc grpc.ClientConnInterface) SourceClient {
 	return &sourceClient{cc}
 }
 
-func (c *sourceClient) GetProviderSchema(ctx context.Context, in *GetProviderSchema_Request, opts ...grpc.CallOption) (*GetProviderSchema_Response, error) {
-	out := new(GetProviderSchema_Response)
-	err := c.cc.Invoke(ctx, "/proto.Source/GetProviderSchema", in, out, opts...)
+func (c *sourceClient) GetTables(ctx context.Context, in *GetTables_Request, opts ...grpc.CallOption) (*GetTables_Response, error) {
+	out := new(GetTables_Response)
+	err := c.cc.Invoke(ctx, "/proto.Source/GetTables", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *sourceClient) GetProviderConfig(ctx context.Context, in *GetProviderConfig_Request, opts ...grpc.CallOption) (*GetProviderConfig_Response, error) {
-	out := new(GetProviderConfig_Response)
-	err := c.cc.Invoke(ctx, "/proto.Source/GetProviderConfig", in, out, opts...)
+func (c *sourceClient) GetExampleConfig(ctx context.Context, in *GetExampleConfig_Request, opts ...grpc.CallOption) (*GetExampleConfig_Response, error) {
+	out := new(GetExampleConfig_Response)
+	err := c.cc.Invoke(ctx, "/proto.Source/GetExampleConfig", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *sourceClient) FetchResources(ctx context.Context, in *FetchResources_Request, opts ...grpc.CallOption) (Source_FetchResourcesClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Source_ServiceDesc.Streams[0], "/proto.Source/FetchResources", opts...)
+func (c *sourceClient) Fetch(ctx context.Context, in *Fetch_Request, opts ...grpc.CallOption) (Source_FetchClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Source_ServiceDesc.Streams[0], "/proto.Source/Fetch", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &sourceFetchResourcesClient{stream}
+	x := &sourceFetchClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -71,17 +71,17 @@ func (c *sourceClient) FetchResources(ctx context.Context, in *FetchResources_Re
 	return x, nil
 }
 
-type Source_FetchResourcesClient interface {
-	Recv() (*FetchResources_Response, error)
+type Source_FetchClient interface {
+	Recv() (*Fetch_Response, error)
 	grpc.ClientStream
 }
 
-type sourceFetchResourcesClient struct {
+type sourceFetchClient struct {
 	grpc.ClientStream
 }
 
-func (x *sourceFetchResourcesClient) Recv() (*FetchResources_Response, error) {
-	m := new(FetchResources_Response)
+func (x *sourceFetchClient) Recv() (*Fetch_Response, error) {
+	m := new(Fetch_Response)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -92,12 +92,12 @@ func (x *sourceFetchResourcesClient) Recv() (*FetchResources_Response, error) {
 // All implementations must embed UnimplementedSourceServer
 // for forward compatibility
 type SourceServer interface {
-	// Information about what a provider supports/expects
-	GetProviderSchema(context.Context, *GetProviderSchema_Request) (*GetProviderSchema_Response, error)
-	// Gets a provider's configuration example
-	GetProviderConfig(context.Context, *GetProviderConfig_Request) (*GetProviderConfig_Response, error)
-	// Fetch Provider Resources
-	FetchResources(*FetchResources_Request, Source_FetchResourcesServer) error
+	// Get all tables the source plugin supports
+	GetTables(context.Context, *GetTables_Request) (*GetTables_Response, error)
+	// Get an example configuration for the source plugin
+	GetExampleConfig(context.Context, *GetExampleConfig_Request) (*GetExampleConfig_Response, error)
+	// Fetch resources
+	Fetch(*Fetch_Request, Source_FetchServer) error
 	mustEmbedUnimplementedSourceServer()
 }
 
@@ -105,14 +105,14 @@ type SourceServer interface {
 type UnimplementedSourceServer struct {
 }
 
-func (UnimplementedSourceServer) GetProviderSchema(context.Context, *GetProviderSchema_Request) (*GetProviderSchema_Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetProviderSchema not implemented")
+func (UnimplementedSourceServer) GetTables(context.Context, *GetTables_Request) (*GetTables_Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTables not implemented")
 }
-func (UnimplementedSourceServer) GetProviderConfig(context.Context, *GetProviderConfig_Request) (*GetProviderConfig_Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetProviderConfig not implemented")
+func (UnimplementedSourceServer) GetExampleConfig(context.Context, *GetExampleConfig_Request) (*GetExampleConfig_Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetExampleConfig not implemented")
 }
-func (UnimplementedSourceServer) FetchResources(*FetchResources_Request, Source_FetchResourcesServer) error {
-	return status.Errorf(codes.Unimplemented, "method FetchResources not implemented")
+func (UnimplementedSourceServer) Fetch(*Fetch_Request, Source_FetchServer) error {
+	return status.Errorf(codes.Unimplemented, "method Fetch not implemented")
 }
 func (UnimplementedSourceServer) mustEmbedUnimplementedSourceServer() {}
 
@@ -127,60 +127,60 @@ func RegisterSourceServer(s grpc.ServiceRegistrar, srv SourceServer) {
 	s.RegisterService(&Source_ServiceDesc, srv)
 }
 
-func _Source_GetProviderSchema_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetProviderSchema_Request)
+func _Source_GetTables_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTables_Request)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SourceServer).GetProviderSchema(ctx, in)
+		return srv.(SourceServer).GetTables(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.Source/GetProviderSchema",
+		FullMethod: "/proto.Source/GetTables",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SourceServer).GetProviderSchema(ctx, req.(*GetProviderSchema_Request))
+		return srv.(SourceServer).GetTables(ctx, req.(*GetTables_Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Source_GetProviderConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetProviderConfig_Request)
+func _Source_GetExampleConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetExampleConfig_Request)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SourceServer).GetProviderConfig(ctx, in)
+		return srv.(SourceServer).GetExampleConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.Source/GetProviderConfig",
+		FullMethod: "/proto.Source/GetExampleConfig",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SourceServer).GetProviderConfig(ctx, req.(*GetProviderConfig_Request))
+		return srv.(SourceServer).GetExampleConfig(ctx, req.(*GetExampleConfig_Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Source_FetchResources_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(FetchResources_Request)
+func _Source_Fetch_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(Fetch_Request)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(SourceServer).FetchResources(m, &sourceFetchResourcesServer{stream})
+	return srv.(SourceServer).Fetch(m, &sourceFetchServer{stream})
 }
 
-type Source_FetchResourcesServer interface {
-	Send(*FetchResources_Response) error
+type Source_FetchServer interface {
+	Send(*Fetch_Response) error
 	grpc.ServerStream
 }
 
-type sourceFetchResourcesServer struct {
+type sourceFetchServer struct {
 	grpc.ServerStream
 }
 
-func (x *sourceFetchResourcesServer) Send(m *FetchResources_Response) error {
+func (x *sourceFetchServer) Send(m *Fetch_Response) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -192,20 +192,20 @@ var Source_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*SourceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetProviderSchema",
-			Handler:    _Source_GetProviderSchema_Handler,
+			MethodName: "GetTables",
+			Handler:    _Source_GetTables_Handler,
 		},
 		{
-			MethodName: "GetProviderConfig",
-			Handler:    _Source_GetProviderConfig_Handler,
+			MethodName: "GetExampleConfig",
+			Handler:    _Source_GetExampleConfig_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "FetchResources",
-			Handler:       _Source_FetchResources_Handler,
+			StreamName:    "Fetch",
+			Handler:       _Source_Fetch_Handler,
 			ServerStreams: true,
 		},
 	},
-	Metadata: "internal/source/source.proto",
+	Metadata: "plugin/source/pb/source.proto",
 }

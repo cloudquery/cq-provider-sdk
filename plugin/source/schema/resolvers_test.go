@@ -134,7 +134,7 @@ func TestPathResolver(t *testing.T) {
 	r1 := PathResolver("Inner.Value")
 	r2 := PathResolver("Value")
 	r3 := PathResolver("unexported")
-	resource := NewResourceData(PostgresDialect{}, pathTestTable, nil, testStruct{Inner: innerStruct{Value: "bla"}, Value: 5, unexported: false}, nil, time.Now())
+	resource := NewResourceData(pathTestTable, nil, testStruct{Inner: innerStruct{Value: "bla"}, Value: 5, unexported: false})
 	err := r1(context.TODO(), nil, resource, Column{Name: "test"})
 
 	assert.Nil(t, err)
@@ -166,7 +166,7 @@ func TestInterfaceSlice(t *testing.T) {
 
 func TestDateTimeResolver(t *testing.T) {
 	r1 := DateResolver("Date")
-	resource := NewResourceData(PostgresDialect{}, dateTestTable, nil, testDateStruct{Date: "2011-10-05T14:48:00.000Z"}, nil, time.Now())
+	resource := NewResourceData(dateTestTable, nil, testDateStruct{Date: "2011-10-05T14:48:00.000Z"})
 	err := r1(context.TODO(), nil, resource, Column{Name: "date"})
 
 	assert.Nil(t, err)
@@ -174,12 +174,12 @@ func TestDateTimeResolver(t *testing.T) {
 	assert.Equal(t, resource.Get("date"), &t1)
 
 	r2 := DateResolver("Date", time.RFC822)
-	resource = NewResourceData(PostgresDialect{}, dateTestTable, nil, testDateStruct{Date: "2011-10-05T14:48:00.000Z"}, nil, time.Now())
+	resource = NewResourceData(dateTestTable, nil, testDateStruct{Date: "2011-10-05T14:48:00.000Z"})
 	err = r2(context.TODO(), nil, resource, Column{Name: "date"})
 
 	assert.Error(t, err)
 
-	resource = NewResourceData(PostgresDialect{}, dateTestTable, nil, testDateStruct{Date: "03 Jan 06 15:04 EST"}, nil, time.Now())
+	resource = NewResourceData(dateTestTable, nil, testDateStruct{Date: "03 Jan 06 15:04 EST"})
 	err = r2(context.TODO(), nil, resource, Column{Name: "date"})
 	assert.Nil(t, err)
 
@@ -187,7 +187,7 @@ func TestDateTimeResolver(t *testing.T) {
 	assert.Equal(t, t2.Unix(), resource.Get("date").(*time.Time).UTC().Unix())
 
 	r3 := DateResolver("Date", time.RFC822, "2006-01-02")
-	resource = NewResourceData(PostgresDialect{}, dateTestTable, nil, testDateStruct{Date: "2011-10-05"}, nil, time.Now())
+	resource = NewResourceData(dateTestTable, nil, testDateStruct{Date: "2011-10-05"})
 	err = r3(context.TODO(), nil, resource, Column{Name: "date"})
 	assert.Nil(t, err)
 
@@ -201,7 +201,7 @@ func TestNetResolvers(t *testing.T) {
 	r3 := IPNetResolver("Net")
 	r4 := IPAddressesResolver("IPS")
 	for _, r := range netTests {
-		resource := NewResourceData(PostgresDialect{}, networkTestTable, nil, r, nil, time.Now())
+		resource := NewResourceData(networkTestTable, nil, r)
 		err := r1(context.TODO(), nil, resource, Column{Name: "ip"})
 		assert.Nil(t, err)
 		err = r2(context.TODO(), nil, resource, Column{Name: "mac"})
@@ -212,7 +212,7 @@ func TestNetResolvers(t *testing.T) {
 		assert.Nil(t, err)
 	}
 	for _, r := range netTestsFails {
-		resource := NewResourceData(PostgresDialect{}, networkTestTable, nil, r, nil, time.Now())
+		resource := NewResourceData(networkTestTable, nil, r)
 		err := r1(context.TODO(), nil, resource, Column{Name: "ip"})
 		assert.Error(t, err)
 		err = r2(context.TODO(), nil, resource, Column{Name: "mac"})
@@ -230,7 +230,7 @@ func TestTransformersResolvers(t *testing.T) {
 	r3 := IntResolver("String")
 	r4 := IntResolver("Float")
 	r5 := IntResolver("BadFloat")
-	resource := NewResourceData(PostgresDialect{}, TransformersTestTable, nil, testTransformersStruct{Int: 10, Float: 10.2, String: "123", BadFloat: "10,1"}, nil, time.Now())
+	resource := NewResourceData(TransformersTestTable, nil, testTransformersStruct{Int: 10, Float: 10.2, String: "123", BadFloat: "10,1"})
 	err := r1(context.TODO(), nil, resource, Column{Name: "int_to_string"})
 	assert.Nil(t, err)
 	assert.Equal(t, resource.Get("int_to_string"), "10")
@@ -254,7 +254,7 @@ func TestTransformersResolvers(t *testing.T) {
 func TestUUIDResolver(t *testing.T) {
 	r1 := UUIDResolver("UUID")
 	r2 := UUIDResolver("BadUUID")
-	resource := NewResourceData(PostgresDialect{}, UUIDTestTable, nil, testUUIDStruct{UUID: "123e4567-e89b-12d3-a456-426614174000", BadUUID: "123e4567-e89b-12d3-a456-4266141740001"}, nil, time.Now())
+	resource := NewResourceData(UUIDTestTable, nil, testUUIDStruct{UUID: "123e4567-e89b-12d3-a456-426614174000", BadUUID: "123e4567-e89b-12d3-a456-4266141740001"})
 
 	err := r1(context.TODO(), nil, resource, Column{Name: "uuid"})
 	assert.Nil(t, err)

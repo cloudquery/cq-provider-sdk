@@ -4,17 +4,12 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
-	"github.com/cloudquery/cq-provider-sdk/cqproto"
 	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/helpers/limit"
-	"github.com/cloudquery/cq-provider-sdk/plugin/source/pb"
-	"github.com/cloudquery/cq-provider-sdk/provider/execution"
-	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
 	"github.com/rs/zerolog"
 	"github.com/thoas/go-funk"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -24,132 +19,91 @@ type Config interface {
 	Example() string
 }
 
+// SourceConfig is the shared configuration for all source plugins
+type SourceConfig struct {
+	MaxGoRoutines int         `json:"max_goroutines" yaml:"max_goroutines"`
+	Tables        []string    `json:"tables" yaml:"tables"`
+	SkipTables    []string    `json:"skip_tables" yaml:"skip_tables"`
+	Configuration interface{} `json:"configuration" yaml:"configuration"`
+}
+
 // Provider is the base structure required to pass and serve an sdk provider.Provider
-type Provider struct {
+type SourcePlugin struct {
 	// Name of plugin i.e aws,gcp, azure etc'
 	Name string
 	// Version of the provider
 	Version string
 	// Configure the plugin and return the context
 	Configure func(zerolog.Logger, interface{}) (schema.ClientMeta, error)
-	// ResourceMap is all resources supported by this plugin
-	ResourceMap map[string]*schema.Table
+	// Tables is all tables supported by this plugin
+	Tables []*schema.Table
 	// Configuration decoded from configure request
 	Config func() Config
 	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger zerolog.Logger
-	// meta is the provider's client created when configure is called
-	meta schema.ClientMeta
 }
 
-func (p *Provider) GetProviderSchema(_ context.Context, _ *pb.GetProviderSchemaRequest) (*cqproto.GetProviderSchemaResponse, error) {
-	return &pb.GetProviderSchemaResponse{
-		Name:           p.Name,
-		Version:        p.Version,
-		ResourceTables: p.ResourceMap,
-	}, nil
-}
-
-func (p *Provider) FetchResources(ctx context.Context, request *pb.FetchResources_Request, sender pb.FetchResources_Response) error {
-	var err error
-	p.meta, err = p.Configure(p.Logger, request.Config)
+// Fetch fetches data acording to source configuration and
+func (p *SourcePlugin) Fetch(ctx context.Context, config SourceConfig, res chan<- *schema.Resource) error {
+	// var err error
+	meta, err := p.Configure(p.Logger, config.Configuration)
 	if err != nil {
-		return err
-	}
-
-	if helpers.HasDuplicates(request.Resources) {
-		return fmt.Errorf("provider has duplicate resources requested")
+		return fmt.Errorf("failed to configure provider: %w", err)
 	}
 
 	// if resources ["*"] is requested we will fetch all resources
-	resources, err := p.interpolateAllResources(request.Resources)
+	tables, err := p.interpolateAllResources(config.Tables)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to interpolate resources: %w", err)
 	}
 
 	// limiter used to limit the amount of resources fetched concurrently
 	var goroutinesSem *semaphore.Weighted
-	maxGoroutines := request.MaxGoroutines
+	maxGoroutines := config.MaxGoRoutines
 	if maxGoroutines == 0 {
 		maxGoroutines = limit.GetMaxGoRoutines()
 	}
-	p.Logger.Info("calculated max goroutines for fetch execution", "max_goroutines", maxGoroutines)
-	goroutinesSem = semaphore.NewWeighted(helpers.Uint64ToInt64(maxGoroutines))
+	p.Logger.Info().Int("max_goroutines", config.MaxGoRoutines).Msg("starting fetch")
+	goroutinesSem = semaphore.NewWeighted(helpers.Uint64ToInt64(uint64(config.MaxGoRoutines)))
 
-	g, gctx := errgroup.WithContext(ctx)
-	if request.ParallelFetchingLimit > 0 {
-		g.SetLimit(helpers.Uint64ToInt(request.ParallelFetchingLimit))
-	}
-	finishedResources := make(map[string]bool, len(resources))
-	l := &sync.Mutex{}
-	var totalResourceCount uint64
-	for _, resource := range resources {
-		table, ok := p.ResourceMap[resource]
-		if !ok {
-			return fmt.Errorf("plugin %s does not provide resource %s", p.Name, resource)
+	wg := sync.WaitGroup{}
+	for _, table := range p.Tables {
+		t := table
+		if funk.ContainsString(config.SkipTables, table.Name) || !funk.ContainsString(tables, table.Name) {
+			p.Logger.Info().Str("table", table.Name).Msg("skipping table")
+			continue
 		}
-		tableExec := execution.NewTableExecutor(resource, p.Logger.With("table", table.Name), table, request.Metadata, goroutinesSem, request.Timeout)
-		p.Logger.Debug("fetching table...", "provider", p.Name, "table", table.Name)
-		// Save resource aside
-		r := resource
-		l.Lock()
-		finishedResources[r] = false
-		l.Unlock()
-		g.Go(func() error {
-			resourceCount, err := tableExec.Resolve(gctx, p.meta)
-			if err != nil {
-				return err
-			}
-			l.Lock()
-			defer l.Unlock()
-			finishedResources[r] = true
-			atomic.AddUint64(&totalResourceCount, resourceCount)
-			status := cqproto.ResourceFetchComplete
-			if isCancelled(ctx) {
-				status = cqproto.ResourceFetchCanceled
-			}
-			if err := sender.Send(&cqproto.FetchResourcesResponse{
-				ResourceName:      r,
-				FinishedResources: finishedResources,
-				ResourceCount:     resourceCount,
-				Summary: cqproto.ResourceFetchSummary{
-					Status:        status,
-					ResourceCount: resourceCount,
-				},
-			}); err != nil {
-				return err
-			}
-			p.Logger.Debug("finished fetching table...", "provider", p.Name, "table", table.Name)
-			return nil
-		})
+		clients := []schema.ClientMeta{meta}
+		if t.Multiplex != nil {
+			clients = table.Multiplex(meta)
+		}
+		for _, client := range clients {
+			c := client
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				t.Resolve(ctx, c, nil, res)
+			}()
+		}
 	}
-	return g.Wait()
+	wg.Wait()
+	return nil
 }
 
-func (p *Provider) interpolateAllResources(requestedResources []string) ([]string, error) {
-	if len(requestedResources) != 1 {
-		if funk.ContainsString(requestedResources, "*") {
-			return nil, fmt.Errorf("invalid \"*\" resource, with explicit resources")
-		}
-		return requestedResources, nil
+func (p *SourcePlugin) interpolateAllResources(tables []string) ([]string, error) {
+	if !funk.ContainsString(tables, "*") {
+		return tables, nil
 	}
-	if requestedResources[0] != "*" {
-		return requestedResources, nil
+
+	if len(tables) > 1 {
+		return nil, fmt.Errorf("invalid \"*\" resource, with explicit resources")
 	}
-	allResources := make([]string, 0, len(p.ResourceMap))
-	for k := range p.ResourceMap {
-		allResources = append(allResources, k)
+
+	allResources := make([]string, 0, len(p.Tables))
+	for k := range p.Tables {
+		allResources = append(allResources, k.Name)
 	}
 	return allResources, nil
-}
-
-func isCancelled(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return true
-	default:
-		return false
-	}
 }
 
 func getTableDuplicates(resource string, table *schema.Table, tableNames map[string]string) error {

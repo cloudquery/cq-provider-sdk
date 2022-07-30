@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
 	"github.com/cloudquery/faker/v3/support/slice"
 	"github.com/georgysavva/scany/pgxscan"
 )

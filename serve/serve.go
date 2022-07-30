@@ -5,8 +5,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/cloudquery/cq-provider-sdk/internal/source"
-	"github.com/cloudquery/cq-provider-sdk/provider"
+	"github.com/cloudquery/cq-provider-sdk/plugin/source"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -23,7 +22,7 @@ type Options struct {
 	Name string
 
 	// Required: Provider is the actual provider that will be served.
-	Provider *provider.Provider
+	Plugin *source.SourcePlugin
 }
 
 func newCmdServe(opts *Options) *cobra.Command {

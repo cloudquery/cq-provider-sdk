@@ -1,17 +1,17 @@
 syntax = "proto3";
 package proto;
-option go_package = "/internal";
+option go_package = "/pb";
 
 service Source {
-  // Information about what a provider supports/expects
-  rpc GetProviderSchema(GetProviderSchema.Request) returns (GetProviderSchema.Response);
-  // Gets a provider's configuration example
-  rpc GetProviderConfig(GetProviderConfig.Request) returns (GetProviderConfig.Response);
-  // Fetch Provider Resources
-  rpc FetchResources(FetchResources.Request) returns (stream FetchResources.Response);
+  // Get all tables the source plugin supports
+  rpc GetTables(GetTables.Request) returns (GetTables.Response);
+  // Get an example configuration for the source plugin
+  rpc GetExampleConfig(GetExampleConfig.Request) returns (GetExampleConfig.Response);
+  // Fetch resources
+  rpc Fetch(Fetch.Request) returns (stream Fetch.Response);
 }
 
-message FetchResources {
+message Fetch {
   message Request {
     // Holds information such as credentials, regions, accounts, etc'
     bytes config = 1;
@@ -30,7 +30,7 @@ message FetchResources {
   }
 }
 
-message GetProviderSchema {
+message GetTables {
   message Request {}
   message Response {
     string name = 1;
@@ -40,7 +40,7 @@ message GetProviderSchema {
   }
 }
 
-message GetProviderConfig {
+message GetExampleConfig {
   message Request {}
   message Response {
     string name = 1;

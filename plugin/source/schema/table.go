@@ -2,10 +2,10 @@ package schema
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
-	"sort"
+	"runtime/debug"
 	"strings"
+
+	"github.com/cloudquery/cq-provider-sdk/helpers"
 )
 
 // TableResolver is the main entry point when a table fetch is called.
@@ -51,6 +51,9 @@ type Table struct {
 	// Used when it is hard to create a reproducible environment with a row in this table.
 	IgnoreInTests bool
 
+	// Parent is the parent table in case this table is called via parent table (i.e. relation)
+	Parent *Table
+
 	// Serial is used to force a signature change, which forces new table creation and cascading removal of old table and relations
 	Serial string
 }
@@ -74,22 +77,6 @@ func (tco TableCreationOptions) signature() string {
 	return strings.Join(tco.PrimaryKeys, ";")
 }
 
-// Signature returns a comparable string about the structure of the table (columns, options, relations)
-func (t Table) Signature(d Dialect) string {
-	const sdkSignatureSerial = "" // Change this to force a change across all providers
-
-	sigs := append(
-		[]string{
-			"sdk:" + sdkSignatureSerial,
-		},
-		t.signature(d, nil)...,
-	)
-
-	h := sha256.New()
-	h.Write([]byte(strings.Join(sigs, "\n")))
-	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
 func (t Table) TableNames() []string {
 	ret := []string{t.Name}
 	for _, rel := range t.Relations {
@@ -98,28 +85,56 @@ func (t Table) TableNames() []string {
 	return ret
 }
 
-func (t Table) signature(d Dialect, parent *Table) []string {
-	sigs := make([]string, 0, len(t.Relations)+1)
-	sigs = append(sigs, strings.Join([]string{
-		"t:" + t.Serial,
-		t.Name,
-		d.Columns(&t).signature(),
-		strings.Join(d.PrimaryKeys(&t), ";"),
-		strings.Join(d.Constraints(&t, parent), "|"),
-		t.Options.signature(),
-	}, ","))
+// Call the table resolver with with all of it's relation for every reolved resource
+func (t Table) Resolve(ctx context.Context, meta ClientMeta, parent *Resource, resolvedResources chan<- *Resource) {
+	res := make(chan interface{})
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				stack := string(debug.Stack())
+				meta.Logger().Error().Str("table_name", t.Name).Str("stack", stack).Msg("table resolver finished with panic")
+			}
+			close(res)
+		}()
+		meta.Logger().Info().Str("table_name", t.Name).Msg("table resolver started")
+		if err := t.Resolver(ctx, meta, parent, res); err != nil {
+			meta.Logger().Error().Str("table_name", t.Name).Err(err).Msg("table resolver finished with error")
+		}
+		meta.Logger().Info().Str("table_name", t.Name).Msg("table resolver finished successfully")
+	}()
 
-	relNames := make([]string, len(t.Relations))
-	relVsTable := make(map[string]*Table, len(t.Relations))
-	for i := range t.Relations {
-		relNames[i] = t.Relations[i].Name
-		relVsTable[t.Relations[i].Name] = t.Relations[i]
+	// each result is an array of interface{}
+	for elem := range res {
+		objects := helpers.InterfaceSlice(elem)
+		if len(objects) == 0 {
+			continue
+		}
+		for i := range objects {
+			resource := NewResourceData(&t, parent, objects[i])
+			t.resolveColumns(ctx, meta, resource)
+			if t.PostResourceResolver != nil {
+				meta.Logger().Debug().Str("table_name", t.Name).Msg("post resource resolver started")
+				if err := t.PostResourceResolver(ctx, meta, resource); err != nil {
+					meta.Logger().Error().Str("table_name", t.Name).Err(err).Msg("post resource resolver finished with error")
+				}
+				meta.Logger().Debug().Str("table_name", t.Name).Msg("post resource resolver finished successfully")
+			}
+			resolvedResources <- resource
+			for _, rel := range t.Relations {
+				rel.Resolve(ctx, meta, resource, resolvedResources)
+			}
+		}
 	}
-	sort.Strings(relNames)
+}
 
-	for _, rel := range relNames {
-		sigs = append(sigs, relVsTable[rel].signature(d, &t)...)
+func (t Table) resolveColumns(ctx context.Context, meta ClientMeta, resource *Resource) {
+	for _, c := range t.Columns {
+		if c.Resolver != nil {
+			meta.Logger().Debug().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver started")
+			if err := c.Resolver(ctx, meta, resource, c); err != nil {
+				meta.Logger().Error().Str("colum_name", c.Name).Str("table_name", t.Name).Err(err).Msg("column resolver finished with error")
+			}
+			meta.Logger().Debug().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver finished successfully")
+		}
 	}
-
-	return sigs
 }

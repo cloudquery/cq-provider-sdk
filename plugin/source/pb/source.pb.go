@@ -2,10 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.28.0
 // 	protoc        v3.19.4
-// source: internal/source/source.proto
+// source: plugin/source/pb/source.proto
 
 package pb
-
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -21,29 +20,29 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type FetchResources struct {
+type Fetch struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 }
 
-func (x *FetchResources) Reset() {
-	*x = FetchResources{}
+func (x *Fetch) Reset() {
+	*x = Fetch{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_source_source_proto_msgTypes[0]
+		mi := &file_plugin_source_pb_source_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *FetchResources) String() string {
+func (x *Fetch) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FetchResources) ProtoMessage() {}
+func (*Fetch) ProtoMessage() {}
 
-func (x *FetchResources) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_source_source_proto_msgTypes[0]
+func (x *Fetch) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_source_pb_source_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -54,34 +53,34 @@ func (x *FetchResources) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FetchResources.ProtoReflect.Descriptor instead.
-func (*FetchResources) Descriptor() ([]byte, []int) {
-	return file_internal_source_source_proto_rawDescGZIP(), []int{0}
+// Deprecated: Use Fetch.ProtoReflect.Descriptor instead.
+func (*Fetch) Descriptor() ([]byte, []int) {
+	return file_plugin_source_pb_source_proto_rawDescGZIP(), []int{0}
 }
 
-type GetProviderSchema struct {
+type GetTables struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 }
 
-func (x *GetProviderSchema) Reset() {
-	*x = GetProviderSchema{}
+func (x *GetTables) Reset() {
+	*x = GetTables{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_source_source_proto_msgTypes[1]
+		mi := &file_plugin_source_pb_source_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *GetProviderSchema) String() string {
+func (x *GetTables) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetProviderSchema) ProtoMessage() {}
+func (*GetTables) ProtoMessage() {}
 
-func (x *GetProviderSchema) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_source_source_proto_msgTypes[1]
+func (x *GetTables) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_source_pb_source_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -92,34 +91,34 @@ func (x *GetProviderSchema) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetProviderSchema.ProtoReflect.Descriptor instead.
-func (*GetProviderSchema) Descriptor() ([]byte, []int) {
-	return file_internal_source_source_proto_rawDescGZIP(), []int{1}
+// Deprecated: Use GetTables.ProtoReflect.Descriptor instead.
+func (*GetTables) Descriptor() ([]byte, []int) {
+	return file_plugin_source_pb_source_proto_rawDescGZIP(), []int{1}
 }
 
-type GetProviderConfig struct {
+type GetExampleConfig struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 }
 
-func (x *GetProviderConfig) Reset() {
-	*x = GetProviderConfig{}
+func (x *GetExampleConfig) Reset() {
+	*x = GetExampleConfig{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_source_source_proto_msgTypes[2]
+		mi := &file_plugin_source_pb_source_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *GetProviderConfig) String() string {
+func (x *GetExampleConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetProviderConfig) ProtoMessage() {}
+func (*GetExampleConfig) ProtoMessage() {}
 
-func (x *GetProviderConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_source_source_proto_msgTypes[2]
+func (x *GetExampleConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_source_pb_source_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -130,12 +129,12 @@ func (x *GetProviderConfig) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetProviderConfig.ProtoReflect.Descriptor instead.
-func (*GetProviderConfig) Descriptor() ([]byte, []int) {
-	return file_internal_source_source_proto_rawDescGZIP(), []int{2}
+// Deprecated: Use GetExampleConfig.ProtoReflect.Descriptor instead.
+func (*GetExampleConfig) Descriptor() ([]byte, []int) {
+	return file_plugin_source_pb_source_proto_rawDescGZIP(), []int{2}
 }
 
-type FetchResources_Request struct {
+type Fetch_Request struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -152,23 +151,23 @@ type FetchResources_Request struct {
 	Timeout int64 `protobuf:"varint,5,opt,name=timeout,proto3" json:"timeout,omitempty"`
 }
 
-func (x *FetchResources_Request) Reset() {
-	*x = FetchResources_Request{}
+func (x *Fetch_Request) Reset() {
+	*x = Fetch_Request{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_source_source_proto_msgTypes[3]
+		mi := &file_plugin_source_pb_source_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *FetchResources_Request) String() string {
+func (x *Fetch_Request) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FetchResources_Request) ProtoMessage() {}
+func (*Fetch_Request) ProtoMessage() {}
 
-func (x *FetchResources_Request) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_source_source_proto_msgTypes[3]
+func (x *Fetch_Request) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_source_pb_source_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -179,47 +178,47 @@ func (x *FetchResources_Request) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FetchResources_Request.ProtoReflect.Descriptor instead.
-func (*FetchResources_Request) Descriptor() ([]byte, []int) {
-	return file_internal_source_source_proto_rawDescGZIP(), []int{0, 0}
+// Deprecated: Use Fetch_Request.ProtoReflect.Descriptor instead.
+func (*Fetch_Request) Descriptor() ([]byte, []int) {
+	return file_plugin_source_pb_source_proto_rawDescGZIP(), []int{0, 0}
 }
 
-func (x *FetchResources_Request) GetConfig() []byte {
+func (x *Fetch_Request) GetConfig() []byte {
 	if x != nil {
 		return x.Config
 	}
 	return nil
 }
 
-func (x *FetchResources_Request) GetResources() []string {
+func (x *Fetch_Request) GetResources() []string {
 	if x != nil {
 		return x.Resources
 	}
 	return nil
 }
 
-func (x *FetchResources_Request) GetParallelFetchingLimit() uint64 {
+func (x *Fetch_Request) GetParallelFetchingLimit() uint64 {
 	if x != nil {
 		return x.ParallelFetchingLimit
 	}
 	return 0
 }
 
-func (x *FetchResources_Request) GetMaxGoroutines() uint64 {
+func (x *Fetch_Request) GetMaxGoroutines() uint64 {
 	if x != nil {
 		return x.MaxGoroutines
 	}
 	return 0
 }
 
-func (x *FetchResources_Request) GetTimeout() int64 {
+func (x *Fetch_Request) GetTimeout() int64 {
 	if x != nil {
 		return x.Timeout
 	}
 	return 0
 }
 
-type FetchResources_Response struct {
+type Fetch_Response struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -228,23 +227,23 @@ type FetchResources_Response struct {
 	Resources []byte `protobuf:"bytes,1,opt,name=resources,proto3" json:"resources,omitempty"`
 }
 
-func (x *FetchResources_Response) Reset() {
-	*x = FetchResources_Response{}
+func (x *Fetch_Response) Reset() {
+	*x = Fetch_Response{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_source_source_proto_msgTypes[4]
+		mi := &file_plugin_source_pb_source_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *FetchResources_Response) String() string {
+func (x *Fetch_Response) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FetchResources_Response) ProtoMessage() {}
+func (*Fetch_Response) ProtoMessage() {}
 
-func (x *FetchResources_Response) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_source_source_proto_msgTypes[4]
+func (x *Fetch_Response) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_source_pb_source_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -255,41 +254,41 @@ func (x *FetchResources_Response) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FetchResources_Response.ProtoReflect.Descriptor instead.
-func (*FetchResources_Response) Descriptor() ([]byte, []int) {
-	return file_internal_source_source_proto_rawDescGZIP(), []int{0, 1}
+// Deprecated: Use Fetch_Response.ProtoReflect.Descriptor instead.
+func (*Fetch_Response) Descriptor() ([]byte, []int) {
+	return file_plugin_source_pb_source_proto_rawDescGZIP(), []int{0, 1}
 }
 
-func (x *FetchResources_Response) GetResources() []byte {
+func (x *Fetch_Response) GetResources() []byte {
 	if x != nil {
 		return x.Resources
 	}
 	return nil
 }
 
-type GetProviderSchema_Request struct {
+type GetTables_Request struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 }
 
-func (x *GetProviderSchema_Request) Reset() {
-	*x = GetProviderSchema_Request{}
+func (x *GetTables_Request) Reset() {
+	*x = GetTables_Request{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_source_source_proto_msgTypes[5]
+		mi := &file_plugin_source_pb_source_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *GetProviderSchema_Request) String() string {
+func (x *GetTables_Request) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetProviderSchema_Request) ProtoMessage() {}
+func (*GetTables_Request) ProtoMessage() {}
 
-func (x *GetProviderSchema_Request) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_source_source_proto_msgTypes[5]
+func (x *GetTables_Request) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_source_pb_source_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -300,12 +299,12 @@ func (x *GetProviderSchema_Request) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetProviderSchema_Request.ProtoReflect.Descriptor instead.
-func (*GetProviderSchema_Request) Descriptor() ([]byte, []int) {
-	return file_internal_source_source_proto_rawDescGZIP(), []int{1, 0}
+// Deprecated: Use GetTables_Request.ProtoReflect.Descriptor instead.
+func (*GetTables_Request) Descriptor() ([]byte, []int) {
+	return file_plugin_source_pb_source_proto_rawDescGZIP(), []int{1, 0}
 }
 
-type GetProviderSchema_Response struct {
+type GetTables_Response struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -316,23 +315,23 @@ type GetProviderSchema_Response struct {
 	Tables []byte `protobuf:"bytes,3,opt,name=tables,proto3" json:"tables,omitempty"`
 }
 
-func (x *GetProviderSchema_Response) Reset() {
-	*x = GetProviderSchema_Response{}
+func (x *GetTables_Response) Reset() {
+	*x = GetTables_Response{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_source_source_proto_msgTypes[6]
+		mi := &file_plugin_source_pb_source_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *GetProviderSchema_Response) String() string {
+func (x *GetTables_Response) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetProviderSchema_Response) ProtoMessage() {}
+func (*GetTables_Response) ProtoMessage() {}
 
-func (x *GetProviderSchema_Response) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_source_source_proto_msgTypes[6]
+func (x *GetTables_Response) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_source_pb_source_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -343,55 +342,55 @@ func (x *GetProviderSchema_Response) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetProviderSchema_Response.ProtoReflect.Descriptor instead.
-func (*GetProviderSchema_Response) Descriptor() ([]byte, []int) {
-	return file_internal_source_source_proto_rawDescGZIP(), []int{1, 1}
+// Deprecated: Use GetTables_Response.ProtoReflect.Descriptor instead.
+func (*GetTables_Response) Descriptor() ([]byte, []int) {
+	return file_plugin_source_pb_source_proto_rawDescGZIP(), []int{1, 1}
 }
 
-func (x *GetProviderSchema_Response) GetName() string {
+func (x *GetTables_Response) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *GetProviderSchema_Response) GetVersion() string {
+func (x *GetTables_Response) GetVersion() string {
 	if x != nil {
 		return x.Version
 	}
 	return ""
 }
 
-func (x *GetProviderSchema_Response) GetTables() []byte {
+func (x *GetTables_Response) GetTables() []byte {
 	if x != nil {
 		return x.Tables
 	}
 	return nil
 }
 
-type GetProviderConfig_Request struct {
+type GetExampleConfig_Request struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 }
 
-func (x *GetProviderConfig_Request) Reset() {
-	*x = GetProviderConfig_Request{}
+func (x *GetExampleConfig_Request) Reset() {
+	*x = GetExampleConfig_Request{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_source_source_proto_msgTypes[7]
+		mi := &file_plugin_source_pb_source_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *GetProviderConfig_Request) String() string {
+func (x *GetExampleConfig_Request) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetProviderConfig_Request) ProtoMessage() {}
+func (*GetExampleConfig_Request) ProtoMessage() {}
 
-func (x *GetProviderConfig_Request) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_source_source_proto_msgTypes[7]
+func (x *GetExampleConfig_Request) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_source_pb_source_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,12 +401,12 @@ func (x *GetProviderConfig_Request) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetProviderConfig_Request.ProtoReflect.Descriptor instead.
-func (*GetProviderConfig_Request) Descriptor() ([]byte, []int) {
-	return file_internal_source_source_proto_rawDescGZIP(), []int{2, 0}
+// Deprecated: Use GetExampleConfig_Request.ProtoReflect.Descriptor instead.
+func (*GetExampleConfig_Request) Descriptor() ([]byte, []int) {
+	return file_plugin_source_pb_source_proto_rawDescGZIP(), []int{2, 0}
 }
 
-type GetProviderConfig_Response struct {
+type GetExampleConfig_Response struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -417,23 +416,23 @@ type GetProviderConfig_Response struct {
 	Config  []byte `protobuf:"bytes,3,opt,name=config,proto3" json:"config,omitempty"`
 }
 
-func (x *GetProviderConfig_Response) Reset() {
-	*x = GetProviderConfig_Response{}
+func (x *GetExampleConfig_Response) Reset() {
+	*x = GetExampleConfig_Response{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_source_source_proto_msgTypes[8]
+		mi := &file_plugin_source_pb_source_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *GetProviderConfig_Response) String() string {
+func (x *GetExampleConfig_Response) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetProviderConfig_Response) ProtoMessage() {}
+func (*GetExampleConfig_Response) ProtoMessage() {}
 
-func (x *GetProviderConfig_Response) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_source_source_proto_msgTypes[8]
+func (x *GetExampleConfig_Response) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_source_pb_source_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -444,119 +443,114 @@ func (x *GetProviderConfig_Response) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetProviderConfig_Response.ProtoReflect.Descriptor instead.
-func (*GetProviderConfig_Response) Descriptor() ([]byte, []int) {
-	return file_internal_source_source_proto_rawDescGZIP(), []int{2, 1}
+// Deprecated: Use GetExampleConfig_Response.ProtoReflect.Descriptor instead.
+func (*GetExampleConfig_Response) Descriptor() ([]byte, []int) {
+	return file_plugin_source_pb_source_proto_rawDescGZIP(), []int{2, 1}
 }
 
-func (x *GetProviderConfig_Response) GetName() string {
+func (x *GetExampleConfig_Response) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *GetProviderConfig_Response) GetVersion() string {
+func (x *GetExampleConfig_Response) GetVersion() string {
 	if x != nil {
 		return x.Version
 	}
 	return ""
 }
 
-func (x *GetProviderConfig_Response) GetConfig() []byte {
+func (x *GetExampleConfig_Response) GetConfig() []byte {
 	if x != nil {
 		return x.Config
 	}
 	return nil
 }
 
-var File_internal_source_source_proto protoreflect.FileDescriptor
+var File_plugin_source_pb_source_proto protoreflect.FileDescriptor
 
-var file_internal_source_source_proto_rawDesc = []byte{
-	0x0a, 0x1c, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x73, 0x6f, 0x75, 0x72, 0x63,
-	0x65, 0x2f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0xf5, 0x01, 0x0a, 0x0e, 0x46, 0x65, 0x74, 0x63, 0x68, 0x52,
-	0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x1a, 0xb8, 0x01, 0x0a, 0x07, 0x52, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x1c, 0x0a, 0x09,
-	0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52,
-	0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x12, 0x36, 0x0a, 0x17, 0x70, 0x61,
-	0x72, 0x61, 0x6c, 0x6c, 0x65, 0x6c, 0x5f, 0x66, 0x65, 0x74, 0x63, 0x68, 0x69, 0x6e, 0x67, 0x5f,
-	0x6c, 0x69, 0x6d, 0x69, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x15, 0x70, 0x61, 0x72,
-	0x61, 0x6c, 0x6c, 0x65, 0x6c, 0x46, 0x65, 0x74, 0x63, 0x68, 0x69, 0x6e, 0x67, 0x4c, 0x69, 0x6d,
-	0x69, 0x74, 0x12, 0x25, 0x0a, 0x0e, 0x6d, 0x61, 0x78, 0x5f, 0x67, 0x6f, 0x72, 0x6f, 0x75, 0x74,
-	0x69, 0x6e, 0x65, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0d, 0x6d, 0x61, 0x78, 0x47,
-	0x6f, 0x72, 0x6f, 0x75, 0x74, 0x69, 0x6e, 0x65, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x74, 0x69, 0x6d,
-	0x65, 0x6f, 0x75, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x74, 0x69, 0x6d, 0x65,
-	0x6f, 0x75, 0x74, 0x1a, 0x28, 0x0a, 0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
-	0x1c, 0x0a, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x0c, 0x52, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x22, 0x70, 0x0a,
-	0x11, 0x47, 0x65, 0x74, 0x50, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x53, 0x63, 0x68, 0x65,
-	0x6d, 0x61, 0x1a, 0x09, 0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x50, 0x0a,
+var file_plugin_source_pb_source_proto_rawDesc = []byte{
+	0x0a, 0x1d, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x2f,
+	0x70, 0x62, 0x2f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12,
+	0x05, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0xec, 0x01, 0x0a, 0x05, 0x46, 0x65, 0x74, 0x63, 0x68,
+	0x1a, 0xb8, 0x01, 0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x16, 0x0a, 0x06,
+	0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x63, 0x6f,
+	0x6e, 0x66, 0x69, 0x67, 0x12, 0x1c, 0x0a, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65,
+	0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63,
+	0x65, 0x73, 0x12, 0x36, 0x0a, 0x17, 0x70, 0x61, 0x72, 0x61, 0x6c, 0x6c, 0x65, 0x6c, 0x5f, 0x66,
+	0x65, 0x74, 0x63, 0x68, 0x69, 0x6e, 0x67, 0x5f, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x04, 0x52, 0x15, 0x70, 0x61, 0x72, 0x61, 0x6c, 0x6c, 0x65, 0x6c, 0x46, 0x65, 0x74,
+	0x63, 0x68, 0x69, 0x6e, 0x67, 0x4c, 0x69, 0x6d, 0x69, 0x74, 0x12, 0x25, 0x0a, 0x0e, 0x6d, 0x61,
+	0x78, 0x5f, 0x67, 0x6f, 0x72, 0x6f, 0x75, 0x74, 0x69, 0x6e, 0x65, 0x73, 0x18, 0x04, 0x20, 0x01,
+	0x28, 0x04, 0x52, 0x0d, 0x6d, 0x61, 0x78, 0x47, 0x6f, 0x72, 0x6f, 0x75, 0x74, 0x69, 0x6e, 0x65,
+	0x73, 0x12, 0x18, 0x0a, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x18, 0x05, 0x20, 0x01,
+	0x28, 0x03, 0x52, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x1a, 0x28, 0x0a, 0x08, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75,
+	0x72, 0x63, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x09, 0x72, 0x65, 0x73, 0x6f,
+	0x75, 0x72, 0x63, 0x65, 0x73, 0x22, 0x68, 0x0a, 0x09, 0x47, 0x65, 0x74, 0x54, 0x61, 0x62, 0x6c,
+	0x65, 0x73, 0x1a, 0x09, 0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x50, 0x0a,
 	0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d,
 	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a,
 	0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07,
 	0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x16, 0x0a, 0x06, 0x74, 0x61, 0x62, 0x6c, 0x65,
 	0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x73, 0x22,
-	0x70, 0x0a, 0x11, 0x47, 0x65, 0x74, 0x50, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x43, 0x6f,
-	0x6e, 0x66, 0x69, 0x67, 0x1a, 0x09, 0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
-	0x50, 0x0a, 0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6e,
-	0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12,
-	0x18, 0x0a, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x16, 0x0a, 0x06, 0x63, 0x6f, 0x6e,
-	0x66, 0x69, 0x67, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x63, 0x6f, 0x6e, 0x66, 0x69,
-	0x67, 0x32, 0x8f, 0x02, 0x0a, 0x06, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x12, 0x58, 0x0a, 0x11,
-	0x47, 0x65, 0x74, 0x50, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x53, 0x63, 0x68, 0x65, 0x6d,
-	0x61, 0x12, 0x20, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x50, 0x72, 0x6f,
-	0x76, 0x69, 0x64, 0x65, 0x72, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x2e, 0x52, 0x65, 0x71, 0x75,
-	0x65, 0x73, 0x74, 0x1a, 0x21, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x50,
-	0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x2e, 0x52, 0x65,
-	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x58, 0x0a, 0x11, 0x47, 0x65, 0x74, 0x50, 0x72, 0x6f,
-	0x76, 0x69, 0x64, 0x65, 0x72, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x20, 0x2e, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x50, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x43,
-	0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x21, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x50, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65,
-	0x72, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
-	0x12, 0x51, 0x0a, 0x0e, 0x46, 0x65, 0x74, 0x63, 0x68, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63,
-	0x65, 0x73, 0x12, 0x1d, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x46, 0x65, 0x74, 0x63, 0x68,
-	0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
-	0x74, 0x1a, 0x1e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x46, 0x65, 0x74, 0x63, 0x68, 0x52,
-	0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
-	0x65, 0x30, 0x01, 0x42, 0x0b, 0x5a, 0x09, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c,
-	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x6f, 0x0a, 0x10, 0x47, 0x65, 0x74, 0x45, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x43, 0x6f, 0x6e,
+	0x66, 0x69, 0x67, 0x1a, 0x09, 0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x50,
+	0x0a, 0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61,
+	0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x18,
+	0x0a, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x16, 0x0a, 0x06, 0x63, 0x6f, 0x6e, 0x66,
+	0x69, 0x67, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
+	0x32, 0xd9, 0x01, 0x0a, 0x06, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x12, 0x40, 0x0a, 0x09, 0x47,
+	0x65, 0x74, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x73, 0x12, 0x18, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x2e, 0x47, 0x65, 0x74, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x73, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x1a, 0x19, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x54, 0x61,
+	0x62, 0x6c, 0x65, 0x73, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x55, 0x0a,
+	0x10, 0x47, 0x65, 0x74, 0x45, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69,
+	0x67, 0x12, 0x1f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x45, 0x78, 0x61,
+	0x6d, 0x70, 0x6c, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x1a, 0x20, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x45, 0x78,
+	0x61, 0x6d, 0x70, 0x6c, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x36, 0x0a, 0x05, 0x46, 0x65, 0x74, 0x63, 0x68, 0x12, 0x14, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x46, 0x65, 0x74, 0x63, 0x68, 0x2e, 0x52, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x1a, 0x15, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x46, 0x65, 0x74, 0x63,
+	0x68, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x30, 0x01, 0x42, 0x05, 0x5a, 0x03,
+	0x2f, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
-	file_internal_source_source_proto_rawDescOnce sync.Once
-	file_internal_source_source_proto_rawDescData = file_internal_source_source_proto_rawDesc
+	file_plugin_source_pb_source_proto_rawDescOnce sync.Once
+	file_plugin_source_pb_source_proto_rawDescData = file_plugin_source_pb_source_proto_rawDesc
 )
 
-func file_internal_source_source_proto_rawDescGZIP() []byte {
-	file_internal_source_source_proto_rawDescOnce.Do(func() {
-		file_internal_source_source_proto_rawDescData = protoimpl.X.CompressGZIP(file_internal_source_source_proto_rawDescData)
+func file_plugin_source_pb_source_proto_rawDescGZIP() []byte {
+	file_plugin_source_pb_source_proto_rawDescOnce.Do(func() {
+		file_plugin_source_pb_source_proto_rawDescData = protoimpl.X.CompressGZIP(file_plugin_source_pb_source_proto_rawDescData)
 	})
-	return file_internal_source_source_proto_rawDescData
+	return file_plugin_source_pb_source_proto_rawDescData
 }
 
-var file_internal_source_source_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-var file_internal_source_source_proto_goTypes = []interface{}{
-	(*FetchResources)(nil),             // 0: proto.FetchResources
-	(*GetProviderSchema)(nil),          // 1: proto.GetProviderSchema
-	(*GetProviderConfig)(nil),          // 2: proto.GetProviderConfig
-	(*FetchResources_Request)(nil),     // 3: proto.FetchResources.Request
-	(*FetchResources_Response)(nil),    // 4: proto.FetchResources.Response
-	(*GetProviderSchema_Request)(nil),  // 5: proto.GetProviderSchema.Request
-	(*GetProviderSchema_Response)(nil), // 6: proto.GetProviderSchema.Response
-	(*GetProviderConfig_Request)(nil),  // 7: proto.GetProviderConfig.Request
-	(*GetProviderConfig_Response)(nil), // 8: proto.GetProviderConfig.Response
+var file_plugin_source_pb_source_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_plugin_source_pb_source_proto_goTypes = []interface{}{
+	(*Fetch)(nil),                     // 0: proto.Fetch
+	(*GetTables)(nil),                 // 1: proto.GetTables
+	(*GetExampleConfig)(nil),          // 2: proto.GetExampleConfig
+	(*Fetch_Request)(nil),             // 3: proto.Fetch.Request
+	(*Fetch_Response)(nil),            // 4: proto.Fetch.Response
+	(*GetTables_Request)(nil),         // 5: proto.GetTables.Request
+	(*GetTables_Response)(nil),        // 6: proto.GetTables.Response
+	(*GetExampleConfig_Request)(nil),  // 7: proto.GetExampleConfig.Request
+	(*GetExampleConfig_Response)(nil), // 8: proto.GetExampleConfig.Response
 }
-var file_internal_source_source_proto_depIdxs = []int32{
-	5, // 0: proto.Source.GetProviderSchema:input_type -> proto.GetProviderSchema.Request
-	7, // 1: proto.Source.GetProviderConfig:input_type -> proto.GetProviderConfig.Request
-	3, // 2: proto.Source.FetchResources:input_type -> proto.FetchResources.Request
-	6, // 3: proto.Source.GetProviderSchema:output_type -> proto.GetProviderSchema.Response
-	8, // 4: proto.Source.GetProviderConfig:output_type -> proto.GetProviderConfig.Response
-	4, // 5: proto.Source.FetchResources:output_type -> proto.FetchResources.Response
+var file_plugin_source_pb_source_proto_depIdxs = []int32{
+	5, // 0: proto.Source.GetTables:input_type -> proto.GetTables.Request
+	7, // 1: proto.Source.GetExampleConfig:input_type -> proto.GetExampleConfig.Request
+	3, // 2: proto.Source.Fetch:input_type -> proto.Fetch.Request
+	6, // 3: proto.Source.GetTables:output_type -> proto.GetTables.Response
+	8, // 4: proto.Source.GetExampleConfig:output_type -> proto.GetExampleConfig.Response
+	4, // 5: proto.Source.Fetch:output_type -> proto.Fetch.Response
 	3, // [3:6] is the sub-list for method output_type
 	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -564,14 +558,14 @@ var file_internal_source_source_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_internal_source_source_proto_init() }
-func file_internal_source_source_proto_init() {
-	if File_internal_source_source_proto != nil {
+func init() { file_plugin_source_pb_source_proto_init() }
+func file_plugin_source_pb_source_proto_init() {
+	if File_plugin_source_pb_source_proto != nil {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_internal_source_source_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*FetchResources); i {
+		file_plugin_source_pb_source_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Fetch); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -582,8 +576,8 @@ func file_internal_source_source_proto_init() {
 				return nil
 			}
 		}
-		file_internal_source_source_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetProviderSchema); i {
+		file_plugin_source_pb_source_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetTables); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -594,8 +588,8 @@ func file_internal_source_source_proto_init() {
 				return nil
 			}
 		}
-		file_internal_source_source_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetProviderConfig); i {
+		file_plugin_source_pb_source_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetExampleConfig); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -606,8 +600,8 @@ func file_internal_source_source_proto_init() {
 				return nil
 			}
 		}
-		file_internal_source_source_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*FetchResources_Request); i {
+		file_plugin_source_pb_source_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Fetch_Request); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -618,8 +612,8 @@ func file_internal_source_source_proto_init() {
 				return nil
 			}
 		}
-		file_internal_source_source_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*FetchResources_Response); i {
+		file_plugin_source_pb_source_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Fetch_Response); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -630,8 +624,8 @@ func file_internal_source_source_proto_init() {
 				return nil
 			}
 		}
-		file_internal_source_source_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetProviderSchema_Request); i {
+		file_plugin_source_pb_source_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetTables_Request); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -642,8 +636,8 @@ func file_internal_source_source_proto_init() {
 				return nil
 			}
 		}
-		file_internal_source_source_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetProviderSchema_Response); i {
+		file_plugin_source_pb_source_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetTables_Response); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -654,8 +648,8 @@ func file_internal_source_source_proto_init() {
 				return nil
 			}
 		}
-		file_internal_source_source_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetProviderConfig_Request); i {
+		file_plugin_source_pb_source_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetExampleConfig_Request); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -666,8 +660,8 @@ func file_internal_source_source_proto_init() {
 				return nil
 			}
 		}
-		file_internal_source_source_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetProviderConfig_Response); i {
+		file_plugin_source_pb_source_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetExampleConfig_Response); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -683,18 +677,18 @@ func file_internal_source_source_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_internal_source_source_proto_rawDesc,
+			RawDescriptor: file_plugin_source_pb_source_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_source_source_proto_goTypes,
-		DependencyIndexes: file_internal_source_source_proto_depIdxs,
-		MessageInfos:      file_internal_source_source_proto_msgTypes,
+		GoTypes:           file_plugin_source_pb_source_proto_goTypes,
+		DependencyIndexes: file_plugin_source_pb_source_proto_depIdxs,
+		MessageInfos:      file_plugin_source_pb_source_proto_msgTypes,
 	}.Build()
-	File_internal_source_source_proto = out.File
-	file_internal_source_source_proto_rawDesc = nil
-	file_internal_source_source_proto_goTypes = nil
-	file_internal_source_source_proto_depIdxs = nil
+	File_plugin_source_pb_source_proto = out.File
+	file_plugin_source_pb_source_proto_rawDesc = nil
+	file_plugin_source_pb_source_proto_goTypes = nil
+	file_plugin_source_pb_source_proto_depIdxs = nil
 }

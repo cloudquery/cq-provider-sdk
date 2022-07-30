@@ -4,7 +4,6 @@ import (
 	"crypto"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/hashstructure/v2"
@@ -21,54 +20,51 @@ type Resource struct {
 	// Set if this is an embedded table
 	Parent *Resource
 	// internal fields
-	table          *Table
-	data           map[string]interface{}
-	cqId           uuid.UUID
-	metadata       map[string]interface{}
-	columns        []string
-	dialect        Dialect
-	executionStart time.Time
+	table    *Table
+	data     map[string]interface{}
+	cqId     uuid.UUID
+	metadata map[string]interface{}
+	columns  []string
 }
 
-func NewResourceData(dialect Dialect, t *Table, parent *Resource, item interface{}, metadata map[string]interface{}, startTime time.Time) *Resource {
+func NewResourceData(t *Table, parent *Resource, item interface{}) *Resource {
 	return &Resource{
-		Item:           item,
-		Parent:         parent,
-		table:          t,
-		data:           make(map[string]interface{}),
-		cqId:           uuid.New(),
-		columns:        dialect.Columns(t).Names(),
-		metadata:       metadata,
-		dialect:        dialect,
-		executionStart: startTime,
+		Item:   item,
+		Parent: parent,
+		table:  t,
+		data:   make(map[string]interface{}),
+		cqId:   uuid.New(),
+		// columns:  dialect.Columns(t).Names(),
+		// metadata: metadata,
 	}
 }
-func (r *Resource) PrimaryKeyValues() []string {
-	tablePrimKeys := r.dialect.PrimaryKeys(r.table)
-	if len(tablePrimKeys) == 0 {
-		return []string{}
-	}
-	results := make([]string, 0)
-	for _, primKey := range tablePrimKeys {
-		data := r.Get(primKey)
-		if data == nil {
-			continue
-		}
-		// we can have more types, but PKs are usually either ints, strings or a structure
-		// hopefully supporting Stringer interface, otherwise we fallback
-		switch v := data.(type) {
-		case fmt.Stringer:
-			results = append(results, v.String())
-		case *string:
-			results = append(results, *v)
-		case *int:
-			results = append(results, fmt.Sprintf("%d", *v))
-		default:
-			results = append(results, fmt.Sprintf("%v", v))
-		}
-	}
-	return results
-}
+
+// func (r *Resource) PrimaryKeyValues() []string {
+// 	tablePrimKeys := r.dialect.PrimaryKeys(r.table)
+// 	if len(tablePrimKeys) == 0 {
+// 		return []string{}
+// 	}
+// 	results := make([]string, 0)
+// 	for _, primKey := range tablePrimKeys {
+// 		data := r.Get(primKey)
+// 		if data == nil {
+// 			continue
+// 		}
+// 		// we can have more types, but PKs are usually either ints, strings or a structure
+// 		// hopefully supporting Stringer interface, otherwise we fallback
+// 		switch v := data.(type) {
+// 		case fmt.Stringer:
+// 			results = append(results, v.String())
+// 		case *string:
+// 			results = append(results, *v)
+// 		case *int:
+// 			results = append(results, fmt.Sprintf("%d", *v))
+// 		default:
+// 			results = append(results, fmt.Sprintf("%v", v))
+// 		}
+// 	}
+// 	return results
+// }
 
 func (r *Resource) Get(key string) interface{} {
 	return r.data[key]
@@ -87,44 +83,44 @@ func (r *Resource) Id() uuid.UUID {
 	return r.cqId
 }
 
-func (r *Resource) Values() ([]interface{}, error) {
-	values := make([]interface{}, 0)
-	for _, c := range r.dialect.Columns(r.table) {
-		v := r.Get(c.Name)
-		if err := c.ValidateType(v); err != nil {
-			return nil, err
-		}
-		values = append(values, v)
-	}
-	return values, nil
-}
+// func (r *Resource) Values() ([]interface{}, error) {
+// 	values := make([]interface{}, 0)
+// 	for _, c := range r.dialect.Columns(r.table) {
+// 		v := r.Get(c.Name)
+// 		if err := c.ValidateType(v); err != nil {
+// 			return nil, err
+// 		}
+// 		values = append(values, v)
+// 	}
+// 	return values, nil
+// }
 
-func (r *Resource) GenerateCQId() error {
-	if len(r.table.Options.PrimaryKeys) == 0 {
-		return nil
-	}
-	pks := r.dialect.PrimaryKeys(r.table)
-	objs := make([]interface{}, 0, len(pks))
-	for _, pk := range pks {
-		if col := r.getColumnByName(pk); col == nil {
-			return fmt.Errorf("failed to generate cq_id for %s, pk column missing %s", r.table.Name, pk)
-		} else if col.internal {
-			continue
-		}
+// func (r *Resource) GenerateCQId() error {
+// 	if len(r.table.Options.PrimaryKeys) == 0 {
+// 		return nil
+// 	}
+// 	pks := r.dialect.PrimaryKeys(r.table)
+// 	objs := make([]interface{}, 0, len(pks))
+// 	for _, pk := range pks {
+// 		if col := r.getColumnByName(pk); col == nil {
+// 			return fmt.Errorf("failed to generate cq_id for %s, pk column missing %s", r.table.Name, pk)
+// 		} else if col.internal {
+// 			continue
+// 		}
 
-		value := r.Get(pk)
-		if value == nil {
-			return fmt.Errorf("failed to generate cq_id for %s, pk field missing %s", r.table.Name, pk)
-		}
-		objs = append(objs, value)
-	}
-	id, err := hashUUID(objs)
-	if err != nil {
-		return err
-	}
-	r.cqId = id
-	return nil
-}
+// 		value := r.Get(pk)
+// 		if value == nil {
+// 			return fmt.Errorf("failed to generate cq_id for %s, pk field missing %s", r.table.Name, pk)
+// 		}
+// 		objs = append(objs, value)
+// 	}
+// 	id, err := hashUUID(objs)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	r.cqId = id
+// 	return nil
+// }
 
 func (r *Resource) TableName() string {
 	if r.table == nil {
@@ -142,7 +138,7 @@ func (r Resource) GetMeta(key string) (interface{}, bool) {
 }
 
 func (r Resource) getColumnByName(column string) *Column {
-	for _, c := range r.dialect.Columns(r.table) {
+	for _, c := range r.table.Columns {
 		if strings.Compare(column, c.Name) == 0 {
 			return &c
 		}

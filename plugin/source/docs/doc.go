@@ -12,8 +12,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/cloudquery/cq-provider-sdk/provider"
-	"github.com/cloudquery/cq-provider-sdk/provider/schema"
+	"github.com/cloudquery/cq-provider-sdk/plugin/source"
+	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
 )
 
 const (
@@ -21,14 +21,14 @@ const (
 )
 
 // GenerateDocs creates table documentation for the provider based on it's ResourceMap
-func GenerateDocs(p *provider.Provider, outputPath string, deleteOld bool) error {
+func GenerateDocs(p *source.SourcePlugin, outputPath string, deleteOld bool) error {
 	if deleteOld {
 		if err := deleteOldFiles(outputPath); err != nil {
 			fmt.Printf("failed to remove old docs: %s", err)
 			return err
 		}
 	}
-	for _, table := range p.ResourceMap {
+	for _, table := range p.Tables {
 		if err := renderAllTables(table, outputPath); err != nil {
 			fmt.Printf("render table %s error: %s", table.Name, err)
 			return err
@@ -73,7 +73,6 @@ func renderAllTables(t *schema.Table, outputPath string) error {
 
 func renderTable(table *schema.Table, path string) error {
 	t := template.New("").Funcs(map[string]interface{}{
-		"pgType": schema.PostgresDialect{}.DBTypeFromType,
 		"removeLineBreaks": func(text string) string {
 			return strings.ReplaceAll(text, "\n", " ")
 		},
@@ -98,6 +97,6 @@ const tableTmpl = `
 | Name        | Type           | Description  |
 | ------------- | ------------- | -----  |
 {{- range $column := $.Columns }}
-|{{$column.Name}}|{{$column.Type|pgType}}|{{$column.Description|removeLineBreaks}}|
+|{{$column.Name}}|{{$column.Type}}|{{$column.Description|removeLineBreaks}}|
 {{- end }}
 `

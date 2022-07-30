@@ -10,11 +10,7 @@ import (
 )
 
 type ClientMeta interface {
-	Logger() zerolog.Logger
-}
-
-type ClientIdentifier interface {
-	Identify() string
+	Logger() *zerolog.Logger
 }
 
 type Meta struct {

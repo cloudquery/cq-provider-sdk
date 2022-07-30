@@ -1,155 +1,71 @@
 package schema
 
 import (
+	"context"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/rs/zerolog"
 )
 
-var tableDefinitionTestCases = []tableTestCase{
-	{
-		Name: "simpleTable",
-		Table: &Table{
-			Name: "simple_table",
-			Columns: []Column{
-				{
-					Name: "some_string",
-					Type: TypeString,
-				},
-			},
-		},
-		ExpectedColumnNames: []string{"cq_id", "cq_meta", "some_string"},
-		ExpectedHasId:       false,
-	},
-	{
-		Name: "simpleTableWithId",
-		Table: &Table{
-			Name: "simple_table_with_id",
-			Columns: []Column{
-				{
-					Name: "some_string",
-					Type: TypeString,
-				},
-				{
-					Name: "some_int",
-					Type: TypeInt,
-				},
-			},
-		},
-		ExpectedColumnNames: []string{"cq_id", "cq_meta", "some_string", "some_int"},
-		ExpectedHasId:       true,
-	},
-	{
-		Name: "simpleTableWithEmbedded",
-		Table: &Table{
-			Name: "simple_embedded_table",
-			Columns: []Column{
-				{
-					Name: "some_string",
-					Type: TypeString,
-				},
-				{
-					Name: "some_int",
-					Type: TypeInt,
-				},
-				{
-					Name: "embedded_some_string",
-					Type: TypeString,
-				},
-				{
-					Name: "embedded_some_int",
-					Type: TypeInt,
-				},
-			},
-		},
-		ExpectedColumnNames: []string{"cq_id", "cq_meta", "some_string", "some_int", "embedded_some_string", "embedded_some_int"},
-	},
-
-	{
-		Name: "multiEmbeddedTable",
-		Table: &Table{
-			Name: "multi_embedded_table",
-			Columns: []Column{
-				{
-					Name: "some_int",
-					Type: TypeInt,
-				},
-				{
-					Name: "embedded_some_string",
-					Type: TypeString,
-				},
-				{
-					Name: "embedded_inner_some_int",
-					Type: TypeInt,
-				},
-			},
-		},
-		ExpectedColumnNames: []string{"cq_id", "cq_meta", "some_int", "embedded_some_string", "embedded_inner_some_int"},
-	},
-	{
-		Name: "simpleTableWithEmbedded",
-		Table: &Table{
-			Name: "simple_embedded_table",
-			Columns: []Column{
-				{
-					Name: "some_string",
-					Type: TypeString,
-				},
-				{
-					Name: "some_int",
-					Type: TypeInt,
-				},
-				{
-					Name: "some_string_no_prefix",
-					Type: TypeString,
-				},
-				{
-					Name: "some_int_no_prefix",
-					Type: TypeInt,
-				},
-			},
-		},
-		ExpectedColumnNames: []string{"cq_id", "cq_meta", "some_string", "some_int", "some_string_no_prefix", "some_int_no_prefix"},
-	},
-}
-
 type tableTestCase struct {
-	Name                string
-	Table               *Table
-	ExpectedColumnNames []string
-	ExpectedHasId       bool
+	Table     Table
+	Resources []*Resource
 }
 
-func TestTableDefinitionUseCases(t *testing.T) {
-	for _, c := range tableDefinitionTestCases {
-		assert.Equal(t, c.ExpectedColumnNames, PostgresDialect{}.Columns(c.Table).Names(), "failed case %s", c.Name)
-	}
+var tableTestCases = []tableTestCase{
+	{
+		Table: Table{
+			Name: "testResolver",
+			Columns: []Column{
+				{
+					Name: "test",
+					Type: TypeInt,
+				},
+			},
+			Resolver: func(ctx context.Context, meta ClientMeta, parent *Resource, res chan<- interface{}) error {
+				res <- []map[string]interface{}{
+					{
+						"test": 1,
+					},
+				}
+				return nil
+			},
+		},
+		Resources: []*Resource{
+			{
+				data: map[string]interface{}{
+					"test": 1,
+				},
+			},
+		},
+	},
 }
 
-func TestTableSignatures(t *testing.T) {
-	signaturesSoFar := make(map[string]struct{})
-	for i, c := range tableDefinitionTestCases {
-		s := c.Table.Signature(PostgresDialect{})
-		if _, ok := signaturesSoFar[s]; ok {
-			t.Fatalf("duplicate signature encountered (index #%d)", i+1)
-		}
-		signaturesSoFar[s] = struct{}{}
+type testClient struct {
+}
 
-		newT := *c.Table
-		newT.Columns = append(newT.Columns, Column{Name: "extra_column_in_test", Type: TypeString})
-		newSig := newT.Signature(PostgresDialect{})
-		assert.NotEqual(t, s, newSig)
+func (c testClient) Logger() *zerolog.Logger {
+	return &zerolog.Logger{}
+}
 
-		newSig2 := newT.Signature(PostgresDialect{})
-		assert.Equal(t, newSig, newSig2)
-
-		newT.Serial = "some_test_serial"
-		newSig3 := newT.Signature(PostgresDialect{})
-		assert.NotEqual(t, newSig, newSig3)
-
-		newT = *c.Table
-		newT.Columns = newT.Columns[1:]
-		newSig4 := newT.Signature(PostgresDialect{})
-		assert.NotEqual(t, newSig, newSig4)
+func TestTableExecution(t *testing.T) {
+	ctx := context.Background()
+	for _, tc := range tableTestCases {
+		tc := tc
+		t.Run(tc.Table.Name, func(t *testing.T) {
+			m := testClient{}
+			resources := make(chan *Resource)
+			go func() {
+				tc.Table.Resolve(ctx, m, nil, resources)
+			}()
+			var i = 0
+			for resource := range resources {
+				if reflect.DeepEqual(resource.data, tc.Resources[i].data) {
+					t.Errorf("expected %v, got %v", tc.Resources[i].data, resource)
+				}
+				i += 1
+			}
+		})
 	}
 }
