@@ -29,12 +29,12 @@ type Resource struct {
 
 func NewResourceData(t *Table, parent *Resource, item interface{}) *Resource {
 	return &Resource{
-		Item:   item,
-		Parent: parent,
-		table:  t,
-		data:   make(map[string]interface{}),
-		cqId:   uuid.New(),
-		// columns:  dialect.Columns(t).Names(),
+		Item:    item,
+		Parent:  parent,
+		table:   t,
+		data:    make(map[string]interface{}),
+		cqId:    uuid.New(),
+		columns: t.Columns.Names(),
 		// metadata: metadata,
 	}
 }

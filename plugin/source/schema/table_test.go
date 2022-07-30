@@ -57,6 +57,7 @@ func TestTableExecution(t *testing.T) {
 			m := testClient{}
 			resources := make(chan *Resource)
 			go func() {
+				defer close(resources)
 				tc.Table.Resolve(ctx, m, nil, resources)
 			}()
 			var i = 0

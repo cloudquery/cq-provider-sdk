@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/thoas/go-funk"
 	"golang.org/x/sync/semaphore"
+	"gopkg.in/yaml.v3"
 )
 
 // Config Every provider implements a resources field we only want to extract that in fetch execution
@@ -21,10 +22,10 @@ type Config interface {
 
 // SourceConfig is the shared configuration for all source plugins
 type SourceConfig struct {
-	MaxGoRoutines uint64      `json:"max_goroutines" yaml:"max_goroutines"`
-	Tables        []string    `json:"tables" yaml:"tables"`
-	SkipTables    []string    `json:"skip_tables" yaml:"skip_tables"`
-	Configuration interface{} `json:"configuration" yaml:"configuration"`
+	MaxGoRoutines uint64    `json:"max_goroutines" yaml:"max_goroutines"`
+	Tables        []string  `json:"tables" yaml:"tables"`
+	SkipTables    []string  `json:"skip_tables" yaml:"skip_tables"`
+	Configuration yaml.Node `json:"configuration" yaml:"configuration"`
 }
 
 // Provider is the base structure required to pass and serve an sdk provider.Provider
@@ -44,31 +45,43 @@ type SourcePlugin struct {
 }
 
 // Fetch fetches data acording to source configuration and
-func (p *SourcePlugin) Fetch(ctx context.Context, config SourceConfig, res chan<- *schema.Resource) error {
+func (p *SourcePlugin) Fetch(ctx context.Context, config []byte, res chan<- *schema.Resource) error {
+	sourceConfig := SourceConfig{}
+	if err := yaml.Unmarshal(config, &sourceConfig); err != nil {
+		return fmt.Errorf("failed to unmarshal generic configuration: %w", err)
+	}
+	pluginConfig := p.Config()
+	if err := sourceConfig.Configuration.Decode(pluginConfig); err != nil {
+		return fmt.Errorf("failed to decode specific configuration: %w", err)
+	}
+
 	// var err error
-	meta, err := p.Configure(p.Logger, config.Configuration)
+	meta, err := p.Configure(p.Logger, pluginConfig)
 	if err != nil {
 		return fmt.Errorf("failed to configure provider: %w", err)
 	}
+	if meta == nil {
+		return fmt.Errorf("failed to configure provider: Configure can't return nil")
+	}
 
 	// if resources ["*"] is requested we will fetch all resources
-	tables, err := p.interpolateAllResources(config.Tables)
+	tables, err := p.interpolateAllResources(sourceConfig.Tables)
 	if err != nil {
 		return fmt.Errorf("failed to interpolate resources: %w", err)
 	}
 
 	// limiter used to limit the amount of resources fetched concurrently
-	maxGoroutines := config.MaxGoRoutines
+	maxGoroutines := sourceConfig.MaxGoRoutines
 	if maxGoroutines == 0 {
 		maxGoroutines = limit.GetMaxGoRoutines()
 	}
-	p.Logger.Info().Uint64("max_goroutines", config.MaxGoRoutines).Msg("starting fetch")
-	goroutinesSem := semaphore.NewWeighted(helpers.Uint64ToInt64(uint64(config.MaxGoRoutines)))
+	p.Logger.Info().Uint64("max_goroutines", maxGoroutines).Msg("starting fetch")
+	goroutinesSem := semaphore.NewWeighted(helpers.Uint64ToInt64(uint64(maxGoroutines)))
 
 	wg := sync.WaitGroup{}
 	for _, table := range p.Tables {
 		t := table
-		if funk.ContainsString(config.SkipTables, table.Name) || !funk.ContainsString(tables, table.Name) {
+		if funk.ContainsString(sourceConfig.SkipTables, table.Name) || !funk.ContainsString(tables, table.Name) {
 			p.Logger.Info().Str("table", table.Name).Msg("skipping table")
 			continue
 		}
