@@ -41,6 +41,9 @@ var testSourcePlugin = SourcePlugin{
 		{
 			Name: "testTable",
 			Resolver: func(ctx context.Context, meta schema.ClientMeta, parent *schema.Resource, res chan<- interface{}) error {
+				res <- map[string]interface{}{
+					"testColumn": 3,
+				}
 				return nil
 			},
 			Columns: []schema.Column{
