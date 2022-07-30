@@ -3,7 +3,6 @@ package schema
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -43,16 +42,16 @@ var (
 		Name:        "cq_id",
 		Type:        TypeUUID,
 		Description: "Unique CloudQuery Id added to every resource",
-		Resolver: func(ctx context.Context, meta ClientMeta, resource *Resource, c Column) error {
-			if err := resource.GenerateCQId(); err != nil {
-				if resource.Parent == nil {
-					return err
-				}
+		// Resolver: func(ctx context.Context, meta ClientMeta, resource *Resource, c Column) error {
+		// 	if err := resource.GenerateCQId(); err != nil {
+		// 		if resource.Parent == nil {
+		// 			return err
+		// 		}
 
-				meta.Logger().Debug("one of the table pk is nil", "table", resource.table.Name)
-			}
-			return resource.Set(c.Name, resource.Id())
-		},
+		// 		meta.Logger().Debug("one of the table pk is nil", "table", resource.table.Name)
+		// 	}
+		// 	return resource.Set(c.Name, resource.Id())
+		// },
 		CreationOptions: ColumnCreationOptions{
 			Unique:  true,
 			NotNull: true,
@@ -63,16 +62,16 @@ var (
 		Name:        "cq_fetch_date",
 		Type:        TypeTimestamp,
 		Description: "Time of fetch for this resource",
-		Resolver: func(ctx context.Context, meta ClientMeta, resource *Resource, c Column) error {
-			val, ok := resource.GetMeta("cq_fetch_date")
-			if !ok && !resource.executionStart.IsZero() {
-				val = resource.executionStart
-			}
-			if val == nil {
-				return fmt.Errorf("zero cq_fetch date")
-			}
-			return resource.Set(c.Name, val)
-		},
+		// Resolver: func(ctx context.Context, meta ClientMeta, resource *Resource, c Column) error {
+		// 	val, ok := resource.GetMeta("cq_fetch_date")
+		// 	if !ok && !resource.executionStart.IsZero() {
+		// 		val = resource.executionStart
+		// 	}
+		// 	if val == nil {
+		// 		return fmt.Errorf("zero cq_fetch date")
+		// 	}
+		// 	return resource.Set(c.Name, val)
+		// },
 		CreationOptions: ColumnCreationOptions{
 			NotNull: true,
 		},

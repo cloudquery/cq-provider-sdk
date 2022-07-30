@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cloudquery/cq-provider-sdk/plugin/source"
+	"github.com/cloudquery/cq-provider-sdk/plugin/source/pb"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -41,13 +42,13 @@ func newCmdServe(opts *Options) *cobra.Command {
 				return err
 			}
 			logger := zerolog.New(os.Stderr).Level(zerologLevel)
-			opts.Provider.Logger = logger
+			opts.Plugin.Logger = logger
 			listener, err := net.Listen(network, address)
 			if err != nil {
 				return fmt.Errorf("failed to listen: %w", err)
 			}
 			s := grpc.NewServer()
-			source.RegisterSourceServer(s, &source.SourceServerImpl{Provider: opts.Provider})
+			pb.RegisterSourceServer(s, &source.SourceServer{Plugin: opts.Plugin})
 			logger.Info().Str("address", listener.Addr().String()).Msg("server listening")
 			if err := s.Serve(listener); err != nil {
 				return fmt.Errorf("failed to serve: %w", err)

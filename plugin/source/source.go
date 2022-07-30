@@ -21,7 +21,7 @@ type Config interface {
 
 // SourceConfig is the shared configuration for all source plugins
 type SourceConfig struct {
-	MaxGoRoutines int         `json:"max_goroutines" yaml:"max_goroutines"`
+	MaxGoRoutines uint64      `json:"max_goroutines" yaml:"max_goroutines"`
 	Tables        []string    `json:"tables" yaml:"tables"`
 	SkipTables    []string    `json:"skip_tables" yaml:"skip_tables"`
 	Configuration interface{} `json:"configuration" yaml:"configuration"`
@@ -58,13 +58,12 @@ func (p *SourcePlugin) Fetch(ctx context.Context, config SourceConfig, res chan<
 	}
 
 	// limiter used to limit the amount of resources fetched concurrently
-	var goroutinesSem *semaphore.Weighted
 	maxGoroutines := config.MaxGoRoutines
 	if maxGoroutines == 0 {
 		maxGoroutines = limit.GetMaxGoRoutines()
 	}
-	p.Logger.Info().Int("max_goroutines", config.MaxGoRoutines).Msg("starting fetch")
-	goroutinesSem = semaphore.NewWeighted(helpers.Uint64ToInt64(uint64(config.MaxGoRoutines)))
+	p.Logger.Info().Uint64("max_goroutines", config.MaxGoRoutines).Msg("starting fetch")
+	goroutinesSem := semaphore.NewWeighted(helpers.Uint64ToInt64(uint64(config.MaxGoRoutines)))
 
 	wg := sync.WaitGroup{}
 	for _, table := range p.Tables {
@@ -79,6 +78,11 @@ func (p *SourcePlugin) Fetch(ctx context.Context, config SourceConfig, res chan<
 		}
 		for _, client := range clients {
 			c := client
+			if err := goroutinesSem.Acquire(ctx, 1); err != nil {
+				// this can happen if context was cancelled so we just break out of the loop
+				c.Logger().Error().Err(err).Msg("failed to acquire semaphore")
+				break
+			}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -100,21 +104,21 @@ func (p *SourcePlugin) interpolateAllResources(tables []string) ([]string, error
 	}
 
 	allResources := make([]string, 0, len(p.Tables))
-	for k := range p.Tables {
+	for _, k := range p.Tables {
 		allResources = append(allResources, k.Name)
 	}
 	return allResources, nil
 }
 
-func getTableDuplicates(resource string, table *schema.Table, tableNames map[string]string) error {
-	for _, r := range table.Relations {
-		if err := getTableDuplicates(resource, r, tableNames); err != nil {
-			return err
-		}
-	}
-	if existing, ok := tableNames[table.Name]; ok {
-		return fmt.Errorf("table name %s used more than once, duplicates are in %s and %s", table.Name, existing, resource)
-	}
-	tableNames[table.Name] = resource
-	return nil
-}
+// func getTableDuplicates(resource string, table *schema.Table, tableNames map[string]string) error {
+// 	for _, r := range table.Relations {
+// 		if err := getTableDuplicates(resource, r, tableNames); err != nil {
+// 			return err
+// 		}
+// 	}
+// 	if existing, ok := tableNames[table.Name]; ok {
+// 		return fmt.Errorf("table name %s used more than once, duplicates are in %s and %s", table.Name, existing, resource)
+// 	}
+// 	tableNames[table.Name] = resource
+// 	return nil
+// }

@@ -12,11 +12,11 @@ import (
 
 type SourceServer struct {
 	pb.UnimplementedSourceServer
-	plugin *SourcePlugin
+	Plugin *SourcePlugin
 }
 
 func (s *SourceServer) GetTables(context.Context, *pb.GetTables_Request) (*pb.GetTables_Response, error) {
-	b, err := msgpack.Marshal(s.plugin.Tables)
+	b, err := msgpack.Marshal(s.Plugin.Tables)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal tables: %w", err)
 	}
