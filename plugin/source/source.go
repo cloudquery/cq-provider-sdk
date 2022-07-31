@@ -39,7 +39,7 @@ type SourcePlugin struct {
 	// Tables is all tables supported by this plugin
 	Tables []*schema.Table
 	// Configuration decoded from configure request
-	Config func() Config
+	Config func() interface{}
 	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger zerolog.Logger
 }

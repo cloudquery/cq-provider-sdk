@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/cloudquery/cq-provider-sdk/helpers"
+	"github.com/iancoleman/strcase"
+	"github.com/thoas/go-funk"
 )
 
 // TableResolver is the main entry point when a table fetch is called.
@@ -130,11 +132,18 @@ func (t Table) Resolve(ctx context.Context, meta ClientMeta, parent *Resource, r
 func (t Table) resolveColumns(ctx context.Context, meta ClientMeta, resource *Resource) {
 	for _, c := range t.Columns {
 		if c.Resolver != nil {
-			meta.Logger().Debug().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver started")
+			meta.Logger().Debug().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver custom started")
 			if err := c.Resolver(ctx, meta, resource, c); err != nil {
 				meta.Logger().Error().Str("colum_name", c.Name).Str("table_name", t.Name).Err(err).Msg("column resolver finished with error")
 			}
 			meta.Logger().Debug().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver finished successfully")
+		} else {
+			meta.Logger().Debug().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver default started")
+			// base use case: try to get column with CamelCase name
+			v := funk.Get(resource.Item, strcase.ToCamel(c.Name), funk.WithAllowZero())
+			if err := resource.Set(c.Name, v); err != nil {
+				meta.Logger().Error().Str("colum_name", c.Name).Str("table_name", t.Name).Err(err).Msg("column resolver default finished with error")
+			}
 		}
 	}
 }

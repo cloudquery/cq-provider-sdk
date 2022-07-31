@@ -2,13 +2,13 @@ package testing
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/cloudquery/cq-provider-sdk/plugin/source"
 	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
 	"github.com/cloudquery/faker/v3"
 	"github.com/georgysavva/scany/pgxscan"
+	"github.com/rs/zerolog"
 )
 
 type ResourceTestCase struct {
@@ -38,10 +38,10 @@ func init() {
 	_ = faker.SetRandomMapAndSliceMaxSize(1)
 }
 
-func TestResource(t *testing.T, resource ResourceTestCase) {
-	if !resource.NotParallel {
-		t.Parallel()
-	}
+// type
+
+func TestResource(t *testing.T, tc ResourceTestCase) {
+	t.Parallel()
 	t.Helper()
 
 	// No need for configuration or db connection, get it out of the way first
@@ -51,15 +51,26 @@ func TestResource(t *testing.T, resource ResourceTestCase) {
 	// l.SetLevel(hclog.Info)
 	// resource.Plugin.Logger = l
 	resources := make(chan *schema.Resource)
+	var fetchErr error
+	tc.Plugin.Logger = zerolog.New(zerolog.NewTestWriter(t))
 	go func() {
 		defer close(resources)
-		resource.Plugin.Fetch(context.Background(), source.SourceConfig{}, resources)
+		fetchErr = tc.Plugin.Fetch(context.Background(), []byte(tc.Config), resources)
 	}()
 	for resource := range resources {
-		fmt.Println(resource)
-		// resource.
-		// resource.
-		// resource.Env
+		validateResource(t, resource)
+	}
+	if fetchErr != nil {
+		t.Fatal(fetchErr)
+	}
+}
+
+func validateResource(t *testing.T, resource *schema.Resource) {
+	t.Helper()
+	for _, columnName := range resource.Table.Columns.Names() {
+		if resource.Get(columnName) == nil {
+			t.Errorf("table: %s with unset column %s", resource.Table.Name, columnName)
+		}
 	}
 }
 

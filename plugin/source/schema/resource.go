@@ -20,7 +20,7 @@ type Resource struct {
 	// Set if this is an embedded table
 	Parent *Resource
 	// internal fields
-	table    *Table
+	Table    *Table
 	data     map[string]interface{}
 	cqId     uuid.UUID
 	metadata map[string]interface{}
@@ -31,7 +31,7 @@ func NewResourceData(t *Table, parent *Resource, item interface{}) *Resource {
 	return &Resource{
 		Item:    item,
 		Parent:  parent,
-		table:   t,
+		Table:   t,
 		data:    make(map[string]interface{}),
 		cqId:    uuid.New(),
 		columns: t.Columns.Names(),
@@ -123,10 +123,10 @@ func (r *Resource) Id() uuid.UUID {
 // }
 
 func (r *Resource) TableName() string {
-	if r.table == nil {
+	if r.Table == nil {
 		return ""
 	}
-	return r.table.Name
+	return r.Table.Name
 }
 
 func (r Resource) GetMeta(key string) (interface{}, bool) {
@@ -138,7 +138,7 @@ func (r Resource) GetMeta(key string) (interface{}, bool) {
 }
 
 func (r Resource) getColumnByName(column string) *Column {
-	for _, c := range r.table.Columns {
+	for _, c := range r.Table.Columns {
 		if strings.Compare(column, c.Name) == 0 {
 			return &c
 		}
@@ -157,7 +157,7 @@ func (rr Resources) TableName() string {
 	if len(rr) == 0 {
 		return ""
 	}
-	return rr[0].table.Name
+	return rr[0].Table.Name
 }
 
 func (rr Resources) ColumnNames() []string {

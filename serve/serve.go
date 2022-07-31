@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/cloudquery/cq-provider-sdk/plugin/source"
 	"github.com/cloudquery/cq-provider-sdk/plugin/source/pb"
@@ -29,19 +30,24 @@ type Options struct {
 func newCmdServe(opts *Options) *cobra.Command {
 	var address string
 	var network string
-	var logLevel string
-	var logFormat string
+	logLevel := newEnum([]string{"trace", "debug", "info", "warn", "error"}, "info")
+	logFormat := newEnum([]string{"text", "json"}, "text")
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "serve cloudquery plugin",
 		Long:  "serve cloudquery plugin",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			zerologLevel, err := zerolog.ParseLevel(logLevel)
+			zerologLevel, err := zerolog.ParseLevel(logLevel.String())
 			if err != nil {
 				return err
 			}
-			logger := zerolog.New(os.Stderr).Level(zerologLevel)
+			var logger zerolog.Logger
+			if logFormat.String() == "json" {
+				logger = zerolog.New(os.Stderr).Level(zerologLevel)
+			} else {
+				logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerologLevel)
+			}
 			opts.Plugin.Logger = logger
 			listener, err := net.Listen(network, address)
 			if err != nil {
@@ -58,8 +64,8 @@ func newCmdServe(opts *Options) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&address, "address", "localhost:7777", "address to serve on. can be tcp: `localhost:7777` or unix socket: `/tmp/plugin.rpc.sock`")
 	cmd.Flags().StringVar(&network, "network", "tcp", `the network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket"`)
-	cmd.Flags().StringVar(&logLevel, "log-level", "info", "log level. debug, info, warn, error")
-	cmd.Flags().StringVar(&logFormat, "log-format", "text", "log format. text or json")
+	cmd.Flags().Var(logLevel, "log-level", fmt.Sprintf("log level. one of: %s", strings.Join(logLevel.Allowed, ",")))
+	cmd.Flags().Var(logFormat, "log-format", fmt.Sprintf("log format. one of: %s", strings.Join(logFormat.Allowed, ",")))
 	return cmd
 }
 
@@ -75,6 +81,7 @@ func newCmdRoot(opts *Options) *cobra.Command {
 
 func Serve(opts *Options) {
 	if err := newCmdRoot(opts).Execute(); err != nil {
-		log.Fatal().Err(err).Msg("plugin failed")
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
