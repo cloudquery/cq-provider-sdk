@@ -7,6 +7,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/plugin/source/pb"
 	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
 	"github.com/vmihailenco/msgpack/v5"
+	"github.com/xeipuuv/gojsonschema"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -33,9 +34,11 @@ func (s *SourceServer) GetExampleConfig(context.Context, *pb.GetExampleConfig_Re
 func (s *SourceServer) Fetch(req *pb.Fetch_Request, stream pb.Source_FetchServer) error {
 	resources := make(chan *schema.Resource)
 	var fetchErr error
+	var jsonSchemaResult *gojsonschema.Result
 	go func() {
+		var err error
 		defer close(resources)
-		if err := s.Plugin.Fetch(stream.Context(), req.Config, resources); err != nil {
+		if jsonSchemaResult, err = s.Plugin.Fetch(stream.Context(), req.Config, resources); err != nil {
 			fetchErr = fmt.Errorf("failed to fetch resources: %w", err)
 		}
 	}()
@@ -47,5 +50,17 @@ func (s *SourceServer) Fetch(req *pb.Fetch_Request, stream pb.Source_FetchServer
 		}
 		stream.Send(&pb.Fetch_Response{Resources: b})
 	}
-	return fetchErr
+	if fetchErr != nil {
+		return fetchErr
+	}
+	if jsonSchemaResult != nil {
+		b, err := msgpack.Marshal(jsonSchemaResult)
+		if err != nil {
+			return fmt.Errorf("failed to marshal json schema result: %w", err)
+		}
+		stream.Send(&pb.Fetch_Response{
+			JsonschemaResult: b,
+		})
+	}
+	return nil
 }

@@ -54,7 +54,7 @@ var testSourcePlugin = SourcePlugin{
 			},
 		},
 	},
-	Config: func() Config {
+	Config: func() interface{} {
 		return &TestConfig{}
 	},
 	Logger: zerolog.New(os.Stderr),

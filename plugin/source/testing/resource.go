@@ -9,6 +9,7 @@ import (
 	"github.com/cloudquery/faker/v3"
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/rs/zerolog"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 type ResourceTestCase struct {
@@ -52,16 +53,20 @@ func TestResource(t *testing.T, tc ResourceTestCase) {
 	// resource.Plugin.Logger = l
 	resources := make(chan *schema.Resource)
 	var fetchErr error
+	var result *gojsonschema.Result
 	tc.Plugin.Logger = zerolog.New(zerolog.NewTestWriter(t))
 	go func() {
 		defer close(resources)
-		fetchErr = tc.Plugin.Fetch(context.Background(), []byte(tc.Config), resources)
+		result, fetchErr = tc.Plugin.Fetch(context.Background(), []byte(tc.Config), resources)
 	}()
 	for resource := range resources {
 		validateResource(t, resource)
 	}
 	if fetchErr != nil {
 		t.Fatal(fetchErr)
+	}
+	if result != nil && !result.Valid() {
+		t.Errorf("invalid schema: %v", result.Errors())
 	}
 }
 

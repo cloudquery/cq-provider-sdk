@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"sync"
 
+	_ "embed"
+
 	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/helpers/limit"
 	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
 	"github.com/rs/zerolog"
 	"github.com/thoas/go-funk"
+	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/sync/semaphore"
 	"gopkg.in/yaml.v3"
 )
@@ -19,6 +22,9 @@ type Config interface {
 	// Example returns a configuration example (with comments) so user clients can generate an example config
 	Example() string
 }
+
+//go:embed schema.json
+var sourceConfigSchema string
 
 // SourceConfig is the shared configuration for all source plugins
 type SourceConfig struct {
@@ -45,29 +51,39 @@ type SourcePlugin struct {
 }
 
 // Fetch fetches data acording to source configuration and
-func (p *SourcePlugin) Fetch(ctx context.Context, config []byte, res chan<- *schema.Resource) error {
+func (p *SourcePlugin) Fetch(ctx context.Context, config []byte, res chan<- *schema.Resource) (*gojsonschema.Result, error) {
 	sourceConfig := SourceConfig{}
 	if err := yaml.Unmarshal(config, &sourceConfig); err != nil {
-		return fmt.Errorf("failed to unmarshal generic configuration: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal generic configuration: %w", err)
 	}
+	schemaLoader := gojsonschema.NewStringLoader(sourceConfigSchema)
+	documentLoader := gojsonschema.NewGoLoader(sourceConfig)
+	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate configuration: %w", err)
+	}
+	if !result.Valid() {
+		return result, nil
+	}
+
 	pluginConfig := p.Config()
 	if err := sourceConfig.Configuration.Decode(pluginConfig); err != nil {
-		return fmt.Errorf("failed to decode specific configuration: %w", err)
+		return nil, fmt.Errorf("failed to decode specific configuration: %w", err)
 	}
 
 	// var err error
 	meta, err := p.Configure(p.Logger, pluginConfig)
 	if err != nil {
-		return fmt.Errorf("failed to configure provider: %w", err)
+		return nil, fmt.Errorf("failed to configure provider: %w", err)
 	}
 	if meta == nil {
-		return fmt.Errorf("failed to configure provider: Configure can't return nil")
+		return nil, fmt.Errorf("failed to configure provider: Configure can't return nil")
 	}
 
 	// if resources ["*"] is requested we will fetch all resources
 	tables, err := p.interpolateAllResources(sourceConfig.Tables)
 	if err != nil {
-		return fmt.Errorf("failed to interpolate resources: %w", err)
+		return nil, fmt.Errorf("failed to interpolate resources: %w", err)
 	}
 
 	// limiter used to limit the amount of resources fetched concurrently
@@ -104,7 +120,7 @@ func (p *SourcePlugin) Fetch(ctx context.Context, config []byte, res chan<- *sch
 		}
 	}
 	wg.Wait()
-	return nil
+	return nil, nil
 }
 
 func (p *SourcePlugin) interpolateAllResources(tables []string) ([]string, error) {

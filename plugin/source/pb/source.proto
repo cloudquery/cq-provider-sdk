@@ -19,6 +19,8 @@ message Fetch {
   message Response {
     // marshalled []*schema.Resources
     bytes resources = 1;
+    // marshalled goschemajson.Result
+    bytes jsonschema_result = 2;
   }
 }
 
