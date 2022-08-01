@@ -22,6 +22,8 @@ type ProviderClient interface {
 	GetProviderSchema(ctx context.Context, in *GetProviderSchema_Request, opts ...grpc.CallOption) (*GetProviderSchema_Response, error)
 	// Gets a provider's configuration example
 	GetProviderConfig(ctx context.Context, in *GetProviderConfig_Request, opts ...grpc.CallOption) (*GetProviderConfig_Response, error)
+	// Validates a config for the provider
+	ValidateProviderConfig(ctx context.Context, in *ValidateProviderConfig_Request, opts ...grpc.CallOption) (*ValidateProviderConfig_Response, error)
 	// One-time initialization, called before other functions below
 	ConfigureProvider(ctx context.Context, in *ConfigureProvider_Request, opts ...grpc.CallOption) (*ConfigureProvider_Response, error)
 	// Fetch Provider Resources
@@ -50,6 +52,15 @@ func (c *providerClient) GetProviderSchema(ctx context.Context, in *GetProviderS
 func (c *providerClient) GetProviderConfig(ctx context.Context, in *GetProviderConfig_Request, opts ...grpc.CallOption) (*GetProviderConfig_Response, error) {
 	out := new(GetProviderConfig_Response)
 	err := c.cc.Invoke(ctx, "/proto.Provider/GetProviderConfig", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *providerClient) ValidateProviderConfig(ctx context.Context, in *ValidateProviderConfig_Request, opts ...grpc.CallOption) (*ValidateProviderConfig_Response, error) {
+	out := new(ValidateProviderConfig_Response)
+	err := c.cc.Invoke(ctx, "/proto.Provider/ValidateProviderConfig", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +125,8 @@ type ProviderServer interface {
 	GetProviderSchema(context.Context, *GetProviderSchema_Request) (*GetProviderSchema_Response, error)
 	// Gets a provider's configuration example
 	GetProviderConfig(context.Context, *GetProviderConfig_Request) (*GetProviderConfig_Response, error)
+	// Validates a config for the provider
+	ValidateProviderConfig(context.Context, *ValidateProviderConfig_Request) (*ValidateProviderConfig_Response, error)
 	// One-time initialization, called before other functions below
 	ConfigureProvider(context.Context, *ConfigureProvider_Request) (*ConfigureProvider_Response, error)
 	// Fetch Provider Resources
@@ -132,6 +145,9 @@ func (UnimplementedProviderServer) GetProviderSchema(context.Context, *GetProvid
 }
 func (UnimplementedProviderServer) GetProviderConfig(context.Context, *GetProviderConfig_Request) (*GetProviderConfig_Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProviderConfig not implemented")
+}
+func (UnimplementedProviderServer) ValidateProviderConfig(context.Context, *ValidateProviderConfig_Request) (*ValidateProviderConfig_Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ValidateProviderConfig not implemented")
 }
 func (UnimplementedProviderServer) ConfigureProvider(context.Context, *ConfigureProvider_Request) (*ConfigureProvider_Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConfigureProvider not implemented")
@@ -187,6 +203,24 @@ func _Provider_GetProviderConfig_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProviderServer).GetProviderConfig(ctx, req.(*GetProviderConfig_Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Provider_ValidateProviderConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateProviderConfig_Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderServer).ValidateProviderConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.Provider/ValidateProviderConfig",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderServer).ValidateProviderConfig(ctx, req.(*ValidateProviderConfig_Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -262,6 +296,10 @@ var Provider_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetProviderConfig",
 			Handler:    _Provider_GetProviderConfig_Handler,
+		},
+		{
+			MethodName: "ValidateProviderConfig",
+			Handler:    _Provider_ValidateProviderConfig_Handler,
 		},
 		{
 			MethodName: "ConfigureProvider",

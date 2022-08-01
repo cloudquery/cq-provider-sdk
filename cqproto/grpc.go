@@ -58,6 +58,19 @@ func (g GRPCClient) GetProviderConfig(ctx context.Context, request *GetProviderC
 	}, nil
 }
 
+func (g GRPCClient) ValidateProviderConfig(ctx context.Context, request *ValidateProviderConfigRequest) (*ValidateProviderConfigResponse, error) {
+	res, err := g.client.ValidateProviderConfig(ctx, &internal.ValidateProviderConfig_Request{
+		Config: request.Config,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ValidateProviderConfigResponse{
+		Diagnostics: diagnosticsFromProto("", res.Diagnostics),
+	}, nil
+}
+
 func (g GRPCClient) ConfigureProvider(ctx context.Context, request *ConfigureProviderRequest) (*ConfigureProviderResponse, error) {
 	res, err := g.client.ConfigureProvider(ctx, &internal.ConfigureProvider_Request{
 		CloudqueryVersion: request.CloudQueryVersion,
