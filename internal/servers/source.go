@@ -1,20 +1,19 @@
-package source
+package servers
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/cloudquery/cq-provider-sdk/plugin/source/pb"
-	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
+	"github.com/cloudquery/cq-provider-sdk/internal/pb"
+	"github.com/cloudquery/cq-provider-sdk/plugins"
+	"github.com/cloudquery/cq-provider-sdk/schema"
 	"github.com/vmihailenco/msgpack/v5"
 	"github.com/xeipuuv/gojsonschema"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type SourceServer struct {
 	pb.UnimplementedSourceServer
-	Plugin *SourcePlugin
+	Plugin *plugins.SourcePlugin
 }
 
 func (s *SourceServer) GetTables(context.Context, *pb.GetTables_Request) (*pb.GetTables_Response, error) {
@@ -28,7 +27,7 @@ func (s *SourceServer) GetTables(context.Context, *pb.GetTables_Request) (*pb.Ge
 }
 
 func (s *SourceServer) GetExampleConfig(context.Context, *pb.GetExampleConfig_Request) (*pb.GetExampleConfig_Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetExampleConfig not implemented")
+	return &pb.GetExampleConfig_Response{Config: []byte(s.Plugin.ExampleConfig)}, nil
 }
 
 func (s *SourceServer) Fetch(req *pb.Fetch_Request, stream pb.Source_FetchServer) error {

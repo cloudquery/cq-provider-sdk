@@ -1,12 +1,13 @@
-package source
+package plugins
 
 import (
 	"context"
 	"os"
 	"testing"
 
-	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
+	"github.com/cloudquery/cq-provider-sdk/schema"
 	"github.com/rs/zerolog"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 type Account struct {
@@ -74,9 +75,10 @@ configuration:
 `
 	resources := make(chan *schema.Resource)
 	var fetchErr error
+	var result *gojsonschema.Result
 	go func() {
 		defer close(resources)
-		fetchErr = testSourcePlugin.Fetch(context.Background(), []byte(cfg), resources)
+		result, fetchErr = testSourcePlugin.Fetch(context.Background(), []byte(cfg), resources)
 	}()
 	for resource := range resources {
 		t.Logf("%+v", resource)

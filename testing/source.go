@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloudquery/cq-provider-sdk/plugin/source"
-	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
+	"github.com/cloudquery/cq-provider-sdk/plugins"
+	"github.com/cloudquery/cq-provider-sdk/schema"
 	"github.com/cloudquery/faker/v3"
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/rs/zerolog"
@@ -13,7 +13,7 @@ import (
 )
 
 type ResourceTestCase struct {
-	Plugin *source.SourcePlugin
+	Plugin *plugins.SourcePlugin
 	Config string
 	// we want it to be parallel by default
 	NotParallel bool

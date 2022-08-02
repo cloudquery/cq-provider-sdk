@@ -12,8 +12,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/cloudquery/cq-provider-sdk/plugin/source"
-	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
+	"github.com/cloudquery/cq-provider-sdk/plugins"
+	"github.com/cloudquery/cq-provider-sdk/schema"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 )
 
 // GenerateDocs creates table documentation for the provider based on it's ResourceMap
-func GenerateDocs(p *source.SourcePlugin, outputPath string, deleteOld bool) error {
+func GenerateDocs(p *plugins.SourcePlugin, outputPath string, deleteOld bool) error {
 	if deleteOld {
 		if err := deleteOldFiles(outputPath); err != nil {
 			fmt.Printf("failed to remove old docs: %s", err)

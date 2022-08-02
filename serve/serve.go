@@ -6,8 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cloudquery/cq-provider-sdk/plugin/source"
-	"github.com/cloudquery/cq-provider-sdk/plugin/source/pb"
+	"github.com/cloudquery/cq-provider-sdk/internal/pb"
+	"github.com/cloudquery/cq-provider-sdk/internal/servers"
+	"github.com/cloudquery/cq-provider-sdk/plugins"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -20,11 +21,9 @@ Set CQ_PROVIDER_DEBUG=1 to run plugin in debug mode, for additional info see htt
 `
 
 type Options struct {
-	// Required: Name of provider
-	Name string
-
 	// Required: Provider is the actual provider that will be served.
-	Plugin *source.SourcePlugin
+	SourcePlugin      *plugins.SourcePlugin
+	DestinationPlugin plugins.DestinationPlugin
 }
 
 func newCmdServe(opts *Options) *cobra.Command {
@@ -48,13 +47,16 @@ func newCmdServe(opts *Options) *cobra.Command {
 			} else {
 				logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerologLevel)
 			}
-			opts.Plugin.Logger = logger
+			// opts.Plugin.Logger = logger
 			listener, err := net.Listen(network, address)
 			if err != nil {
 				return fmt.Errorf("failed to listen: %w", err)
 			}
 			s := grpc.NewServer()
-			pb.RegisterSourceServer(s, &source.SourceServer{Plugin: opts.Plugin})
+			if opts.SourcePlugin != nil {
+				pb.RegisterSourceServer(s, &servers.SourceServer{Plugin: opts.SourcePlugin})
+			}
+
 			logger.Info().Str("address", listener.Addr().String()).Msg("server listening")
 			if err := s.Serve(listener); err != nil {
 				return fmt.Errorf("failed to serve: %w", err)

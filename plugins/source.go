@@ -1,4 +1,4 @@
-package source
+package plugins
 
 import (
 	"context"
@@ -9,7 +9,8 @@ import (
 
 	"github.com/cloudquery/cq-provider-sdk/helpers"
 	"github.com/cloudquery/cq-provider-sdk/helpers/limit"
-	"github.com/cloudquery/cq-provider-sdk/plugin/source/schema"
+	"github.com/cloudquery/cq-provider-sdk/schema"
+	"github.com/cloudquery/cq-provider-sdk/spec"
 	"github.com/rs/zerolog"
 	"github.com/thoas/go-funk"
 	"github.com/xeipuuv/gojsonschema"
@@ -17,22 +18,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config Every provider implements a resources field we only want to extract that in fetch execution
-type Config interface {
-	// Example returns a configuration example (with comments) so user clients can generate an example config
-	Example() string
-}
-
-//go:embed schema.json
+//go:embed source_schema.json
 var sourceConfigSchema string
 
-// SourceConfig is the shared configuration for all source plugins
-type SourceConfig struct {
-	MaxGoRoutines uint64    `json:"max_goroutines" yaml:"max_goroutines"`
-	Tables        []string  `json:"tables" yaml:"tables"`
-	SkipTables    []string  `json:"skip_tables" yaml:"skip_tables"`
-	Configuration yaml.Node `json:"configuration" yaml:"configuration"`
-}
+const ExampleSourceConfig = `# max_goroutines to use when fetching. 0 means default and calculated by CloudQuery
+max_goroutines: 0
+# By default cloudquery will fetch all tables in the source plugin
+tables: ["*"]
+# skip_tables specify which tables to skip. especially useful when using "*" for tables
+skip_tables: []
+`
 
 // Provider is the base structure required to pass and serve an sdk provider.Provider
 type SourcePlugin struct {
@@ -46,13 +41,15 @@ type SourcePlugin struct {
 	Tables []*schema.Table
 	// Configuration decoded from configure request
 	Config func() interface{}
+	// ExampleConfig is the example configuration for this plugin
+	ExampleConfig string
 	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger zerolog.Logger
 }
 
 // Fetch fetches data acording to source configuration and
 func (p *SourcePlugin) Fetch(ctx context.Context, config []byte, res chan<- *schema.Resource) (*gojsonschema.Result, error) {
-	sourceConfig := SourceConfig{}
+	sourceConfig := spec.SourceSpec{}
 	if err := yaml.Unmarshal(config, &sourceConfig); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal generic configuration: %w", err)
 	}

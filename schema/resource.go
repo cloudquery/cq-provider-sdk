@@ -83,6 +83,10 @@ func (r *Resource) Id() uuid.UUID {
 	return r.cqId
 }
 
+func (r *Resource) Columns() []string {
+	return r.columns
+}
+
 // func (r *Resource) Values() ([]interface{}, error) {
 // 	values := make([]interface{}, 0)
 // 	for _, c := range r.dialect.Columns(r.table) {
