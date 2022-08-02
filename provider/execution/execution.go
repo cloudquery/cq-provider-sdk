@@ -20,10 +20,6 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// executionJitter adds a -1 minute to execution of fetch, so if a user fetches only 1 resources and it finishes
-// faster than the <1s it won't be deleted by remove stale.
-const executionJitter = -1 * time.Minute
-
 // TableExecutor marks all the related execution info passed to TableResolver and ColumnResolver giving access to the Runner's meta
 type TableExecutor struct {
 	// ResourceName name of top-level resource associated with table
@@ -49,6 +45,10 @@ type TableExecutor struct {
 	// timeout for each parent resource resolve call
 	timeout time.Duration
 }
+
+// executionJitter adds a -1 minute to execution of fetch, so if a user fetches only 1 resources and it finishes
+// faster than the <1s it won't be deleted by remove stale.
+const executionJitter = -1 * time.Minute
 
 // NewTableExecutor creates a new TableExecutor for given schema.Table
 func NewTableExecutor(resourceName string, db Storage, logger hclog.Logger, table *schema.Table, metadata map[string]interface{}, classifier ErrorClassifier, goroutinesSem *semaphore.Weighted, timeout time.Duration) TableExecutor {

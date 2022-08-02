@@ -14,16 +14,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-var Handshake = plugin.HandshakeConfig{
-	MagicCookieKey:   "CQ_PLUGIN_COOKIE",
-	MagicCookieValue: "6753812e-79c2-4af5-ad01-e6083c374e1f",
-}
-
-const pluginExecutionMsg = `This binary is a plugin. These are not meant to be executed directly.
-Please execute the program that consumes these plugins, which will load any plugins automatically.
-Set CQ_PROVIDER_DEBUG=1 to run plugin in debug mode, for additional info see https://docs.cloudquery.io/docs/developers/debugging.
-`
-
 type Options struct {
 	// Required: Name of provider
 	Name string
@@ -45,6 +35,16 @@ type Options struct {
 	// plugin's lifecycle and communicate connection information. See the
 	// go-plugin GoDoc for more information.
 	TestConfig *plugin.ServeTestConfig
+}
+
+const pluginExecutionMsg = `This binary is a plugin. These are not meant to be executed directly.
+Please execute the program that consumes these plugins, which will load any plugins automatically.
+Set CQ_PROVIDER_DEBUG=1 to run plugin in debug mode, for additional info see https://docs.cloudquery.io/docs/developers/debugging.
+`
+
+var Handshake = plugin.HandshakeConfig{
+	MagicCookieKey:   "CQ_PLUGIN_COOKIE",
+	MagicCookieValue: "6753812e-79c2-4af5-ad01-e6083c374e1f",
 }
 
 func Serve(opts *Options) {

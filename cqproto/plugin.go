@@ -8,13 +8,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	V4 = 4
-	V5 = 5
-
-	Vunmanaged = -1
-)
-
 // CQPlugin This is the implementation of plugin.GRPCServer so we can serve/consume this.
 type CQPlugin struct {
 	// GRPCPlugin must still implement the Stub interface
@@ -23,6 +16,13 @@ type CQPlugin struct {
 	// that are written in Go.
 	Impl CQProviderServer
 }
+
+const (
+	V4 = 4
+	V5 = 5
+
+	VUnmanaged = -1
+)
 
 func (p *CQPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
 	internal.RegisterProviderServer(s, &GRPCServer{Impl: p.Impl})
