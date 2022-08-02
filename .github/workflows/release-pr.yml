@@ -26,7 +26,7 @@ jobs:
           input_string: ${{ steps.release.outputs.tag_name }}
       - name: Mark as pre-release
         if: steps.semver_parser.outputs.prerelease != ''
-        uses: tubone24/update_release@ef1052963da78ecdc430f10503a39f46507d639d
+        uses: tubone24/update_release@2146f1550a23d883b8ea0c036298ed74cd65eac6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ steps.release.outputs.tag_name }}
