@@ -7,12 +7,12 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/provider/schema"
 )
 
+type ErrorClassifier func(meta schema.ClientMeta, resourceName string, err error) diag.Diagnostics
+
 const (
 	// fdLimitMessage defines the message for when a client isn't able to fetch because the open fd limit is hit
 	fdLimitMessage = "try increasing number of available file descriptors via `ulimit -n 10240` or by increasing timeout via provider specific parameters"
 )
-
-type ErrorClassifier func(meta schema.ClientMeta, resourceName string, err error) diag.Diagnostics
 
 func ClassifyError(err error, opts ...diag.BaseErrorOption) diag.Diagnostics {
 	if err != nil && strings.Contains(err.Error(), ": socket: too many open files") {
