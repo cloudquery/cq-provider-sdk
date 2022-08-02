@@ -6,6 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type tableTestCase struct {
+	Name                string
+	Table               *Table
+	ExpectedColumnNames []string
+	ExpectedHasId       bool
+}
+
 var tableDefinitionTestCases = []tableTestCase{
 	{
 		Name: "simpleTable",
@@ -111,13 +118,6 @@ var tableDefinitionTestCases = []tableTestCase{
 		},
 		ExpectedColumnNames: []string{"cq_id", "cq_meta", "some_string", "some_int", "some_string_no_prefix", "some_int_no_prefix"},
 	},
-}
-
-type tableTestCase struct {
-	Name                string
-	Table               *Table
-	ExpectedColumnNames []string
-	ExpectedHasId       bool
 }
 
 func TestTableDefinitionUseCases(t *testing.T) {
