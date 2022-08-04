@@ -1,7 +1,8 @@
 syntax = "proto3";
 package proto;
 option go_package = "/pb";
-import "/base.proto";
+// import "/internal/pb/base.proto";
+import "internal/pb/base.proto";
 
 service Source {
   // Get all tables the source plugin supports

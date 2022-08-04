@@ -1,7 +1,7 @@
 syntax = "proto3";
 package proto;
 option go_package = "/pb";
-import "/base.proto";
+ import "internal/pb/base.proto";
 
 service Destination {
   rpc Configure(Configure.Request) returns (Configure.Response);
