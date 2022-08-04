@@ -1,0 +1,12 @@
+syntax = "proto3";
+package proto;
+option go_package = "/pb";
+
+message GetExampleConfig {
+  message Request {}
+  message Response {
+    string name = 1;
+    string version = 2;
+    bytes config = 3;
+  }
+}

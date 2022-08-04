@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.19.4
-// source: plugin/source/pb/source.proto
+// source: internal/pb/source.proto
 
 package pb
 
@@ -207,5 +207,5 @@ var Source_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "plugin/source/pb/source.proto",
+	Metadata: "internal/pb/source.proto",
 }

@@ -8,4 +8,5 @@ lint:
 
 .PHONY: generate-protobuf
 generate-protobuf:
-	protoc --go_out . --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative plugin/source/pb/source.proto
+	protoc -I internal/pb --go_out . --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative internal/pb/source.proto
+	protoc --go_out . --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative internal/pb/destination.proto

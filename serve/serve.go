@@ -15,11 +15,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-const pluginExecutionMsg = `This binary is a plugin. These are not meant to be executed directly.
-Please execute the program that consumes these plugins, which will load any plugins automatically.
-Set CQ_PROVIDER_DEBUG=1 to run plugin in debug mode, for additional info see https://docs.cloudquery.io/docs/developers/debugging.
-`
-
 type Options struct {
 	// Required: Provider is the actual provider that will be served.
 	SourcePlugin      *plugins.SourcePlugin

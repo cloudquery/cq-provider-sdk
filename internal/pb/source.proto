@@ -1,6 +1,7 @@
 syntax = "proto3";
 package proto;
 option go_package = "/pb";
+import "/base.proto";
 
 service Source {
   // Get all tables the source plugin supports
@@ -31,15 +32,6 @@ message GetTables {
     string version = 2;
     // Marshalled []*schema.Table
     bytes tables = 3;
-  }
-}
-
-message GetExampleConfig {
-  message Request {}
-  message Response {
-    string name = 1;
-    string version = 2;
-    bytes config = 3;
   }
 }
 
