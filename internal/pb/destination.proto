@@ -1,22 +1,33 @@
 syntax = "proto3";
 package proto;
 option go_package = "/pb";
- import "internal/pb/base.proto";
+import "internal/pb/base.proto";
 
 service Destination {
   rpc Configure(Configure.Request) returns (Configure.Response);
   // Get an example configuration for the source plugin
   rpc GetExampleConfig(GetExampleConfig.Request) returns (GetExampleConfig.Response);
-  // Fetch resources
-  rpc Save(stream Save.Request) returns (stream Save.Response);
+  // Save resources
+  rpc Save(stream Save.Request) returns (Save.Response);
+  // Create tables
+  rpc CreateTables(CreateTables.Request) returns (CreateTables.Response);
 }
 
 message Configure {
   message Request {
-
+    // marshlled spec.DestinationSpec
+    bytes destination_spec = 1;
   }
   message Response {
-    
+  }
+}
+
+message CreateTables {
+  message Request {
+    // marshalled []*schema.Table
+    bytes tables = 1;
+  }
+  message Response {
   }
 }
 

@@ -27,7 +27,7 @@ func (s *SourceServer) GetTables(context.Context, *pb.GetTables_Request) (*pb.Ge
 }
 
 func (s *SourceServer) GetExampleConfig(context.Context, *pb.GetExampleConfig_Request) (*pb.GetExampleConfig_Response, error) {
-	return &pb.GetExampleConfig_Response{Config: []byte(s.Plugin.ExampleConfig)}, nil
+	return &pb.GetExampleConfig_Response{Config: s.Plugin.ExampleConfig}, nil
 }
 
 func (s *SourceServer) Fetch(req *pb.Fetch_Request, stream pb.Source_FetchServer) error {

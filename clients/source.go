@@ -66,7 +66,7 @@ func (c *SourceClient) GetExampleConfig(ctx context.Context) ([]byte, error) {
 	return tpl.Bytes(), nil
 }
 
-func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan<- []*schema.Resource) error {
+func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan<- []byte) error {
 	stream, err := c.pbClient.Fetch(ctx, &pb.Fetch_Request{
 		Config: []byte{},
 	})
@@ -81,11 +81,7 @@ func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan
 			}
 			return fmt.Errorf("failed to fetch resources from stream: %w", err)
 		}
-		var resources []*schema.Resource
-		if err := msgpack.Unmarshal(r.Resources, &resources); err != nil {
-			return fmt.Errorf("failed to unmarshal resources: %w", err)
-		}
-		res <- resources
+		res <- r.Resources
 	}
 	return nil
 }

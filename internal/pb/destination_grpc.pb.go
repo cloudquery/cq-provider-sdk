@@ -25,8 +25,10 @@ type DestinationClient interface {
 	Configure(ctx context.Context, in *Configure_Request, opts ...grpc.CallOption) (*Configure_Response, error)
 	// Get an example configuration for the source plugin
 	GetExampleConfig(ctx context.Context, in *GetExampleConfig_Request, opts ...grpc.CallOption) (*GetExampleConfig_Response, error)
-	// Fetch resources
+	// Save resources
 	Save(ctx context.Context, opts ...grpc.CallOption) (Destination_SaveClient, error)
+	// Create tables
+	CreateTables(ctx context.Context, in *CreateTables_Request, opts ...grpc.CallOption) (*CreateTables_Response, error)
 }
 
 type destinationClient struct {
@@ -66,7 +68,7 @@ func (c *destinationClient) Save(ctx context.Context, opts ...grpc.CallOption) (
 
 type Destination_SaveClient interface {
 	Send(*Save_Request) error
-	Recv() (*Save_Response, error)
+	CloseAndRecv() (*Save_Response, error)
 	grpc.ClientStream
 }
 
@@ -78,12 +80,24 @@ func (x *destinationSaveClient) Send(m *Save_Request) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *destinationSaveClient) Recv() (*Save_Response, error) {
+func (x *destinationSaveClient) CloseAndRecv() (*Save_Response, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
 	m := new(Save_Response)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
+}
+
+func (c *destinationClient) CreateTables(ctx context.Context, in *CreateTables_Request, opts ...grpc.CallOption) (*CreateTables_Response, error) {
+	out := new(CreateTables_Response)
+	err := c.cc.Invoke(ctx, "/proto.Destination/CreateTables", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // DestinationServer is the server API for Destination service.
@@ -93,8 +107,10 @@ type DestinationServer interface {
 	Configure(context.Context, *Configure_Request) (*Configure_Response, error)
 	// Get an example configuration for the source plugin
 	GetExampleConfig(context.Context, *GetExampleConfig_Request) (*GetExampleConfig_Response, error)
-	// Fetch resources
+	// Save resources
 	Save(Destination_SaveServer) error
+	// Create tables
+	CreateTables(context.Context, *CreateTables_Request) (*CreateTables_Response, error)
 	mustEmbedUnimplementedDestinationServer()
 }
 
@@ -110,6 +126,9 @@ func (UnimplementedDestinationServer) GetExampleConfig(context.Context, *GetExam
 }
 func (UnimplementedDestinationServer) Save(Destination_SaveServer) error {
 	return status.Errorf(codes.Unimplemented, "method Save not implemented")
+}
+func (UnimplementedDestinationServer) CreateTables(context.Context, *CreateTables_Request) (*CreateTables_Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateTables not implemented")
 }
 func (UnimplementedDestinationServer) mustEmbedUnimplementedDestinationServer() {}
 
@@ -165,7 +184,7 @@ func _Destination_Save_Handler(srv interface{}, stream grpc.ServerStream) error 
 }
 
 type Destination_SaveServer interface {
-	Send(*Save_Response) error
+	SendAndClose(*Save_Response) error
 	Recv() (*Save_Request, error)
 	grpc.ServerStream
 }
@@ -174,7 +193,7 @@ type destinationSaveServer struct {
 	grpc.ServerStream
 }
 
-func (x *destinationSaveServer) Send(m *Save_Response) error {
+func (x *destinationSaveServer) SendAndClose(m *Save_Response) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -184,6 +203,24 @@ func (x *destinationSaveServer) Recv() (*Save_Request, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+func _Destination_CreateTables_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateTables_Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DestinationServer).CreateTables(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.Destination/CreateTables",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DestinationServer).CreateTables(ctx, req.(*CreateTables_Request))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 // Destination_ServiceDesc is the grpc.ServiceDesc for Destination service.
@@ -201,12 +238,15 @@ var Destination_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetExampleConfig",
 			Handler:    _Destination_GetExampleConfig_Handler,
 		},
+		{
+			MethodName: "CreateTables",
+			Handler:    _Destination_CreateTables_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Save",
 			Handler:       _Destination_Save_Handler,
-			ServerStreams: true,
 			ClientStreams: true,
 		},
 	},

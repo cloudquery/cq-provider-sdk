@@ -11,10 +11,10 @@ import (
 type DestinationPluginOptions struct {
 	Logger zerolog.Logger
 }
-type NewDestinationPluginFunc func(ctx context.Context, spec spec.DestinationSpec, opts DestinationPluginOptions) (DestinationPlugin, error)
 
 type DestinationPlugin interface {
-	Save(ctx context.Context, resources []*schema.Resource) error
+	Configure(ctx context.Context, spec spec.DestinationSpec) error
 	CreateTables(ctx context.Context, table []*schema.Table) error
-	ExampleConfig(ctx context.Context) string
+	Save(ctx context.Context, resources []*schema.Resource) error
+	GetExampleConfig(ctx context.Context) string
 }

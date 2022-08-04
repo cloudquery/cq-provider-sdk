@@ -51,6 +51,9 @@ func newCmdServe(opts *Options) *cobra.Command {
 			if opts.SourcePlugin != nil {
 				pb.RegisterSourceServer(s, &servers.SourceServer{Plugin: opts.SourcePlugin})
 			}
+			if opts.DestinationPlugin != nil {
+				pb.RegisterDestinationServer(s, &servers.DestinationServer{Plugin: opts.DestinationPlugin})
+			}
 
 			logger.Info().Str("address", listener.Addr().String()).Msg("server listening")
 			if err := s.Serve(listener); err != nil {
