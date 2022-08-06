@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	docShort = "generate markdown documentation for table"
+	docShort = "Generate markdown documentation for table"
 )
 
 func newCmdDoc(opts Options) *cobra.Command {

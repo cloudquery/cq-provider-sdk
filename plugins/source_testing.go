@@ -1,18 +1,19 @@
-package testing
+package plugins
 
 import (
 	"context"
 	"testing"
 
-	"github.com/cloudquery/cq-provider-sdk/plugins"
 	"github.com/cloudquery/cq-provider-sdk/schema"
+	"github.com/cloudquery/cq-provider-sdk/spec"
 	"github.com/cloudquery/faker/v3"
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/xeipuuv/gojsonschema"
+	"gopkg.in/yaml.v3"
 )
 
 type ResourceTestCase struct {
-	Plugin *plugins.SourcePlugin
+	Plugin *SourcePlugin
 	Config string
 	// we want it to be parallel by default
 	NotParallel bool
@@ -28,10 +29,6 @@ type ResourceTestCase struct {
 
 // Verifier verifies tables specified by table schema (main table and its relations).
 type Verifier func(t *testing.T, table *schema.Table, conn pgxscan.Querier, shouldSkipIgnoreInTest bool)
-
-type testResourceSender struct {
-	Errors []string
-}
 
 func init() {
 	_ = faker.SetRandomMapAndSliceMinSize(1)
@@ -53,6 +50,18 @@ func TestResource(t *testing.T, tc ResourceTestCase) {
 	resources := make(chan *schema.Resource)
 	var fetchErr error
 	var result *gojsonschema.Result
+	var sourceSpec spec.SourceSpec
+	if err := yaml.Unmarshal([]byte(tc.Config), &sourceSpec); err != nil {
+		t.Fatal("failed to unmarshal source spec:", err)
+	}
+	validationResult, err := tc.Plugin.Init(context.Background(), sourceSpec)
+	if err != nil {
+		t.Fatal("failed to init plugin:", err)
+	}
+	if !validationResult.Valid() {
+		t.Fatal("failed to validate plugin config:", validationResult.Errors())
+	}
+
 	// tc.Plugin.Logger = zerolog.New(zerolog.NewTestWriter(t))
 	go func() {
 		defer close(resources)
@@ -72,7 +81,8 @@ func TestResource(t *testing.T, tc ResourceTestCase) {
 func validateResource(t *testing.T, resource *schema.Resource) {
 	t.Helper()
 	for _, columnName := range resource.Table.Columns.Names() {
-		if resource.Get(columnName) == nil {
+
+		if resource.Get(columnName) == nil && !resource.Table.Columns.Get(columnName).IgnoreInTests {
 			t.Errorf("table: %s with unset column %s", resource.Table.Name, columnName)
 		}
 	}

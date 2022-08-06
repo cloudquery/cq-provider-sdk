@@ -24,6 +24,10 @@ type Options struct {
 	DestinationPlugin plugins.DestinationPlugin
 }
 
+const (
+	serveShort = `Start plugin server`
+)
+
 func newCmdServe(opts Options) *cobra.Command {
 	var address string
 	var network string
@@ -31,8 +35,8 @@ func newCmdServe(opts Options) *cobra.Command {
 	logFormat := newEnum([]string{"text", "json"}, "text")
 	cmd := &cobra.Command{
 		Use:   "serve",
-		Short: "serve cloudquery plugin",
-		Long:  "serve cloudquery plugin",
+		Short: serveShort,
+		Long:  serveShort,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			zerologLevel, err := zerolog.ParseLevel(logLevel.String())
@@ -84,9 +88,7 @@ func newCmdServe(opts Options) *cobra.Command {
 
 func newCmdRoot(opts Options) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "plugin",
-		Short: "cloudquery source plugin",
-		Long:  "cloudquery source plugin",
+		Use: "plugin <command>",
 	}
 	cmd.AddCommand(newCmdServe(opts))
 	cmd.AddCommand(newCmdDoc(opts))

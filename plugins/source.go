@@ -64,10 +64,10 @@ func (p *SourcePlugin) Init(ctx context.Context, s spec.SourceSpec) (*gojsonsche
 	}
 	p.clientMeta, err = p.Configure(ctx, p, s)
 	if err != nil {
-		return nil, fmt.Errorf("failed to configure source plugin: %w", err)
+		return res, fmt.Errorf("failed to configure source plugin: %w", err)
 	}
 	p.spec = s
-	return nil, nil
+	return res, nil
 }
 
 // Fetch fetches data acording to source configuration and
