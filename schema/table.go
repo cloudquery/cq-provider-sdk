@@ -96,11 +96,11 @@ func (t Table) Resolve(ctx context.Context, meta ClientMeta, parent *Resource, r
 			}
 			close(res)
 		}()
-		meta.Logger().Info().Str("table_name", t.Name).Msg("table resolver started")
+		meta.Logger().Debug().Str("table_name", t.Name).Msg("table resolver started")
 		if err := t.Resolver(ctx, meta, parent, res); err != nil {
 			meta.Logger().Error().Str("table_name", t.Name).Err(err).Msg("table resolver finished with error")
 		}
-		meta.Logger().Info().Str("table_name", t.Name).Msg("table resolver finished successfully")
+		meta.Logger().Debug().Str("table_name", t.Name).Msg("table resolver finished successfully")
 	}()
 
 	// each result is an array of interface{}
@@ -113,11 +113,11 @@ func (t Table) Resolve(ctx context.Context, meta ClientMeta, parent *Resource, r
 			resource := NewResourceData(&t, parent, objects[i])
 			t.resolveColumns(ctx, meta, resource)
 			if t.PostResourceResolver != nil {
-				meta.Logger().Debug().Str("table_name", t.Name).Msg("post resource resolver started")
+				meta.Logger().Trace().Str("table_name", t.Name).Msg("post resource resolver started")
 				if err := t.PostResourceResolver(ctx, meta, resource); err != nil {
 					meta.Logger().Error().Str("table_name", t.Name).Err(err).Msg("post resource resolver finished with error")
 				}
-				meta.Logger().Debug().Str("table_name", t.Name).Msg("post resource resolver finished successfully")
+				meta.Logger().Trace().Str("table_name", t.Name).Msg("post resource resolver finished successfully")
 			}
 			resolvedResources <- resource
 			for _, rel := range t.Relations {
@@ -130,18 +130,19 @@ func (t Table) Resolve(ctx context.Context, meta ClientMeta, parent *Resource, r
 func (t Table) resolveColumns(ctx context.Context, meta ClientMeta, resource *Resource) {
 	for _, c := range t.Columns {
 		if c.Resolver != nil {
-			meta.Logger().Debug().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver custom started")
+			meta.Logger().Trace().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver custom started")
 			if err := c.Resolver(ctx, meta, resource, c); err != nil {
 				meta.Logger().Error().Str("colum_name", c.Name).Str("table_name", t.Name).Err(err).Msg("column resolver finished with error")
 			}
-			meta.Logger().Debug().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver finished successfully")
+			meta.Logger().Trace().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver finished successfully")
 		} else {
-			meta.Logger().Debug().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver default started")
+			meta.Logger().Trace().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver default started")
 			// base use case: try to get column with CamelCase name
 			v := funk.Get(resource.Item, strcase.ToCamel(c.Name), funk.WithAllowZero())
 			if err := resource.Set(c.Name, v); err != nil {
 				meta.Logger().Error().Str("colum_name", c.Name).Str("table_name", t.Name).Err(err).Msg("column resolver default finished with error")
 			}
+			meta.Logger().Trace().Str("colum_name", c.Name).Str("table_name", t.Name).Msg("column resolver default finished successfully")
 		}
 	}
 }

@@ -12,9 +12,11 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/internal/pb"
 	"github.com/cloudquery/cq-provider-sdk/schema"
 	"github.com/cloudquery/cq-provider-sdk/spec"
+	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack/v5"
 	"github.com/xeipuuv/gojsonschema"
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v3"
 )
 
 type SourceClient struct {
@@ -47,6 +49,22 @@ func (c *SourceClient) GetTables(ctx context.Context) ([]*schema.Table, error) {
 	return tables, nil
 }
 
+func (c *SourceClient) Configure(ctx context.Context, s spec.SourceSpec) (*gojsonschema.Result, error) {
+	b, err := yaml.Marshal(s)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal source spec")
+	}
+	res, err := c.pbClient.Configure(ctx, &pb.Configure_Request{Config: b})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure source")
+	}
+	var validationResult gojsonschema.Result
+	if err := msgpack.Unmarshal(res.JsonschemaResult, &validationResult); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal validation result")
+	}
+	return &validationResult, nil
+}
+
 func (c *SourceClient) GetExampleConfig(ctx context.Context) (string, error) {
 	res, err := c.pbClient.GetExampleConfig(ctx, &pb.GetExampleConfig_Request{})
 	if err != nil {
@@ -67,24 +85,18 @@ func (c *SourceClient) GetExampleConfig(ctx context.Context) (string, error) {
 	return tpl.String(), nil
 }
 
-func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan<- []byte) (*gojsonschema.Result, error) {
-	stream, err := c.pbClient.Fetch(ctx, &pb.Fetch_Request{
-		Config: []byte{},
-	})
+func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan<- []byte) error {
+	stream, err := c.pbClient.Fetch(ctx, &pb.Fetch_Request{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch resources: %w", err)
+		return fmt.Errorf("failed to fetch resources: %w", err)
 	}
 	for {
 		r, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
-				var result gojsonschema.Result
-				if err := msgpack.Unmarshal(r.JsonschemaResult, &result); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal jsonschema result: %w", err)
-				}
-				return &result, nil
+				return nil
 			}
-			return nil, fmt.Errorf("failed to fetch resources from stream: %w", err)
+			return fmt.Errorf("failed to fetch resources from stream: %w", err)
 		}
 		res <- r.Resources
 	}

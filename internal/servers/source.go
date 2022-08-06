@@ -8,10 +8,8 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/plugins"
 	"github.com/cloudquery/cq-provider-sdk/schema"
 	"github.com/cloudquery/cq-provider-sdk/spec"
+	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack/v5"
-	"github.com/xeipuuv/gojsonschema"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v3"
 )
 
@@ -23,7 +21,7 @@ type SourceServer struct {
 func (s *SourceServer) GetTables(context.Context, *pb.GetTables_Request) (*pb.GetTables_Response, error) {
 	b, err := msgpack.Marshal(s.Plugin.Tables)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal tables: %w", err)
+		return nil, errors.Wrap(err, "failed to marshal tables")
 	}
 	return &pb.GetTables_Response{
 		Tables: b,
@@ -40,11 +38,11 @@ func (s *SourceServer) GetExampleConfig(context.Context, *pb.GetExampleConfig_Re
 func (s *SourceServer) Configure(ctx context.Context, req *pb.Configure_Request) (*pb.Configure_Response, error) {
 	var spec spec.SourceSpec
 	if err := yaml.Unmarshal(req.Config, &spec); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to unmarshal spec: %v", err)
+		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 	jsonschemaResult, err := s.Plugin.Init(ctx, spec)
 	if err != nil {
-		return nil, fmt.Errorf("failed to configure source: %w", err)
+		return nil, errors.Wrap(err, "failed to configure source")
 	}
 	b, err := msgpack.Marshal(jsonschemaResult)
 	if err != nil {
@@ -58,7 +56,6 @@ func (s *SourceServer) Configure(ctx context.Context, req *pb.Configure_Request)
 func (s *SourceServer) Fetch(req *pb.Fetch_Request, stream pb.Source_FetchServer) error {
 	resources := make(chan *schema.Resource)
 	var fetchErr error
-	var jsonSchemaResult *gojsonschema.Result
 	go func() {
 		defer close(resources)
 		if err := s.Plugin.Fetch(stream.Context(), resources); err != nil {
@@ -76,14 +73,6 @@ func (s *SourceServer) Fetch(req *pb.Fetch_Request, stream pb.Source_FetchServer
 	if fetchErr != nil {
 		return fetchErr
 	}
-	if jsonSchemaResult != nil {
-		b, err := msgpack.Marshal(jsonSchemaResult)
-		if err != nil {
-			return fmt.Errorf("failed to marshal json schema result: %w", err)
-		}
-		stream.Send(&pb.Fetch_Response{
-			JsonschemaResult: b,
-		})
-	}
+
 	return nil
 }

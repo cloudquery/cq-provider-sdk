@@ -66,9 +66,11 @@ func newCmdServe(opts Options) *cobra.Command {
 				// grpc.ChainUnaryInterceptor(),
 			)
 			if opts.SourcePlugin != nil {
+				opts.SourcePlugin.Logger = logger
 				pb.RegisterSourceServer(s, &servers.SourceServer{Plugin: opts.SourcePlugin})
 			}
 			if opts.DestinationPlugin != nil {
+				opts.SourcePlugin.Logger = logger
 				pb.RegisterDestinationServer(s, &servers.DestinationServer{Plugin: opts.DestinationPlugin})
 			}
 

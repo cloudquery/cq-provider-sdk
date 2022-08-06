@@ -55,7 +55,7 @@ func (c *DestinationClient) GetExampleConfig(ctx context.Context) (string, error
 	return string(res.Config), nil
 }
 
-func (c *DestinationClient) Save(ctx context.Context, resources <-chan []byte) error {
+func (c *DestinationClient) Save(ctx context.Context, resources []*schema.Resource) error {
 	var saveClient pb.Destination_SaveClient
 	var err error
 	if c.pbClient != nil {
@@ -64,19 +64,13 @@ func (c *DestinationClient) Save(ctx context.Context, resources <-chan []byte) e
 			return fmt.Errorf("failed to create save client: %w", err)
 		}
 	}
-	for res := range resources {
-		if c.localClient != nil {
-			var resources []*schema.Resource
-			if err := yaml.Unmarshal(res, &resources); err != nil {
-				return fmt.Errorf("failed to unmarshal resources: %w", err)
-			}
-			if err := c.localClient.Save(ctx, resources); err != nil {
-				return fmt.Errorf("failed to save resources: %w", err)
-			}
-		} else {
-			if err := saveClient.Send(&pb.Save_Request{Resources: res}); err != nil {
-				return err
-			}
+	if c.localClient != nil {
+		if err := c.localClient.Save(ctx, resources); err != nil {
+			return fmt.Errorf("failed to save resources: %w", err)
+		}
+	} else {
+		if err := saveClient.Send(&pb.Save_Request{Resources: resources}); err != nil {
+			return err
 		}
 	}
 	return nil
