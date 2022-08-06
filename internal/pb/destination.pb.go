@@ -20,44 +20,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Configure struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *Configure) Reset() {
-	*x = Configure{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_pb_destination_proto_msgTypes[0]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *Configure) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Configure) ProtoMessage() {}
-
-func (x *Configure) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_pb_destination_proto_msgTypes[0]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Configure.ProtoReflect.Descriptor instead.
-func (*Configure) Descriptor() ([]byte, []int) {
-	return file_internal_pb_destination_proto_rawDescGZIP(), []int{0}
-}
-
 type CreateTables struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -67,7 +29,7 @@ type CreateTables struct {
 func (x *CreateTables) Reset() {
 	*x = CreateTables{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_pb_destination_proto_msgTypes[1]
+		mi := &file_internal_pb_destination_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -80,7 +42,7 @@ func (x *CreateTables) String() string {
 func (*CreateTables) ProtoMessage() {}
 
 func (x *CreateTables) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_pb_destination_proto_msgTypes[1]
+	mi := &file_internal_pb_destination_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -93,7 +55,7 @@ func (x *CreateTables) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTables.ProtoReflect.Descriptor instead.
 func (*CreateTables) Descriptor() ([]byte, []int) {
-	return file_internal_pb_destination_proto_rawDescGZIP(), []int{1}
+	return file_internal_pb_destination_proto_rawDescGZIP(), []int{0}
 }
 
 type Save struct {
@@ -105,7 +67,7 @@ type Save struct {
 func (x *Save) Reset() {
 	*x = Save{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_pb_destination_proto_msgTypes[2]
+		mi := &file_internal_pb_destination_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -118,7 +80,7 @@ func (x *Save) String() string {
 func (*Save) ProtoMessage() {}
 
 func (x *Save) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_pb_destination_proto_msgTypes[2]
+	mi := &file_internal_pb_destination_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -131,93 +93,7 @@ func (x *Save) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Save.ProtoReflect.Descriptor instead.
 func (*Save) Descriptor() ([]byte, []int) {
-	return file_internal_pb_destination_proto_rawDescGZIP(), []int{2}
-}
-
-type Configure_Request struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	// marshlled spec.DestinationSpec
-	DestinationSpec []byte `protobuf:"bytes,1,opt,name=destination_spec,json=destinationSpec,proto3" json:"destination_spec,omitempty"`
-}
-
-func (x *Configure_Request) Reset() {
-	*x = Configure_Request{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_pb_destination_proto_msgTypes[3]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *Configure_Request) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Configure_Request) ProtoMessage() {}
-
-func (x *Configure_Request) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_pb_destination_proto_msgTypes[3]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Configure_Request.ProtoReflect.Descriptor instead.
-func (*Configure_Request) Descriptor() ([]byte, []int) {
-	return file_internal_pb_destination_proto_rawDescGZIP(), []int{0, 0}
-}
-
-func (x *Configure_Request) GetDestinationSpec() []byte {
-	if x != nil {
-		return x.DestinationSpec
-	}
-	return nil
-}
-
-type Configure_Response struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *Configure_Response) Reset() {
-	*x = Configure_Response{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_pb_destination_proto_msgTypes[4]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *Configure_Response) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Configure_Response) ProtoMessage() {}
-
-func (x *Configure_Response) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_pb_destination_proto_msgTypes[4]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Configure_Response.ProtoReflect.Descriptor instead.
-func (*Configure_Response) Descriptor() ([]byte, []int) {
-	return file_internal_pb_destination_proto_rawDescGZIP(), []int{0, 1}
+	return file_internal_pb_destination_proto_rawDescGZIP(), []int{1}
 }
 
 type CreateTables_Request struct {
@@ -232,7 +108,7 @@ type CreateTables_Request struct {
 func (x *CreateTables_Request) Reset() {
 	*x = CreateTables_Request{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_pb_destination_proto_msgTypes[5]
+		mi := &file_internal_pb_destination_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -245,7 +121,7 @@ func (x *CreateTables_Request) String() string {
 func (*CreateTables_Request) ProtoMessage() {}
 
 func (x *CreateTables_Request) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_pb_destination_proto_msgTypes[5]
+	mi := &file_internal_pb_destination_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -258,7 +134,7 @@ func (x *CreateTables_Request) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTables_Request.ProtoReflect.Descriptor instead.
 func (*CreateTables_Request) Descriptor() ([]byte, []int) {
-	return file_internal_pb_destination_proto_rawDescGZIP(), []int{1, 0}
+	return file_internal_pb_destination_proto_rawDescGZIP(), []int{0, 0}
 }
 
 func (x *CreateTables_Request) GetTables() []byte {
@@ -277,7 +153,7 @@ type CreateTables_Response struct {
 func (x *CreateTables_Response) Reset() {
 	*x = CreateTables_Response{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_pb_destination_proto_msgTypes[6]
+		mi := &file_internal_pb_destination_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -290,7 +166,7 @@ func (x *CreateTables_Response) String() string {
 func (*CreateTables_Response) ProtoMessage() {}
 
 func (x *CreateTables_Response) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_pb_destination_proto_msgTypes[6]
+	mi := &file_internal_pb_destination_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -303,7 +179,7 @@ func (x *CreateTables_Response) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTables_Response.ProtoReflect.Descriptor instead.
 func (*CreateTables_Response) Descriptor() ([]byte, []int) {
-	return file_internal_pb_destination_proto_rawDescGZIP(), []int{1, 1}
+	return file_internal_pb_destination_proto_rawDescGZIP(), []int{0, 1}
 }
 
 type Save_Request struct {
@@ -318,7 +194,7 @@ type Save_Request struct {
 func (x *Save_Request) Reset() {
 	*x = Save_Request{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_pb_destination_proto_msgTypes[7]
+		mi := &file_internal_pb_destination_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -331,7 +207,7 @@ func (x *Save_Request) String() string {
 func (*Save_Request) ProtoMessage() {}
 
 func (x *Save_Request) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_pb_destination_proto_msgTypes[7]
+	mi := &file_internal_pb_destination_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -344,7 +220,7 @@ func (x *Save_Request) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Save_Request.ProtoReflect.Descriptor instead.
 func (*Save_Request) Descriptor() ([]byte, []int) {
-	return file_internal_pb_destination_proto_rawDescGZIP(), []int{2, 0}
+	return file_internal_pb_destination_proto_rawDescGZIP(), []int{1, 0}
 }
 
 func (x *Save_Request) GetResources() []byte {
@@ -366,7 +242,7 @@ type Save_Response struct {
 func (x *Save_Response) Reset() {
 	*x = Save_Response{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_internal_pb_destination_proto_msgTypes[8]
+		mi := &file_internal_pb_destination_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -379,7 +255,7 @@ func (x *Save_Response) String() string {
 func (*Save_Response) ProtoMessage() {}
 
 func (x *Save_Response) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_pb_destination_proto_msgTypes[8]
+	mi := &file_internal_pb_destination_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -392,7 +268,7 @@ func (x *Save_Response) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Save_Response.ProtoReflect.Descriptor instead.
 func (*Save_Response) Descriptor() ([]byte, []int) {
-	return file_internal_pb_destination_proto_rawDescGZIP(), []int{2, 1}
+	return file_internal_pb_destination_proto_rawDescGZIP(), []int{1, 1}
 }
 
 func (x *Save_Response) GetError() string {
@@ -408,41 +284,36 @@ var file_internal_pb_destination_proto_rawDesc = []byte{
 	0x0a, 0x1d, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x70, 0x62, 0x2f, 0x64, 0x65,
 	0x73, 0x74, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12,
 	0x05, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x16, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c,
-	0x2f, 0x70, 0x62, 0x2f, 0x62, 0x61, 0x73, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x4d,
-	0x0a, 0x09, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x75, 0x72, 0x65, 0x1a, 0x34, 0x0a, 0x07, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x29, 0x0a, 0x10, 0x64, 0x65, 0x73, 0x74, 0x69, 0x6e,
-	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x73, 0x70, 0x65, 0x63, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c,
-	0x52, 0x0f, 0x64, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x53, 0x70, 0x65,
-	0x63, 0x1a, 0x0a, 0x0a, 0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x3d, 0x0a,
-	0x0c, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x73, 0x1a, 0x21, 0x0a,
-	0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x74, 0x61, 0x62, 0x6c,
-	0x65, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x73,
-	0x1a, 0x0a, 0x0a, 0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x51, 0x0a, 0x04,
-	0x53, 0x61, 0x76, 0x65, 0x1a, 0x27, 0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
-	0x1c, 0x0a, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x0c, 0x52, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x1a, 0x20, 0x0a,
-	0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x65, 0x72, 0x72,
-	0x6f, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x32,
-	0xa6, 0x02, 0x0a, 0x0b, 0x44, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12,
-	0x40, 0x0a, 0x09, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x75, 0x72, 0x65, 0x12, 0x18, 0x2e, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x75, 0x72, 0x65, 0x2e, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x19, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43,
-	0x6f, 0x6e, 0x66, 0x69, 0x67, 0x75, 0x72, 0x65, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
-	0x65, 0x12, 0x55, 0x0a, 0x10, 0x47, 0x65, 0x74, 0x45, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x43,
-	0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x1f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65,
-	0x74, 0x45, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x20, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47,
+	0x2f, 0x70, 0x62, 0x2f, 0x62, 0x61, 0x73, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x3d,
+	0x0a, 0x0c, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x73, 0x1a, 0x21,
+	0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x74, 0x61, 0x62,
+	0x6c, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x74, 0x61, 0x62, 0x6c, 0x65,
+	0x73, 0x1a, 0x0a, 0x0a, 0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x51, 0x0a,
+	0x04, 0x53, 0x61, 0x76, 0x65, 0x1a, 0x27, 0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x12, 0x1c, 0x0a, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0c, 0x52, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x1a, 0x20,
+	0x0a, 0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x65, 0x72,
+	0x72, 0x6f, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72,
+	0x32, 0xa6, 0x02, 0x0a, 0x0b, 0x44, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x12, 0x40, 0x0a, 0x09, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x75, 0x72, 0x65, 0x12, 0x18, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x75, 0x72, 0x65, 0x2e,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x19, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e,
+	0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x75, 0x72, 0x65, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x55, 0x0a, 0x10, 0x47, 0x65, 0x74, 0x45, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65,
+	0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x1f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47,
 	0x65, 0x74, 0x45, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e,
-	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x33, 0x0a, 0x04, 0x53, 0x61, 0x76, 0x65,
-	0x12, 0x13, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x61, 0x76, 0x65, 0x2e, 0x52, 0x65,
-	0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x14, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x61,
-	0x76, 0x65, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x28, 0x01, 0x12, 0x49, 0x0a,
-	0x0c, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x73, 0x12, 0x1b, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x61, 0x62, 0x6c,
-	0x65, 0x73, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1c, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x2e, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x73, 0x2e,
-	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x42, 0x05, 0x5a, 0x03, 0x2f, 0x70, 0x62, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x20, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e,
+	0x47, 0x65, 0x74, 0x45, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67,
+	0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x33, 0x0a, 0x04, 0x53, 0x61, 0x76,
+	0x65, 0x12, 0x13, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x61, 0x76, 0x65, 0x2e, 0x52,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x14, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53,
+	0x61, 0x76, 0x65, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x28, 0x01, 0x12, 0x49,
+	0x0a, 0x0c, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x73, 0x12, 0x1b,
+	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x61, 0x62,
+	0x6c, 0x65, 0x73, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1c, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x73,
+	0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x42, 0x05, 0x5a, 0x03, 0x2f, 0x70, 0x62,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -457,34 +328,33 @@ func file_internal_pb_destination_proto_rawDescGZIP() []byte {
 	return file_internal_pb_destination_proto_rawDescData
 }
 
-var file_internal_pb_destination_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_internal_pb_destination_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_internal_pb_destination_proto_goTypes = []interface{}{
-	(*Configure)(nil),                 // 0: proto.Configure
-	(*CreateTables)(nil),              // 1: proto.CreateTables
-	(*Save)(nil),                      // 2: proto.Save
-	(*Configure_Request)(nil),         // 3: proto.Configure.Request
-	(*Configure_Response)(nil),        // 4: proto.Configure.Response
-	(*CreateTables_Request)(nil),      // 5: proto.CreateTables.Request
-	(*CreateTables_Response)(nil),     // 6: proto.CreateTables.Response
-	(*Save_Request)(nil),              // 7: proto.Save.Request
-	(*Save_Response)(nil),             // 8: proto.Save.Response
-	(*GetExampleConfig_Request)(nil),  // 9: proto.GetExampleConfig.Request
-	(*GetExampleConfig_Response)(nil), // 10: proto.GetExampleConfig.Response
+	(*CreateTables)(nil),              // 0: proto.CreateTables
+	(*Save)(nil),                      // 1: proto.Save
+	(*CreateTables_Request)(nil),      // 2: proto.CreateTables.Request
+	(*CreateTables_Response)(nil),     // 3: proto.CreateTables.Response
+	(*Save_Request)(nil),              // 4: proto.Save.Request
+	(*Save_Response)(nil),             // 5: proto.Save.Response
+	(*Configure_Request)(nil),         // 6: proto.Configure.Request
+	(*GetExampleConfig_Request)(nil),  // 7: proto.GetExampleConfig.Request
+	(*Configure_Response)(nil),        // 8: proto.Configure.Response
+	(*GetExampleConfig_Response)(nil), // 9: proto.GetExampleConfig.Response
 }
 var file_internal_pb_destination_proto_depIdxs = []int32{
-	3,  // 0: proto.Destination.Configure:input_type -> proto.Configure.Request
-	9,  // 1: proto.Destination.GetExampleConfig:input_type -> proto.GetExampleConfig.Request
-	7,  // 2: proto.Destination.Save:input_type -> proto.Save.Request
-	5,  // 3: proto.Destination.CreateTables:input_type -> proto.CreateTables.Request
-	4,  // 4: proto.Destination.Configure:output_type -> proto.Configure.Response
-	10, // 5: proto.Destination.GetExampleConfig:output_type -> proto.GetExampleConfig.Response
-	8,  // 6: proto.Destination.Save:output_type -> proto.Save.Response
-	6,  // 7: proto.Destination.CreateTables:output_type -> proto.CreateTables.Response
-	4,  // [4:8] is the sub-list for method output_type
-	0,  // [0:4] is the sub-list for method input_type
-	0,  // [0:0] is the sub-list for extension type_name
-	0,  // [0:0] is the sub-list for extension extendee
-	0,  // [0:0] is the sub-list for field type_name
+	6, // 0: proto.Destination.Configure:input_type -> proto.Configure.Request
+	7, // 1: proto.Destination.GetExampleConfig:input_type -> proto.GetExampleConfig.Request
+	4, // 2: proto.Destination.Save:input_type -> proto.Save.Request
+	2, // 3: proto.Destination.CreateTables:input_type -> proto.CreateTables.Request
+	8, // 4: proto.Destination.Configure:output_type -> proto.Configure.Response
+	9, // 5: proto.Destination.GetExampleConfig:output_type -> proto.GetExampleConfig.Response
+	5, // 6: proto.Destination.Save:output_type -> proto.Save.Response
+	3, // 7: proto.Destination.CreateTables:output_type -> proto.CreateTables.Response
+	4, // [4:8] is the sub-list for method output_type
+	0, // [0:4] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_internal_pb_destination_proto_init() }
@@ -495,18 +365,6 @@ func file_internal_pb_destination_proto_init() {
 	file_internal_pb_base_proto_init()
 	if !protoimpl.UnsafeEnabled {
 		file_internal_pb_destination_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Configure); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_internal_pb_destination_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CreateTables); i {
 			case 0:
 				return &v.state
@@ -518,7 +376,7 @@ func file_internal_pb_destination_proto_init() {
 				return nil
 			}
 		}
-		file_internal_pb_destination_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_internal_pb_destination_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Save); i {
 			case 0:
 				return &v.state
@@ -530,31 +388,7 @@ func file_internal_pb_destination_proto_init() {
 				return nil
 			}
 		}
-		file_internal_pb_destination_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Configure_Request); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_internal_pb_destination_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Configure_Response); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_internal_pb_destination_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_internal_pb_destination_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CreateTables_Request); i {
 			case 0:
 				return &v.state
@@ -566,7 +400,7 @@ func file_internal_pb_destination_proto_init() {
 				return nil
 			}
 		}
-		file_internal_pb_destination_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+		file_internal_pb_destination_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CreateTables_Response); i {
 			case 0:
 				return &v.state
@@ -578,7 +412,7 @@ func file_internal_pb_destination_proto_init() {
 				return nil
 			}
 		}
-		file_internal_pb_destination_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+		file_internal_pb_destination_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Save_Request); i {
 			case 0:
 				return &v.state
@@ -590,7 +424,7 @@ func file_internal_pb_destination_proto_init() {
 				return nil
 			}
 		}
-		file_internal_pb_destination_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+		file_internal_pb_destination_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Save_Response); i {
 			case 0:
 				return &v.state
@@ -609,7 +443,7 @@ func file_internal_pb_destination_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_internal_pb_destination_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

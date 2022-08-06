@@ -7,8 +7,12 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/internal/pb"
 	"github.com/cloudquery/cq-provider-sdk/plugins"
 	"github.com/cloudquery/cq-provider-sdk/schema"
+	"github.com/cloudquery/cq-provider-sdk/spec"
 	"github.com/vmihailenco/msgpack/v5"
 	"github.com/xeipuuv/gojsonschema"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"gopkg.in/yaml.v3"
 )
 
 type SourceServer struct {
@@ -27,7 +31,28 @@ func (s *SourceServer) GetTables(context.Context, *pb.GetTables_Request) (*pb.Ge
 }
 
 func (s *SourceServer) GetExampleConfig(context.Context, *pb.GetExampleConfig_Request) (*pb.GetExampleConfig_Response, error) {
-	return &pb.GetExampleConfig_Response{Config: s.Plugin.ExampleConfig}, nil
+	return &pb.GetExampleConfig_Response{
+		Name:    s.Plugin.Name,
+		Version: s.Plugin.Version,
+		Config:  s.Plugin.ExampleConfig}, nil
+}
+
+func (s *SourceServer) Configure(ctx context.Context, req *pb.Configure_Request) (*pb.Configure_Response, error) {
+	var spec spec.SourceSpec
+	if err := yaml.Unmarshal(req.Config, &spec); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to unmarshal spec: %v", err)
+	}
+	jsonschemaResult, err := s.Plugin.Init(ctx, spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure source: %w", err)
+	}
+	b, err := msgpack.Marshal(jsonschemaResult)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal json schema result: %w", err)
+	}
+	return &pb.Configure_Response{
+		JsonschemaResult: b,
+	}, nil
 }
 
 func (s *SourceServer) Fetch(req *pb.Fetch_Request, stream pb.Source_FetchServer) error {
@@ -35,9 +60,8 @@ func (s *SourceServer) Fetch(req *pb.Fetch_Request, stream pb.Source_FetchServer
 	var fetchErr error
 	var jsonSchemaResult *gojsonschema.Result
 	go func() {
-		var err error
 		defer close(resources)
-		if jsonSchemaResult, err = s.Plugin.Fetch(stream.Context(), req.Config, resources); err != nil {
+		if err := s.Plugin.Fetch(stream.Context(), resources); err != nil {
 			fetchErr = fmt.Errorf("failed to fetch resources: %w", err)
 		}
 	}()

@@ -9,22 +9,21 @@ service Source {
   rpc GetTables(GetTables.Request) returns (GetTables.Response);
   // Get an example configuration for the source plugin
   rpc GetExampleConfig(GetExampleConfig.Request) returns (GetExampleConfig.Response);
+  // Configure the source plugin with the given spec
+  rpc Configure(Configure.Request) returns (Configure.Response);
   // Fetch resources
   rpc Fetch(Fetch.Request) returns (stream Fetch.Response);
 }
 
 message Fetch {
   message Request {
-    // Holds information such as credentials, regions, accounts, etc'
-    bytes config = 1;
   }
   message Response {
     // marshalled []*schema.Resources
     bytes resources = 1;
-    // marshalled goschemajson.Result
-    bytes jsonschema_result = 2;
   }
 }
+
 
 message GetTables {
   message Request {}

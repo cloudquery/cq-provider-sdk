@@ -38,7 +38,7 @@ func (c *DestinationClient) Configure(ctx context.Context, spec spec.Destination
 	if err != nil {
 		return fmt.Errorf("failed to marshal spec: %w", err)
 	}
-	if _, err := c.pbClient.Configure(ctx, &pb.Configure_Request{DestinationSpec: b}); err != nil {
+	if _, err := c.pbClient.Configure(ctx, &pb.Configure_Request{Config: b}); err != nil {
 		return err
 	}
 	return nil

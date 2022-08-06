@@ -15,76 +15,72 @@ import (
 	"github.com/thoas/go-funk"
 	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/sync/semaphore"
-	"gopkg.in/yaml.v3"
 )
 
 //go:embed source_schema.json
-var sourceConfigSchema string
+var sourceSchema string
 
-const ExampleSourceConfig = `# max_goroutines to use when fetching. 0 means default and calculated by CloudQuery
-max_goroutines: 0
+const ExampleSourceConfig = `
+# max_goroutines to use when fetching. 0 means default and calculated by CloudQuery
+# max_goroutines: 0
 # By default cloudquery will fetch all tables in the source plugin
-tables: ["*"]
+# tables: ["*"]
 # skip_tables specify which tables to skip. especially useful when using "*" for tables
-skip_tables: []
+# skip_tables: []
 `
 
-// Provider is the base structure required to pass and serve an sdk provider.Provider
+// SourcePlugin is the base structure required to pass to sdk.serve
+// We take a similar/declerative approach to API here similar to Cobra
 type SourcePlugin struct {
 	// Name of plugin i.e aws,gcp, azure etc'
 	Name string
-	// Version of the provider
+	// Version of the plugin
 	Version string
-	// Configure the plugin and return the context
-	Configure func(zerolog.Logger, interface{}) (schema.ClientMeta, error)
-	// Tables is all tables supported by this plugin
+	// Called upon configure call to validate and init configuration
+	Configure func(context.Context, *SourcePlugin, spec.SourceSpec) (schema.ClientMeta, error)
+	// Tables is all tables supported by this source plugin
 	Tables []*schema.Table
-	// Configuration decoded from configure request
-	Config func() interface{}
+	// Specific Spec
+	Spec interface{}
+	// JsonSchema for specific source plugin spec
+	JsonSchema string
 	// ExampleConfig is the example configuration for this plugin
 	ExampleConfig string
 	// Logger to call, this logger is passed to the serve.Serve Client, if not define Serve will create one instead.
 	Logger zerolog.Logger
+
+	// Internal fields set by configure
+	clientMeta schema.ClientMeta
+	spec       spec.SourceSpec
+}
+
+func (p *SourcePlugin) Init(ctx context.Context, s spec.SourceSpec) (*gojsonschema.Result, error) {
+	res, err := spec.ValidateSpec(sourceSchema, s)
+	if err != nil {
+		return nil, err
+	}
+	if !res.Valid() {
+		return res, nil
+	}
+	p.clientMeta, err = p.Configure(ctx, p, s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure source plugin: %w", err)
+	}
+	p.spec = s
+	return nil, nil
 }
 
 // Fetch fetches data acording to source configuration and
-func (p *SourcePlugin) Fetch(ctx context.Context, config []byte, res chan<- *schema.Resource) (*gojsonschema.Result, error) {
-	sourceConfig := spec.SourceSpec{}
-	if err := yaml.Unmarshal(config, &sourceConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal generic configuration: %w", err)
-	}
-	schemaLoader := gojsonschema.NewStringLoader(sourceConfigSchema)
-	documentLoader := gojsonschema.NewGoLoader(sourceConfig)
-	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate configuration: %w", err)
-	}
-	if !result.Valid() {
-		return result, nil
-	}
-
-	pluginConfig := p.Config()
-	if err := sourceConfig.Configuration.Decode(pluginConfig); err != nil {
-		return nil, fmt.Errorf("failed to decode specific configuration: %w", err)
-	}
-
-	// var err error
-	meta, err := p.Configure(p.Logger, pluginConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to configure provider: %w", err)
-	}
-	if meta == nil {
-		return nil, fmt.Errorf("failed to configure provider: Configure can't return nil")
-	}
+func (p *SourcePlugin) Fetch(ctx context.Context, res chan<- *schema.Resource) error {
 
 	// if resources ["*"] is requested we will fetch all resources
-	tables, err := p.interpolateAllResources(sourceConfig.Tables)
+	tables, err := p.interpolateAllResources(p.spec.Tables)
 	if err != nil {
-		return nil, fmt.Errorf("failed to interpolate resources: %w", err)
+		return fmt.Errorf("failed to interpolate resources: %w", err)
 	}
 
 	// limiter used to limit the amount of resources fetched concurrently
-	maxGoroutines := sourceConfig.MaxGoRoutines
+	maxGoroutines := p.spec.MaxGoRoutines
 	if maxGoroutines == 0 {
 		maxGoroutines = limit.GetMaxGoRoutines()
 	}
@@ -94,19 +90,19 @@ func (p *SourcePlugin) Fetch(ctx context.Context, config []byte, res chan<- *sch
 	wg := sync.WaitGroup{}
 	for _, table := range p.Tables {
 		t := table
-		if funk.ContainsString(sourceConfig.SkipTables, table.Name) || !funk.ContainsString(tables, table.Name) {
+		if funk.ContainsString(p.spec.SkipTables, table.Name) || !funk.ContainsString(tables, table.Name) {
 			p.Logger.Info().Str("table", table.Name).Msg("skipping table")
 			continue
 		}
-		clients := []schema.ClientMeta{meta}
+		clients := []schema.ClientMeta{p.clientMeta}
 		if t.Multiplex != nil {
-			clients = table.Multiplex(meta)
+			clients = table.Multiplex(p.clientMeta)
 		}
 		for _, client := range clients {
 			c := client
 			if err := goroutinesSem.Acquire(ctx, 1); err != nil {
 				// this can happen if context was cancelled so we just break out of the loop
-				c.Logger().Error().Err(err).Msg("failed to acquire semaphore")
+				p.Logger.Error().Err(err).Msg("failed to acquire semaphore")
 				break
 			}
 			wg.Add(1)
@@ -117,7 +113,7 @@ func (p *SourcePlugin) Fetch(ctx context.Context, config []byte, res chan<- *sch
 		}
 	}
 	wg.Wait()
-	return nil, nil
+	return nil
 }
 
 func (p *SourcePlugin) interpolateAllResources(tables []string) ([]string, error) {

@@ -13,14 +13,6 @@ service Destination {
   rpc CreateTables(CreateTables.Request) returns (CreateTables.Response);
 }
 
-message Configure {
-  message Request {
-    // marshlled spec.DestinationSpec
-    bytes destination_spec = 1;
-  }
-  message Response {
-  }
-}
 
 message CreateTables {
   message Request {

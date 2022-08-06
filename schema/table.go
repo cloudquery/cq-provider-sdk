@@ -34,15 +34,13 @@ type Table struct {
 	// Relations are a set of related tables defines
 	Relations []*Table
 	// Resolver is the main entry point to fetching table data and
-	Resolver TableResolver
+	Resolver TableResolver `msgpack:"-"`
 	// Ignore errors checks if returned error from table resolver should be ignored.
-	IgnoreError IgnoreErrorFunc
+	IgnoreError IgnoreErrorFunc `msgpack:"-"`
 	// Multiplex returns re-purposed meta clients. The sdk will execute the table with each of them
-	Multiplex func(meta ClientMeta) []ClientMeta
-	// DeleteFilter returns a list of key/value pairs to add when truncating this table's data from the database.
-	DeleteFilter func(meta ClientMeta, parent *Resource) []interface{}
+	Multiplex func(meta ClientMeta) []ClientMeta `msgpack:"-"`
 	// Post resource resolver is called after all columns have been resolved, and before resource is inserted to database.
-	PostResourceResolver RowResolver
+	PostResourceResolver RowResolver `msgpack:"-"`
 	// Options allow modification of how the table is defined when created
 	Options TableCreationOptions
 

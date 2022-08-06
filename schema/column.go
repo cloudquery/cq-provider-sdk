@@ -50,7 +50,7 @@ type Column struct {
 	// Description about column, this description is added as a comment in the database
 	Description string
 	// Column Resolver allows to set you own data based on resolving this can be an API call or setting multiple embedded values etc'
-	Resolver ColumnResolver
+	Resolver ColumnResolver `msgpack:"-"`
 	// Creation options allow modifying how column is defined when table is created
 	CreationOptions ColumnCreationOptions
 	// IgnoreInTests is used to skip verifying the column is non-nil in integration tests.

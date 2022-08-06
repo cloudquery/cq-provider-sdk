@@ -9,6 +9,9 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/internal/pb"
 	"github.com/cloudquery/cq-provider-sdk/internal/servers"
 	"github.com/cloudquery/cq-provider-sdk/plugins"
+	grpczerolog "github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
+	middleware "github.com/grpc-ecosystem/go-grpc-middleware/v2"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -21,7 +24,7 @@ type Options struct {
 	DestinationPlugin plugins.DestinationPlugin
 }
 
-func newCmdServe(opts *Options) *cobra.Command {
+func newCmdServe(opts Options) *cobra.Command {
 	var address string
 	var network string
 	logLevel := newEnum([]string{"trace", "debug", "info", "warn", "error"}, "info")
@@ -47,7 +50,17 @@ func newCmdServe(opts *Options) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to listen: %w", err)
 			}
-			s := grpc.NewServer()
+			// See logging pattern https://github.com/grpc-ecosystem/go-grpc-middleware/blob/v2/providers/zerolog/examples_test.go
+			s := grpc.NewServer(
+				middleware.WithUnaryServerChain(
+					logging.UnaryServerInterceptor(grpczerolog.InterceptorLogger(logger)),
+				),
+				middleware.WithStreamServerChain(
+					logging.StreamServerInterceptor(grpczerolog.InterceptorLogger(logger)),
+				),
+				// grpc.ChainStreamInterceptor(grpc_zero),
+				// grpc.ChainUnaryInterceptor(),
+			)
 			if opts.SourcePlugin != nil {
 				pb.RegisterSourceServer(s, &servers.SourceServer{Plugin: opts.SourcePlugin})
 			}
@@ -69,17 +82,18 @@ func newCmdServe(opts *Options) *cobra.Command {
 	return cmd
 }
 
-func newCmdRoot(opts *Options) *cobra.Command {
+func newCmdRoot(opts Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plugin",
 		Short: "cloudquery source plugin",
 		Long:  "cloudquery source plugin",
 	}
 	cmd.AddCommand(newCmdServe(opts))
+	cmd.AddCommand(newCmdDoc(opts))
 	return cmd
 }
 
-func Serve(opts *Options) {
+func Serve(opts Options) {
 	if err := newCmdRoot(opts).Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

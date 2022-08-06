@@ -8,7 +8,6 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/schema"
 	"github.com/cloudquery/faker/v3"
 	"github.com/georgysavva/scany/pgxscan"
-	"github.com/rs/zerolog"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -54,10 +53,10 @@ func TestResource(t *testing.T, tc ResourceTestCase) {
 	resources := make(chan *schema.Resource)
 	var fetchErr error
 	var result *gojsonschema.Result
-	tc.Plugin.Logger = zerolog.New(zerolog.NewTestWriter(t))
+	// tc.Plugin.Logger = zerolog.New(zerolog.NewTestWriter(t))
 	go func() {
 		defer close(resources)
-		result, fetchErr = tc.Plugin.Fetch(context.Background(), []byte(tc.Config), resources)
+		fetchErr = tc.Plugin.Fetch(context.Background(), resources)
 	}()
 	for resource := range resources {
 		validateResource(t, resource)

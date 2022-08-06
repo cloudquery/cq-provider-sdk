@@ -13,6 +13,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/schema"
 	"github.com/cloudquery/cq-provider-sdk/spec"
 	"github.com/vmihailenco/msgpack/v5"
+	"github.com/xeipuuv/gojsonschema"
 	"google.golang.org/grpc"
 )
 
@@ -46,14 +47,14 @@ func (c *SourceClient) GetTables(ctx context.Context) ([]*schema.Table, error) {
 	return tables, nil
 }
 
-func (c *SourceClient) GetExampleConfig(ctx context.Context) ([]byte, error) {
+func (c *SourceClient) GetExampleConfig(ctx context.Context) (string, error) {
 	res, err := c.pbClient.GetExampleConfig(ctx, &pb.GetExampleConfig_Request{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get example config: %w", err)
+		return "", fmt.Errorf("failed to get example config: %w", err)
 	}
 	t, err := template.New("source_plugin").Funcs(templateFuncMap()).Parse(sourcePluginExampleConfigTemplate)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse template: %w", err)
+		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 	var tpl bytes.Buffer
 	if err := t.Execute(&tpl, map[string]interface{}{
@@ -61,27 +62,30 @@ func (c *SourceClient) GetExampleConfig(ctx context.Context) ([]byte, error) {
 		"Version":             res.Version,
 		"PluginExampleConfig": string(res.Config),
 	}); err != nil {
-		return nil, fmt.Errorf("failed to generate example config: %w", err)
+		return "", fmt.Errorf("failed to generate example config: %w", err)
 	}
-	return tpl.Bytes(), nil
+	return tpl.String(), nil
 }
 
-func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan<- []byte) error {
+func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan<- []byte) (*gojsonschema.Result, error) {
 	stream, err := c.pbClient.Fetch(ctx, &pb.Fetch_Request{
 		Config: []byte{},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to fetch resources: %w", err)
+		return nil, fmt.Errorf("failed to fetch resources: %w", err)
 	}
 	for {
 		r, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
-				break
+				var result gojsonschema.Result
+				if err := msgpack.Unmarshal(r.JsonschemaResult, &result); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal jsonschema result: %w", err)
+				}
+				return &result, nil
 			}
-			return fmt.Errorf("failed to fetch resources from stream: %w", err)
+			return nil, fmt.Errorf("failed to fetch resources from stream: %w", err)
 		}
 		res <- r.Resources
 	}
-	return nil
 }
