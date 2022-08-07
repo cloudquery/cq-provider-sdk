@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### :spider: Fixed
 -->
 
+## [0.14.7](https://github.com/cloudquery/cq-provider-sdk/compare/v0.14.6...v0.14.7) (2022-08-02)
+
+
+### Bug Fixes
+
+* **deps:** Update module github.com/hashicorp/go-hclog to v1.2.2 ([#446](https://github.com/cloudquery/cq-provider-sdk/issues/446)) ([581f06e](https://github.com/cloudquery/cq-provider-sdk/commit/581f06e21f15fcc0f5d6cb13865b42b6aaf815c0))
+* **deps:** Update module google.golang.org/protobuf to v1.28.1 ([#447](https://github.com/cloudquery/cq-provider-sdk/issues/447)) ([6bdb035](https://github.com/cloudquery/cq-provider-sdk/commit/6bdb035acdb0a13c5bdb7b4994aadea0f740656c))
+* **deps:** Update tubone24/update_release digest to 2146f15 ([#417](https://github.com/cloudquery/cq-provider-sdk/issues/417)) ([a649972](https://github.com/cloudquery/cq-provider-sdk/commit/a64997254570929e47efdbe520d8e72e3beead5f))
+
 ## [0.14.6](https://github.com/cloudquery/cq-provider-sdk/compare/v0.14.5...v0.14.6) (2022-07-28)
 
 
