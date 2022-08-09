@@ -19,8 +19,8 @@ message Fetch {
   message Request {
   }
   message Response {
-    // marshalled []*schema.Resources
-    bytes resources = 1;
+    // marshalled *schema.Resources
+    bytes resource = 1;
   }
 }
 

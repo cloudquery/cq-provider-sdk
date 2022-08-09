@@ -8,6 +8,7 @@ import (
 	"github.com/cloudquery/cq-provider-sdk/plugins"
 	"github.com/cloudquery/cq-provider-sdk/schema"
 	"github.com/cloudquery/cq-provider-sdk/spec"
+	"github.com/vmihailenco/msgpack/v5"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
 )
@@ -55,7 +56,7 @@ func (c *DestinationClient) GetExampleConfig(ctx context.Context) (string, error
 	return string(res.Config), nil
 }
 
-func (c *DestinationClient) Save(ctx context.Context, resources []*schema.Resource) error {
+func (c *DestinationClient) Save(ctx context.Context, msg *FetchResultMessage) error {
 	var saveClient pb.Destination_SaveClient
 	var err error
 	if c.pbClient != nil {
@@ -65,14 +66,19 @@ func (c *DestinationClient) Save(ctx context.Context, resources []*schema.Resour
 		}
 	}
 	if c.localClient != nil {
-		if err := c.localClient.Save(ctx, resources); err != nil {
+		var resource schema.Resource
+		if err := msgpack.Unmarshal(msg.Resource, &resource); err != nil {
+			return fmt.Errorf("failed to unmarshal resources: %w", err)
+		}
+		if err := c.localClient.Save(ctx, []*schema.Resource{&resource}); err != nil {
 			return fmt.Errorf("failed to save resources: %w", err)
 		}
 	} else {
-		if err := saveClient.Send(&pb.Save_Request{Resources: resources}); err != nil {
+		if err := saveClient.Send(&pb.Save_Request{Resources: msg.Resource}); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 

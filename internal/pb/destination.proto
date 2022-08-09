@@ -25,8 +25,8 @@ message CreateTables {
 
 message Save {
   message Request {
-    // marshalled []*schema.Resources
-    bytes resources = 1;
+    // marshalled *schema.Resources
+    bytes resource = 1;
   }
   message Response {
     // marshalled goschemajson.Result

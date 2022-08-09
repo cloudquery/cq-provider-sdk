@@ -23,6 +23,10 @@ type SourceClient struct {
 	pbClient pb.SourceClient
 }
 
+type FetchResultMessage struct {
+	Resource []byte
+}
+
 const sourcePluginExampleConfigTemplate = `kind: source
 spec:
   name: {{.Name}}
@@ -85,7 +89,7 @@ func (c *SourceClient) GetExampleConfig(ctx context.Context) (string, error) {
 	return tpl.String(), nil
 }
 
-func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan<- []byte) error {
+func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan<- *FetchResultMessage) error {
 	stream, err := c.pbClient.Fetch(ctx, &pb.Fetch_Request{})
 	if err != nil {
 		return fmt.Errorf("failed to fetch resources: %w", err)
@@ -98,6 +102,8 @@ func (c *SourceClient) Fetch(ctx context.Context, spec spec.SourceSpec, res chan
 			}
 			return fmt.Errorf("failed to fetch resources from stream: %w", err)
 		}
-		res <- r.Resources
+		res <- &FetchResultMessage{
+			Resource: r.Resource,
+		}
 	}
 }

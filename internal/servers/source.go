@@ -2,7 +2,6 @@ package servers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloudquery/cq-provider-sdk/internal/pb"
 	"github.com/cloudquery/cq-provider-sdk/plugins"
@@ -46,7 +45,7 @@ func (s *SourceServer) Configure(ctx context.Context, req *pb.Configure_Request)
 	}
 	b, err := msgpack.Marshal(jsonschemaResult)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal json schema result: %w", err)
+		return nil, errors.Wrap(err, "failed to marshal json schema result")
 	}
 	return &pb.Configure_Response{
 		JsonschemaResult: b,
@@ -59,16 +58,18 @@ func (s *SourceServer) Fetch(req *pb.Fetch_Request, stream pb.Source_FetchServer
 	go func() {
 		defer close(resources)
 		if err := s.Plugin.Fetch(stream.Context(), resources); err != nil {
-			fetchErr = fmt.Errorf("failed to fetch resources: %w", err)
+			fetchErr = errors.Wrap(err, "failed to fetch resources")
 		}
 	}()
 
 	for resource := range resources {
 		b, err := msgpack.Marshal(resource)
 		if err != nil {
-			return fmt.Errorf("failed to marshal resource: %w", err)
+			return errors.Wrap(err, "failed to marshal resource")
 		}
-		stream.Send(&pb.Fetch_Response{Resources: b})
+		stream.Send(&pb.Fetch_Response{
+			Resource: b,
+		})
 	}
 	if fetchErr != nil {
 		return fetchErr

@@ -18,23 +18,23 @@ type Resource struct {
 	// Original resource item that wa from prior resolve
 	Item interface{}
 	// Set if this is an embedded table
-	Parent *Resource
+	Parent *Resource `msgpack:"parent"`
 	// internal fields
-	Table    *Table
-	data     map[string]interface{}
-	cqId     uuid.UUID
+	Table    *Table                 `msgpack:"table"`
+	Data     map[string]interface{} `msgpack:"data"`
+	cqId     uuid.UUID              `msgpack:"cq_id"`
 	metadata map[string]interface{}
-	columns  []string
+	CColumns []string `msgpack:"columns"`
 }
 
 func NewResourceData(t *Table, parent *Resource, item interface{}) *Resource {
 	return &Resource{
-		Item:    item,
-		Parent:  parent,
-		Table:   t,
-		data:    make(map[string]interface{}),
-		cqId:    uuid.New(),
-		columns: t.Columns.Names(),
+		Item:     item,
+		Parent:   parent,
+		Table:    t,
+		Data:     make(map[string]interface{}),
+		cqId:     uuid.New(),
+		CColumns: t.Columns.Names(),
 		// metadata: metadata,
 	}
 }
@@ -67,15 +67,15 @@ func NewResourceData(t *Table, parent *Resource, item interface{}) *Resource {
 // }
 
 func (r *Resource) Get(key string) interface{} {
-	return r.data[key]
+	return r.Data[key]
 }
 
 func (r *Resource) Set(key string, value interface{}) error {
-	columnExists := funk.ContainsString(r.columns, key)
+	columnExists := funk.ContainsString(r.CColumns, key)
 	if !columnExists {
 		return fmt.Errorf("column %s does not exist", key)
 	}
-	r.data[key] = value
+	r.Data[key] = value
 	return nil
 }
 
@@ -84,7 +84,7 @@ func (r *Resource) Id() uuid.UUID {
 }
 
 func (r *Resource) Columns() []string {
-	return r.columns
+	return r.CColumns
 }
 
 // func (r *Resource) Values() ([]interface{}, error) {
@@ -168,7 +168,7 @@ func (rr Resources) ColumnNames() []string {
 	if len(rr) == 0 {
 		return []string{}
 	}
-	return rr[0].columns
+	return rr[0].CColumns
 }
 
 func hashUUID(objs interface{}) (uuid.UUID, error) {
