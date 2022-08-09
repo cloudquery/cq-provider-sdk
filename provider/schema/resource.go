@@ -94,9 +94,27 @@ func (r *Resource) Values() ([]interface{}, error) {
 		if err := c.ValidateType(v); err != nil {
 			return nil, err
 		}
+
+		// If the column is a timestamp, change it to UTC before inserting
+		v = maybeChangeTimestampToUtc(v)
+
 		values = append(values, v)
 	}
 	return values, nil
+}
+
+func maybeChangeTimestampToUtc(value interface{}) interface{} {
+	switch concrete := value.(type) {
+	case time.Time:
+		return concrete.UTC()
+	case *time.Time:
+		if concrete != nil {
+			return concrete.UTC()
+		}
+		return value
+	default:
+		return value
+	}
 }
 
 func (r *Resource) GenerateCQId() error {

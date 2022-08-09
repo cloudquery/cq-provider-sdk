@@ -31,6 +31,20 @@ var testPrimaryKeyTable = &Table{
 	},
 }
 
+var testTimestampTable = &Table{
+	Name: "test_timestamp_table",
+	Columns: []Column{
+		{
+			Name: "name",
+			Type: TypeString,
+		},
+		{
+			Name: "time",
+			Type: TypeTimestamp,
+		},
+	},
+}
+
 // TestResourcePrimaryKey checks resource id generation when primary key is set on table
 func TestResourcePrimaryKey(t *testing.T) {
 	r := NewResourceData(PostgresDialect{}, testPrimaryKeyTable, nil, nil, nil, time.Now())
@@ -94,6 +108,34 @@ func TestResourceColumns(t *testing.T) {
 	// check non existing col
 	err = r.Set("non_exist_col", "test")
 	assert.Error(t, err)
+}
+
+func TestResourceColumnsNonUtcTimestamp(t *testing.T) {
+	exampleName := "name"
+
+	newYorkLocation, err := time.LoadLocation("America/New_York")
+	assert.Nil(t, err)
+
+	exampleTimeNewYork := time.Date(2022, 1, 1, 1, 1, 1, 1, newYorkLocation)
+
+	resource := NewResourceData(PostgresDialect{}, testTimestampTable, nil, nil, nil, time.Now())
+
+	err = resource.Set("time", exampleTimeNewYork)
+	assert.Nil(t, err)
+	err = resource.Set("name", exampleName)
+	assert.Nil(t, err)
+
+	values, err := resource.Values()
+	assert.Nil(t, err)
+
+	// First two 'values' are cq_id and cq_meta
+	assert.Equal(t, nil, values[0])
+	assert.Equal(t, nil, values[1])
+	assert.Equal(t, exampleName, values[2])
+
+	concreteValueTime := values[3].(time.Time)
+	assert.True(t, exampleTimeNewYork.Equal(concreteValueTime))
+	assert.Equal(t, time.UTC, concreteValueTime.Location())
 }
 
 func TestResources(t *testing.T) {
