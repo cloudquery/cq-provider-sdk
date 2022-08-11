@@ -2,6 +2,7 @@ package schema
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -39,6 +40,19 @@ var (
 			{
 				Name: "int64",
 				Type: TypeInt,
+			},
+		},
+	}
+	timestampTestTable = Table{
+		Name: "test_table_timestamp",
+		Columns: []Column{
+			{
+				Name: "name",
+				Type: TypeString,
+			},
+			{
+				Name: "time",
+				Type: TypeTimestamp,
 			},
 		},
 	}
@@ -186,4 +200,37 @@ func TestIntColumn(t *testing.T) {
 		_, err := PostgresDialect{}.GetResourceValues(&r)
 		assert.Nil(t, err)
 	}
+}
+
+func TestNonUtcTimestampColumn(t *testing.T) {
+	exampleName := "exampleName"
+
+	newYorkLocation, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		assert.FailNow(t, "failed to load location")
+	}
+
+	exampleNewYorkTime := time.Date(2001, 1, 1, 1, 1, 1, 1, newYorkLocation)
+
+	timestampResource := Resource{
+		data: map[string]interface{}{
+			"name": exampleName,
+			"time": exampleNewYorkTime,
+		},
+		table: &timestampTestTable,
+	}
+
+	values, err := PostgresDialect{}.GetResourceValues(&timestampResource)
+	if err != nil {
+		assert.FailNow(t, "GetResourceValues failed")
+	}
+
+	// First two 'values' are cq_id and cq_meta
+	assert.Equal(t, nil, values[0])
+	assert.Equal(t, nil, values[1])
+	assert.Equal(t, exampleName, values[2])
+
+	concreteValueTime := values[3].(time.Time)
+	assert.True(t, exampleNewYorkTime.Equal(concreteValueTime))
+	assert.Equal(t, time.UTC, concreteValueTime.Location())
 }

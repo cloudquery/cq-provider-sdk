@@ -257,6 +257,8 @@ func doResourceValues(dialect Dialect, r *Resource) ([]interface{}, error) {
 			default:
 				values = append(values, data)
 			}
+		case TypeTimestamp:
+			values = append(values, maybeChangeTimestampToUtc(v))
 		default:
 			values = append(values, v)
 		}
